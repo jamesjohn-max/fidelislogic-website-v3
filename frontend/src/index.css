@@ -1,0 +1,201 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* No font-family here. Tailwind preflight applies theme.fontFamily.sans; a
+   hardcoded stack at this specificity silently overrode it, which is why the
+   site rendered in the system font while a webfont was being downloaded. */
+body {
+    margin: 0;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+    font-family:
+        source-code-pro, Menlo, Monaco, Consolas, "Courier New", monospace;
+}
+
+@layer base {
+    :root {
+        --background: 0 0% 100%;
+        --foreground: 0 0% 3.9%;
+        --card: 0 0% 100%;
+        --card-foreground: 0 0% 3.9%;
+        --popover: 0 0% 100%;
+        --popover-foreground: 0 0% 3.9%;
+        --primary: 0 0% 9%;
+        --primary-foreground: 0 0% 98%;
+        --secondary: 0 0% 96.1%;
+        --secondary-foreground: 0 0% 9%;
+        --muted: 0 0% 96.1%;
+        --muted-foreground: 0 0% 45.1%;
+        --accent: 0 0% 96.1%;
+        --accent-foreground: 0 0% 9%;
+        --destructive: 0 84.2% 60.2%;
+        --destructive-foreground: 0 0% 98%;
+        --border: 0 0% 89.8%;
+        --input: 0 0% 89.8%;
+        --ring: 0 0% 3.9%;
+        --chart-1: 12 76% 61%;
+        --chart-2: 173 58% 39%;
+        --chart-3: 197 37% 24%;
+        --chart-4: 43 74% 66%;
+        --chart-5: 27 87% 67%;
+        --radius: 0.5rem;
+    }
+    .dark {
+        --background: 0 0% 3.9%;
+        --foreground: 0 0% 98%;
+        --card: 0 0% 3.9%;
+        --card-foreground: 0 0% 98%;
+        --popover: 0 0% 3.9%;
+        --popover-foreground: 0 0% 98%;
+        --primary: 0 0% 98%;
+        --primary-foreground: 0 0% 9%;
+        --secondary: 0 0% 14.9%;
+        --secondary-foreground: 0 0% 98%;
+        --muted: 0 0% 14.9%;
+        --muted-foreground: 0 0% 63.9%;
+        --accent: 0 0% 14.9%;
+        --accent-foreground: 0 0% 98%;
+        --destructive: 0 62.8% 30.6%;
+        --destructive-foreground: 0 0% 98%;
+        --border: 0 0% 14.9%;
+        --input: 0 0% 14.9%;
+        --ring: 0 0% 83.1%;
+        --chart-1: 220 70% 50%;
+        --chart-2: 160 60% 45%;
+        --chart-3: 30 80% 55%;
+        --chart-4: 280 65% 60%;
+        --chart-5: 340 75% 55%;
+    }
+}
+
+@layer base {
+    * {
+        @apply border-border;
+    }
+    body {
+        @apply bg-background text-foreground;
+    }
+}
+
+@layer base {
+    [data-debug-wrapper="true"] {
+        display: contents !important;
+    }
+
+    [data-debug-wrapper="true"] > * {
+        margin-left: inherit;
+        margin-right: inherit;
+        margin-top: inherit;
+        margin-bottom: inherit;
+        padding-left: inherit;
+        padding-right: inherit;
+        padding-top: inherit;
+        padding-bottom: inherit;
+        column-gap: inherit;
+        row-gap: inherit;
+        gap: inherit;
+        border-left-width: inherit;
+        border-right-width: inherit;
+        border-top-width: inherit;
+        border-bottom-width: inherit;
+        border-left-style: inherit;
+        border-right-style: inherit;
+        border-top-style: inherit;
+        border-bottom-style: inherit;
+        border-left-color: inherit;
+        border-right-color: inherit;
+        border-top-color: inherit;
+        border-bottom-color: inherit;
+    }
+}
+
+/* Shared interaction recipes. Use these instead of one-off hover classes so
+   every card, image and section label on the site behaves the same way. */
+@layer base {
+    /* Display face on page and section headings only. */
+    h1,
+    h2 {
+        font-family: theme('fontFamily.display');
+        font-weight: 600;
+        letter-spacing: -0.01em;
+    }
+}
+
+@layer components {
+    /* Clickable card: small lift, shadow and brand-blue border on hover. */
+    .card-interactive {
+        @apply transition-[transform,box-shadow,border-color,background-color] duration-200 ease-out-strong hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:translate-y-0;
+    }
+
+    /* Photo inside a `group` card: gentle zoom while the card is hovered. */
+    .image-zoom {
+        @apply transition-transform duration-300 ease-out-strong group-hover:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover:scale-100;
+    }
+
+    /* Small label above a section heading. Rendered as a <p>, never a heading. */
+    .section-label {
+        @apply text-sm font-semibold text-blue-600;
+    }
+}
+
+/* Entrance animations via @starting-style: an element with one of these
+   classes transitions in from the values below the first time it renders.
+   They animate the individual `translate` / `scale` properties so they compose
+   with any Tailwind `transform` utilities already on the element (e.g. the
+   -translate-x-1/2 that centres the Services dropdown). Browsers without
+   @starting-style support simply show the element immediately. */
+.enter-pop {
+    transform-origin: top center;
+    transition:
+        opacity 150ms cubic-bezier(0.23, 1, 0.32, 1),
+        scale 150ms cubic-bezier(0.23, 1, 0.32, 1),
+        translate 150ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.enter-rise {
+    transition:
+        opacity 240ms cubic-bezier(0.23, 1, 0.32, 1),
+        translate 240ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+@starting-style {
+    .enter-pop {
+        opacity: 0;
+        scale: 0.97;
+        translate: 0 -4px;
+    }
+
+    .enter-rise {
+        opacity: 0;
+        translate: 0 12px;
+    }
+}
+
+/* Reduced motion: keep the fade, drop the movement. */
+@media (prefers-reduced-motion: reduce) {
+    @starting-style {
+        .enter-pop,
+        .enter-rise {
+            scale: none;
+            translate: none;
+        }
+    }
+}
+
+/* Corner radius system:
+     buttons, inputs, selects ........ rounded-lg
+     inner tiles, logo boxes, notices . rounded-xl
+     cards and panels ................ rounded-2xl
+     badges, chips, floating buttons . rounded-full */
+
+/* Copy and layout conventions:
+     headings ........ sentence case, left-aligned ("Our capabilities")
+     names ........... keep their capitals wherever they appear: services,
+                       solutions, brands, products, Fidelis Logic, UAE
+     buttons, nav .... Title Case ("Book a Free Consultation", from
+                       consultationCta in data/siteContent.js)
+     CtaBand ......... the one centred heading, as the closing banner */

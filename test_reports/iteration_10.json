@@ -1,0 +1,44 @@
+{
+  "summary": "Backend-only verification of iteration-10 SEO cleanup: (1) SEO.jsx deploy-blocking syntax fix, (2) sitemap simplification (loc+lastmod only), (3) /blog prerender internal link discovery, plus full regression of prior SEO suites. Added /app/backend/tests/test_seo_iter10.py (23 tests). Full backend suite: 236 passed, 3 skipped, 0 failed. Confirmed via @babel/parser (exit 0) and a real `CI=false yarn build:no-prerender` run ('Compiled with warnings', exit 0, no 'Failed to compile', no 'Unexpected character'/'Missing semicolon'). Sitemap: 35 urls, zero changefreq, zero priority, every <url> has exactly one ISO <lastmod> and only {loc,lastmod} children; blog lastmods are per-post and match /api/blog/posts updated_at/published_at; static pages == seo_prerender.py mtime (2026-09-04). Root /sitemap.xml alias matches /api count (35). /blog prerender emits <h2>Latest posts</h2> and 8 anchors inside <main id=\"__seo_prerender\">, one per published post, no broken slugs. Regressions OK: /, /solutions/business-apps, /brands/roomz, /blog/<slug> full metadata; /api/prerender/routes = 15 static + 8 dynamic; Brand JSON-LD on /brands/jabra; www->apex 301. Also ran `yarn build` (with prerender): 23 files written, build/sitemap.xml regenerated with 35 urls and no changefreq/priority, build/blog/index.html contains 8 post anchors.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/sitemap.xml & /api/blog/posts", "issue": "A published post has slug '1' (URL https://fidelislogic.com/blog/1 appears in the sitemap and in the /blog prerender link list). Data-quality issue: a numeric slug is a poor SEO URL and looks like leftover test/seed data. Consider unpublishing/renaming."},
+      {"endpoint": "/api/sitemap.xml", "issue": "Static-page lastmod is derived from seo_prerender.py mtime. In the deployed container this mtime equals the image/build time, so all 27 static URLs will report the deploy date rather than real content-change dates. Acceptable proxy, but be aware it changes on every deploy (may look like churn to crawlers)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_seo_iter10.py",
+    "/app/backend/tests/conftest.py",
+    "/app/test_reports/pytest/iter10_results.xml"
+  ],
+  "action_items": [
+    "HIGH (deploy risk): `CI=true yarn build:no-prerender` STILL FAILS — 'Treating warnings as errors because process.env.CI = true' -> 'Failed to compile'. 4 react-hooks/exhaustive-deps warnings: src/components/RichTextEditor.jsx:175 (missing 'editor'), src/pages/AdminDashboard.jsx:48 (missing 'fetchPosts'), src/pages/BlogEditor.jsx:69 (missing 'fetchPost','isEditing'), src/pages/DealEditor.jsx:61 (missing 'fetchDeal'). The SEO.jsx syntax error is fixed, but if the cloud builder sets CI=true the build will still fail at the ESLint step. Fix the deps (or add eslint-disable-next-line) before redeploying.",
+    "Consider removing/renaming the published blog post with slug '1'."
+  ],
+  "critical_code_review_comments": [
+    "server.py sitemap(): `import seo_prerender as _seo` inside the handler works but is inconsistent with the module-level `from seo_prerender import STATIC_ROUTES` import; move to module level for clarity.",
+    "seo_prerender._blog_hub_links() has no limit on the cursor — with hundreds of posts the /blog prerender HTML grows unbounded. Consider a cap (e.g. 100) plus pagination links.",
+    "server.py _fmt_date() silently falls back to utcnow() for unparseable values, which can emit a misleading lastmod; the sitemap already handles None by omitting <lastmod>, so returning None would be more honest.",
+    "server.py is 742 lines — approaching the split threshold; sitemap/SEO routes could move into their own router module."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_seo_iter10.py (new)",
+    "/app/backend/tests/conftest.py (new — single session-scoped starlette TestClient; two module-scoped clients in one session broke Motor with 'Event loop is closed')",
+    "/app/backend/tests/test_seo_iter9.py (removed local module-scoped client fixture, now uses conftest)",
+    "/app/backend/tests/test_blog_admin.py (BASE_URL fallback to /app/frontend/.env; admin creds now read from /app/memory/test_credentials.md instead of stale hardcoded 'changeme')",
+    "/app/backend/tests/test_image_upload.py (BASE_URL fallback to /app/frontend/.env)"
+  ],
+  "success_rate": {"backend": "100% (236 passed / 3 skipped / 0 failed)", "frontend": "not tested (backend-only request)"},
+  "seed_data_creation": "None; existing published blog posts and deals used read-only.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "test_credentials": "admin / from /app/memory/test_credentials.md (used only by pre-existing blog-admin suites)",
+  "context_for_next_testing_agent": "Run the whole suite with `cd /app/backend && python -m pytest tests/ -p no:randomly -q`. IMPORTANT: use the session-scoped `client` fixture from tests/conftest.py for any starlette TestClient work — creating a second TestClient in the same session makes Motor raise 'Event loop is closed'. The CRA build test in test_seo_iter10.py is opt-in: RUN_FRONTEND_BUILD=1 pytest tests/test_seo_iter10.py -k cra_build (CI=false). Note CI=true build fails on eslint hook-deps warnings (see action_items). /app/frontend/build was regenerated with `yarn build` during this iteration (23 prerendered files + sitemap.xml).",
+  "rca_of_the_issue": "Original deploy failure: JSX-style `{/* ... */}` comments placed in the SEO.jsx function body (outside the JSX return) are not valid JS, so babel/ESLint reported 'Unexpected character'/'Missing semicolon' and the cloud build failed. Converting them to `//` comments resolves it — verified by @babel/parser parse (exit 0) and a full CRA build. Remaining deploy risk is unrelated to SEO.jsx: react-scripts treats ESLint warnings as errors when CI=true, and 4 react-hooks/exhaustive-deps warnings remain in admin/editor components."
+}

@@ -1,0 +1,275 @@
+import { useState, useEffect } from "react";
+import { useParams, Link } from "react-router-dom";
+import { Button } from "../components/ui/button";
+import { SEO } from "../components/SEO";
+import { priorityPillars } from "../data/pillars";
+import { analytics } from "../lib/analytics";
+import { Breadcrumbs } from "../components/Breadcrumbs";
+import { ArrowLeft, Calendar, Tag, User, Clock, Loader2 } from "lucide-react";
+import axios from "axios";
+import { Helmet } from "react-helmet-async";
+
+import { BACKEND_URL, resolveApiAsset } from "../lib/api";
+import { hasPrerenderedSchema } from "../lib/prerenderedSchema";
+import { ScrollProgress } from "../components/magicui/scroll-progress";
+export const BlogPost = () => {
+  const { slug } = useParams();
+  const [post, setPost] = useState(null);
+  const [relatedPosts, setRelatedPosts] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    const fetchPost = async () => {
+      try {
+        const response = await axios.get(BACKEND_URL + "/api/blog/posts");
+        const allPosts = response.data;
+        const foundPost = allPosts.find((p) => p.slug === slug);
+        
+        if (foundPost) {
+          setPost(foundPost);
+          const related = allPosts
+            .filter((p) => p.category === foundPost.category && p.id !== foundPost.id)
+            .slice(0, 3);
+          setRelatedPosts(related);
+        } else {
+          setError(true);
+        }
+      } catch (err) {
+        setError(true);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchPost();
+  }, [slug]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen pt-32 px-4">
+        <div className="max-w-4xl mx-auto text-center">
+          <Loader2 className="animate-spin text-blue-600 mx-auto mb-4" size={48} />
+          <p className="text-gray-600">Loading article...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !post) {
+    return (
+      <div className="min-h-screen pt-32 px-4">
+        <div className="max-w-4xl mx-auto text-center">
+          <h1 className="text-3xl sm:text-4xl font-bold text-brand-dark mb-4 tracking-tight">Post not found</h1>
+          <Link to="/blog">
+            <Button className="bg-blue-600 hover:bg-blue-700 text-white">Back to Blog</Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const formatDate = (d) => {
+    if (!d) return "";
+    return new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  };
+
+  const getReadTime = (c) => {
+    if (!c) return "1 min";
+    const words = c.replace(/<[^>]*>/g, '').split(/\s+/).length;
+    return Math.ceil(words / 200) + " min read";
+  };
+
+  const img = resolveApiAsset(post.featured_image || post.image) || "/img/social/og-home.jpg";
+  const pageUrl = `${window.location.origin}/blog/${slug}`;
+
+  // Which priority pillar this article belongs to, matched on the post's
+  // category and title. Used for the contextual next step below the article;
+  // an article that matches nothing simply gets the consultation invitation.
+  const haystack = `${post.category || ""} ${post.title || ""}`.toLowerCase();
+  const PILLAR_TERMS = {
+    workspace: ["workspace", "roomz", "booking", "hot desk", "desk booking", "occupancy", "hybrid"],
+    "meeting-rooms": ["meeting room", "teams room", "zoom room", "video", "conferencing", "av", "huddle", "boardroom"],
+    "business-apps": ["erp", "crm", "hrms", "business application", "ai", "automation"],
+  };
+  const matchedPillarId = Object.keys(PILLAR_TERMS).find((id) =>
+    PILLAR_TERMS[id].some((term) => haystack.includes(term))
+  );
+  const relatedPillar = priorityPillars.find((pillar) => pillar.id === matchedPillarId);
+
+  // Structured Data for SEO
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "headline": post.seo_title || post.title,
+    "description": post.seo_description || post.excerpt,
+    "image": img,
+    "datePublished": post.date,
+    "author": { "@type": "Person", "name": post.author || "Fidelis Logic" },
+    "publisher": { "@type": "Organization", "name": "Fidelis Logic LLC" },
+    "mainEntityOfPage": { "@type": "WebPage" }
+  };
+
+  return (
+    <div className="min-h-screen">
+      {/* Reading progress, just under the fixed header. Brand blue into cyan,
+          not the library's default purple/pink. */}
+      <ScrollProgress className="top-20 z-40 h-0.5 from-blue-600 via-blue-500 to-fidelis-cyan" />
+      <Helmet>
+        <title>{post.seo_title || post.title} | Fidelis Logic</title>
+        <meta name="description" content={post.seo_description || post.excerpt} />
+        <link rel="canonical" href={pageUrl} />
+        <meta property="og:url" content={pageUrl} />
+        <meta property="og:title" content={post.seo_title || post.title} />
+        <meta property="og:description" content={post.seo_description || post.excerpt} />
+        <meta property="og:image" content={img} />
+        <meta property="og:type" content="article" />
+        {!hasPrerenderedSchema("BlogPosting") && (
+          <script type="application/ld+json">{JSON.stringify(structuredData)}</script>
+        )}
+      </Helmet>
+
+      <Breadcrumbs
+        items={[
+          { name: "Blog", href: "/blog" },
+          { name: post.title }
+        ]}
+        className="pt-24"
+      />
+
+      <section className="pt-4 pb-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-4xl mx-auto">
+          <Link to="/blog">
+            <Button variant="outline" className="mb-8">
+              <ArrowLeft className="mr-2" size={18} />
+              Back to Blog
+            </Button>
+          </Link>
+          
+          <div className="flex flex-wrap items-center gap-4 mb-6">
+            <span className="text-sm font-medium text-blue-600 bg-blue-50 px-4 py-2 rounded-full flex items-center">
+              <Tag className="mr-2" size={16} />
+              {post.category}
+            </span>
+            <span className="text-sm text-gray-500 flex items-center">
+              <Calendar className="mr-2" size={16} />
+              {formatDate(post.date)}
+            </span>
+            <span className="text-sm text-gray-500 flex items-center">
+              <Clock className="mr-2" size={16} />
+              {getReadTime(post.content)}
+            </span>
+          </div>
+          
+          <h1 className="text-4xl md:text-5xl font-bold text-brand-dark mb-6 tracking-tight">{post.title}</h1>
+          <p className="text-xl text-gray-600">{post.excerpt}</p>
+          
+          {post.author && (
+            <div className="flex items-center mt-6 pt-6 border-t">
+              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                <User size={20} className="text-blue-600" />
+              </div>
+              <div>
+                <p className="font-medium">{post.author}</p>
+                <p className="text-sm text-gray-500">Author</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="px-4 sm:px-6 lg:px-8 mb-12">
+        <div className="max-w-5xl mx-auto">
+          <img src={img} alt={post.title} className="w-full h-96 object-cover rounded-2xl shadow-2xl" />
+        </div>
+      </section>
+
+      <section className="px-4 sm:px-6 lg:px-8 pb-20">
+        <div className="max-w-3xl mx-auto">
+          <article 
+            className="prose prose-lg max-w-none"
+            dangerouslySetInnerHTML={{ __html: post.content }}
+          />
+
+          {/* Contextual next step (blueprint section 4): the solution this
+              article is about, then the consultation — rather than the same
+              generic promotional block on every page. */}
+          <div className="bg-blue-50 rounded-2xl p-8 mt-12" data-testid="blog-post-next-step">
+            <h2 className="text-2xl font-bold mb-3">Where this leads</h2>
+            {relatedPillar ? (
+              <>
+                <p className="text-gray-700 mb-6">
+                  This article sits under {relatedPillar.title.toLowerCase()}. The solution
+                  page covers the options, the trade-offs and how a project usually runs.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Link
+                    to={relatedPillar.href}
+                    onClick={() =>
+                      analytics.blogSolutionClick({ topic: relatedPillar.id, post: post.slug })
+                    }
+                  >
+                    <Button className="bg-blue-600 hover:bg-blue-700 text-white w-full sm:w-auto">
+                      {relatedPillar.ctaLabel}
+                    </Button>
+                  </Link>
+                  <Link
+                    to="/contact"
+                    onClick={() =>
+                      analytics.consultationCtaClick({ location: "blog_post", post: post.slug })
+                    }
+                  >
+                    <Button
+                      variant="outline"
+                      className="border-blue-200 text-blue-700 hover:bg-blue-100 w-full sm:w-auto"
+                    >
+                      Book a Consultation
+                    </Button>
+                  </Link>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-gray-700 mb-6">
+                  If this raised a question about your own estate, a short call is usually
+                  the fastest way to answer it.
+                </p>
+                <Link
+                  to="/contact"
+                  onClick={() =>
+                    analytics.consultationCtaClick({ location: "blog_post", post: post.slug })
+                  }
+                >
+                  <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                    Book a Consultation
+                  </Button>
+                </Link>
+              </>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {relatedPosts.length > 0 && (
+        <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gray-50">
+          <div className="max-w-7xl mx-auto">
+            <h2 className="text-3xl font-bold mb-12 tracking-tight">Related articles</h2>
+            <div className="grid md:grid-cols-3 gap-8">
+              {relatedPosts.map((rp) => (
+                <Link key={rp.id} to={"/blog/" + rp.slug}>
+                  <div className="card-interactive bg-white rounded-2xl shadow-lg overflow-hidden">
+                    <img src={resolveApiAsset(rp.featured_image || rp.image) || "/img/social/og-home.jpg"} alt="" loading="lazy" decoding="async" className="w-full h-48 object-cover" />
+                    <div className="p-6">
+                      <span className="text-xs font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full">{rp.category}</span>
+                      <h3 className="text-lg font-semibold mt-3 mb-2">{rp.title}</h3>
+                      <p className="text-sm text-gray-600">{rp.excerpt}</p>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+    </div>
+  );
+};

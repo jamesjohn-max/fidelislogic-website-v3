@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Root /sitemap.xml. Production's static host only serves files that exist in
+  build/, so this is a sitemap index pointing at the dynamic backend sitemap
+  (static pages, published blog posts and live deals). It never goes stale:
+  new posts appear in /api/sitemap.xml without a frontend rebuild.
+-->
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <sitemap>
+    <loc>https://fidelislogic.com/api/sitemap.xml</loc>
+  </sitemap>
+</sitemapindex>

@@ -1,0 +1,1031 @@
+{
+  "coverage": {
+    "label": "Dubai, Abu Dhabi, Sharjah and the Northern Emirates",
+    "regions": [
+      "Dubai",
+      "Abu Dhabi",
+      "Sharjah",
+      "Ajman",
+      "Umm Al Quwain",
+      "Ras Al Khaimah",
+      "Fujairah"
+    ]
+  },
+  "stages": [
+    {
+      "id": "plan",
+      "label": "Plan",
+      "description": "Know what you have and decide what comes next."
+    },
+    {
+      "id": "deliver",
+      "label": "Deliver",
+      "description": "Put the right technology in the right rooms."
+    },
+    {
+      "id": "operate",
+      "label": "Operate",
+      "description": "Keep it running, current and used."
+    }
+  ],
+  "services": [
+    {
+      "slug": "consulting",
+      "name": "Consulting Services",
+      "stage": "plan",
+      "icon": "Compass",
+      "oneLiner": "Vendor-neutral advisory to shape the right workplace technology solution.",
+      "h1": "IT & workplace technology consulting in the UAE",
+      "tagline": "Advisory that starts with your business, not a vendor's product.",
+      "shortDescription": "Independent workplace technology consulting for UAE organisations. We help you define the right solution before anyone quotes a price.",
+      "longDescription": "We work alongside your business, IT and facilities leaders to translate real workplace outcomes into a clear technology brief. That means aligning stakeholders, benchmarking options across vendors, sizing the commercial envelope, and producing a recommendation you can defend to your board, before a single purchase order is raised.",
+      "overviewHeading": "A clear brief before anyone quotes a price",
+      "images": {
+        "hero": "/img/services/consulting-1",
+        "heroPosition": "center 40%",
+        "heroAlt": "Consultant leading a planning session at a whiteboard with a client team",
+        "detail": "/img/services/consulting-2",
+        "detailAlt": "Workshop participants mapping workplace requirements on sticky notes"
+      },
+      "quickFacts": [
+        { "label": "Engagement model", "value": "Fixed-fee assessment or retained advisory" },
+        { "label": "Typical timeline", "value": "4 to 8 weeks to a signed-off recommendation" }
+      ],
+      "challenges": [
+        {
+          "title": "Every proposal says its platform is the answer",
+          "description": "Proposals arrive shaped around what each supplier sells, which makes them hard to compare like for like."
+        },
+        {
+          "title": "Stakeholders want different things",
+          "description": "IT wants manageability, facilities wants utilisation data, and leadership wants a number it can approve."
+        },
+        {
+          "title": "No business case to take to the board",
+          "description": "Without costed options and success measures, projects stall at budget review or get approved on gut feel."
+        }
+      ],
+      "keyBenefits": [
+        {
+          "title": "Independent recommendation",
+          "description": "Options are scored against your requirements, budget and support model, not a vendor's sales target."
+        },
+        {
+          "title": "Board-ready business case",
+          "description": "Costed options, phasing plan, and success metrics documented for stakeholder buy-in."
+        },
+        {
+          "title": "Vendor-neutral shortlist",
+          "description": "We narrow the market to two or three fit-for-purpose options and negotiate on your behalf."
+        },
+        {
+          "title": "Faster time to decision",
+          "description": "Typical engagements move from kickoff to signed-off recommendation in 4 to 8 weeks."
+        }
+      ],
+      "process": [
+        {
+          "title": "Discover",
+          "description": "Workshops with business, IT and facilities teams to capture how people actually meet, work and book space."
+        },
+        {
+          "title": "Assess",
+          "description": "A review of current rooms, devices, licences and network readiness, separating what works from what doesn't."
+        },
+        {
+          "title": "Compare",
+          "description": "Fit-for-purpose options scored across vendors against your requirements, budget and support model."
+        },
+        {
+          "title": "Recommend",
+          "description": "A costed, phased recommendation and executive summary, ready for board approval."
+        }
+      ],
+      "deliverables": [
+        "Discovery workshops with business, IT, and facilities stakeholders",
+        "Current-state assessment of workspace technology estate",
+        "Requirements matrix mapped to business outcomes",
+        "Vendor-neutral shortlist with a scored comparison",
+        "Costed recommendation with phasing plan",
+        "Executive summary and detailed technical appendix"
+      ],
+      "idealFor": [
+        "Organisations at the start of a workplace refresh",
+        "IT leaders replacing legacy meeting-room or workspace systems",
+        "Facilities teams building a hybrid-work programme",
+        "Boards weighing a build-vs-buy or platform-consolidation decision"
+      ],
+      "platforms": [
+        "Microsoft Teams Rooms",
+        "Zoom Rooms",
+        "Google Meet hardware",
+        "BYOD meeting rooms",
+        "Room booking platforms",
+        "Enterprise headsets"
+      ],
+      "brands": ["poly", "neat", "logitech", "yealink", "jabra", "roomz"],
+      "relatedSolutions": ["/solutions/meeting-rooms", "/solutions/workspace-experience"],
+      "relatedServices": ["workspace-audits", "deployment-configuration", "technology-refresh"],
+      "faqs": [
+        {
+          "question": "What does a workplace technology consultant do?",
+          "answer": "A workplace technology consultant helps you decide what to buy, and why, before you commit budget. We translate business goals into a technology brief, compare options across vendors, and give you a costed recommendation for meeting rooms, headsets and workspace platforms."
+        },
+        {
+          "question": "How long does a consulting engagement take?",
+          "answer": "Most engagements move from kickoff to a signed-off recommendation in 4 to 8 weeks. Larger multi-site programmes can continue as retained advisory alongside the rollout."
+        },
+        {
+          "question": "Can you work with our existing reseller or system integrator?",
+          "answer": "Yes. Our recommendation and specification can be delivered through your preferred reseller or system integrator, so you keep existing supplier relationships while gaining an independent view."
+        },
+        {
+          "question": "Which platforms do you advise on?",
+          "answer": "Microsoft Teams Rooms, Zoom Rooms, Google Meet hardware and BYOD meeting spaces, plus enterprise headsets and room booking and workspace platforms. We compare hardware from brands including Poly, Neat, Logitech, Yealink and Jabra."
+        },
+        {
+          "question": "Where in the UAE do you offer consulting?",
+          "answer": "We work on-site with organisations across Dubai, Abu Dhabi, Sharjah and the Northern Emirates."
+        }
+      ],
+      "seo": {
+        "title": "IT & Workplace Technology Consulting UAE",
+        "description": "Independent workplace technology consulting across Dubai, Abu Dhabi and the UAE. Compare and select the right meeting room, headset and workspace platforms.",
+        "keywords": "IT consulting UAE, workplace technology consulting Dubai, vendor neutral IT advisory, meeting room consulting Abu Dhabi, Fidelis Logic"
+      }
+    },
+    {
+      "slug": "deployment-configuration",
+      "name": "Deployment & Configuration",
+      "stage": "deliver",
+      "icon": "Wrench",
+      "oneLiner": "End-to-end installation, commissioning, and platform tuning.",
+      "h1": "Meeting room deployment & AV installation in the UAE",
+      "tagline": "From procurement to production, one team accountable to go-live.",
+      "shortDescription": "Turn-key deployment of meeting rooms, workspace platforms and collaboration devices, installed, commissioned and validated by a single accountable team.",
+      "longDescription": "Once a design is signed off, execution is where most projects wobble. We take ownership from procurement through commissioning: site surveys, structured cabling coordination, device provisioning, calendar integration, network readiness, acoustic tuning, and end-user validation. Every room ships with a one-page quick-start guide and a joining-test video call recorded during handover.",
+      "overviewHeading": "One accountable team from survey to sign-off",
+      "images": {
+        "hero": "/img/services/deployment-configuration-1",
+        "heroPosition": "center 45%",
+        "heroAlt": "Team meeting in a commissioned video conferencing room with a display and acoustic wall panels",
+        "detail": "/img/services/deployment-configuration-2",
+        "detailAlt": "Network patch panel with structured cabling for meeting room devices"
+      },
+      "quickFacts": [
+        { "label": "Engagement model", "value": "Fixed-scope project, or time and materials for phased rollouts" },
+        { "label": "After go-live", "value": "30 days of hypercare and as-built documentation" }
+      ],
+      "challenges": [
+        {
+          "title": "Too many parties, no single owner",
+          "description": "The AV installer, network team, calendar admins and fit-out contractor each own a piece, and gaps appear between them."
+        },
+        {
+          "title": "Every room behaves differently",
+          "description": "Without a common standard, settings vary room to room and users never know what to expect."
+        },
+        {
+          "title": "Surprises on day one",
+          "description": "Calendar sync, firewall rules or camera framing issues surface in front of the people the room was built for."
+        }
+      ],
+      "keyBenefits": [
+        {
+          "title": "Single point of accountability",
+          "description": "One project manager owns AV, network, calendar and enablement. Not four different teams."
+        },
+        {
+          "title": "Consistent room experience",
+          "description": "Every room commissioned against the same acceptance criteria and documented."
+        },
+        {
+          "title": "Change-managed rollout",
+          "description": "Pilot room proven before wave deployment. IT change-tickets aligned to your ITSM tooling."
+        },
+        {
+          "title": "Zero-surprise handover",
+          "description": "Live test call, user walkthrough, and a signed acceptance record before we exit."
+        }
+      ],
+      "process": [
+        {
+          "title": "Survey",
+          "description": "A site survey per room covering power, data points, display positions, acoustics and network readiness."
+        },
+        {
+          "title": "Stage",
+          "description": "Devices are provisioned, updated and configured to your platform standard before they reach site."
+        },
+        {
+          "title": "Install",
+          "description": "Installation, cabling coordination, calendar integration, acoustic tuning and camera framing, room by room."
+        },
+        {
+          "title": "Accept",
+          "description": "Each room passes the same acceptance test, including a live joining call, before sign-off and handover."
+        }
+      ],
+      "deliverables": [
+        "Site survey and installation plan per room",
+        "Structured cabling coordination and QoS verification",
+        "Device configuration and calendar sync (Teams / Zoom / Google)",
+        "Acoustic tuning and camera framing sign-off",
+        "End-user walkthrough and quick-start collateral",
+        "As-built documentation and 30-day hypercare"
+      ],
+      "idealFor": [
+        "Multi-room rollouts (5 to 100+ meeting spaces)",
+        "New office fit-outs on tight timelines",
+        "Headset fleet deployments at scale",
+        "Workspace-platform go-lives (booking, sensors, wayfinding)"
+      ],
+      "platforms": [
+        "Microsoft Teams Rooms",
+        "Zoom Rooms",
+        "Google Meet hardware",
+        "Microsoft 365 calendars",
+        "Google Workspace calendars",
+        "Room booking panels"
+      ],
+      "brands": ["poly", "neat", "logitech", "yealink", "jabra", "roomz"],
+      "relatedSolutions": ["/solutions/meeting-rooms", "/solutions/workspace-experience"],
+      "relatedServices": ["managed-support", "training-adoption", "consulting"],
+      "faqs": [
+        {
+          "question": "Which meeting room platforms do you deploy?",
+          "answer": "We deploy Microsoft Teams Rooms, Zoom Rooms, Google Meet hardware and BYOD rooms using hardware from brands including Poly, Neat, Logitech, Yealink and Jabra, along with room booking panels and workspace platforms."
+        },
+        {
+          "question": "Can you deploy meeting rooms across multiple sites?",
+          "answer": "Yes. Multi-room rollouts from 5 to more than 100 spaces are planned as a pilot room first, then deployed in waves by floor or site."
+        },
+        {
+          "question": "Do you handle Microsoft 365 and calendar integration?",
+          "answer": "Yes. Room resource accounts, calendar sync with Microsoft 365 or Google Workspace, and device sign-in are configured and tested as part of every deployment."
+        },
+        {
+          "question": "What happens after go-live?",
+          "answer": "Every room comes with a quick-start guide, as-built documentation and 30 days of hypercare. Monitoring and support can then continue under our managed support service."
+        },
+        {
+          "question": "Can you work alongside our fit-out contractor?",
+          "answer": "Yes. We coordinate cabling, containment and display mounting with your fit-out contractor and IT team, so the technology work runs on the same programme as the build."
+        }
+      ],
+      "seo": {
+        "title": "Meeting Room Deployment & AV Installation UAE",
+        "description": "Turn-key meeting room and AV deployment across Dubai, Abu Dhabi and the UAE. Teams Rooms and Zoom Rooms installed, configured and commissioned by one team.",
+        "keywords": "meeting room installation UAE, AV installation Dubai, Teams Rooms deployment, Zoom Rooms setup Abu Dhabi, AV commissioning"
+      }
+    },
+    {
+      "slug": "managed-support",
+      "name": "Managed Support & Maintenance",
+      "stage": "operate",
+      "icon": "Headphones",
+      "oneLiner": "Proactive monitoring, SLA-backed incident response, lifecycle care.",
+      "h1": "Managed AV & meeting room support in the UAE",
+      "tagline": "Keep every room, every device, every meeting running.",
+      "shortDescription": "SLA-backed managed services for meeting rooms, workspace platforms and collaboration devices: proactive monitoring, remote remediation and lifecycle firmware management.",
+      "longDescription": "Post go-live is where most of the value is realised, or lost. Our managed service keeps meeting rooms, video devices, and workspace platforms healthy through continuous monitoring, firmware baselining, incident response, and quarterly service reviews. We plug directly into your ITSM tool so tickets never sit in a separate queue.",
+      "overviewHeading": "Problems fixed before users notice them",
+      "images": {
+        "hero": "/img/services/managed-support-1",
+        "heroPosition": "center 40%",
+        "heroAlt": "Support engineers monitoring devices at their workstations",
+        "detail": "/img/services/managed-support-2",
+        "detailAlt": "Network switch with fibre connections in a server rack"
+      },
+      "quickFacts": [
+        { "label": "Engagement model", "value": "Monthly subscription per room, device fleet or platform" },
+        { "label": "Monitoring", "value": "24/7 device and platform monitoring" }
+      ],
+      "challenges": [
+        {
+          "title": "Users report problems before IT knows",
+          "description": "A room drops offline or loses calendar sync, and the first alert is a frustrated email from a meeting organiser."
+        },
+        {
+          "title": "Firmware drifts room by room",
+          "description": "Without a baseline, devices run different versions, and a fix that works in one room fails in the next."
+        },
+        {
+          "title": "Tickets fall between teams",
+          "description": "AV issues bounce between IT, facilities and the vendor, and nobody owns the resolution."
+        }
+      ],
+      "keyBenefits": [
+        {
+          "title": "Proactive over reactive",
+          "description": "Devices monitored 24/7 for offline states, camera health and calendar sync failures, resolved before users notice."
+        },
+        {
+          "title": "Predictable operating cost",
+          "description": "A single monthly line item covering monitoring, remediation, firmware, and quarterly reviews."
+        },
+        {
+          "title": "ITSM-integrated",
+          "description": "Tickets flow through ServiceNow, Jira, or your existing tool. No new portal for your team to learn."
+        },
+        {
+          "title": "Quarterly service reviews",
+          "description": "Utilisation data, incident trends, and improvement recommendations delivered every 90 days."
+        }
+      ],
+      "process": [
+        {
+          "title": "Onboard",
+          "description": "Every room and device is baselined, severity levels are agreed, and monitoring connects to your ITSM tool."
+        },
+        {
+          "title": "Monitor",
+          "description": "Devices and platforms are watched around the clock for offline states, peripheral faults and sync failures."
+        },
+        {
+          "title": "Resolve",
+          "description": "Incidents are fixed remotely where possible and escalated to on-site support where needed, within agreed SLAs."
+        },
+        {
+          "title": "Review",
+          "description": "Quarterly service reviews cover incidents, utilisation trends and recommended improvements."
+        }
+      ],
+      "deliverables": [
+        "24/7 device and platform monitoring",
+        "SLA-backed incident response (severity-tiered)",
+        "Remote remediation and firmware management",
+        "ITSM integration (ServiceNow, Jira, Freshservice)",
+        "Quarterly service reviews with utilisation analytics",
+        "Optional on-site support for regulated environments"
+      ],
+      "idealFor": [
+        "Estates with 20+ managed meeting rooms",
+        "Enterprises without an in-house AV/UC ops team",
+        "Multi-site deployments spanning the UAE and wider GCC",
+        "Regulated industries with strict availability SLAs"
+      ],
+      "platforms": [
+        "Microsoft Teams Rooms",
+        "Zoom Rooms",
+        "Morbit monitoring",
+        "ServiceNow",
+        "Jira Service Management",
+        "Freshservice"
+      ],
+      "brands": ["morbit", "poly", "neat", "logitech", "yealink", "jabra"],
+      "relatedSolutions": ["/solutions/meeting-rooms", "/solutions/workspace-experience"],
+      "relatedServices": ["deployment-configuration", "technology-refresh", "workspace-audits"],
+      "faqs": [
+        {
+          "question": "What does managed meeting room support include?",
+          "answer": "24/7 monitoring of rooms, devices and platforms, SLA-backed incident response, remote remediation, firmware management, ITSM integration and quarterly service reviews. On-site support can be added for regulated environments."
+        },
+        {
+          "question": "Can you support meeting rooms you didn't install?",
+          "answer": "Yes. Rooms installed by others are baselined during onboarding, so we know their condition and configuration before support starts."
+        },
+        {
+          "question": "Will our team need to use a new ticketing portal?",
+          "answer": "No. Tickets flow through your existing tool, such as ServiceNow, Jira or Freshservice, so your team keeps a single queue."
+        },
+        {
+          "question": "How is managed support priced?",
+          "answer": "As a monthly subscription per room, device fleet or platform, covering monitoring, remediation, firmware and quarterly reviews in a single line item."
+        },
+        {
+          "question": "Do you support estates across several emirates?",
+          "answer": "Yes, including multi-site estates across Dubai, Abu Dhabi, Sharjah, the Northern Emirates and the wider GCC."
+        }
+      ],
+      "seo": {
+        "title": "Managed AV & Meeting Room Support UAE",
+        "description": "SLA-backed managed support for meeting rooms and workspace platforms across the UAE. 24/7 monitoring, incident response, firmware management and reviews.",
+        "keywords": "managed AV support UAE, meeting room support Dubai, AV maintenance contract, Teams Rooms managed service, AMC meeting rooms"
+      }
+    },
+    {
+      "slug": "video-conferencing-rentals",
+      "name": "Video Conferencing Rentals",
+      "stage": "deliver",
+      "icon": "Video",
+      "oneLiner": "Short-term hire of certified meeting-room and conferencing kit.",
+      "h1": "Video conferencing equipment rental in the UAE",
+      "tagline": "Enterprise-grade video conferencing, hired by the day, week or month.",
+      "shortDescription": "Rent certified Microsoft Teams, Zoom and BYOD video systems for events, boardroom pilots and temporary offices, delivered, installed and supported.",
+      "longDescription": "Not every meeting warrants a capex commitment. We supply enterprise-grade video-conferencing kit on flexible rental terms for offsites, board meetings, tenders, training sessions, and pilot pods. Kit is delivered pre-configured, tested on-site, and collected after the engagement.",
+      "overviewHeading": "Meeting-ready kit without the capital spend",
+      "images": {
+        "hero": "/img/services/video-conferencing-rentals-1",
+        "heroPosition": "center 35%",
+        "heroAlt": "Hybrid meeting with a remote participant on the conference room screen",
+        "detail": "/img/services/video-conferencing-rentals-2",
+        "detailAlt": "Boardroom with a long table and presentation screen set up for a meeting"
+      },
+      "quickFacts": [
+        { "label": "Rental terms", "value": "Daily, weekly or monthly, all-inclusive" },
+        { "label": "Setup", "value": "Delivered, installed and test-called on site" }
+      ],
+      "challenges": [
+        {
+          "title": "A one-off meeting that has to work",
+          "description": "Board meetings, shareholder calls and tender sessions can't rely on a laptop webcam and a borrowed speaker."
+        },
+        {
+          "title": "No case for buying permanent kit",
+          "description": "Temporary offices, project sites and pilots rarely justify purchasing a full room system."
+        },
+        {
+          "title": "Nobody on hand to support it",
+          "description": "Events often happen away from your IT team, so someone needs to own setup and troubleshooting."
+        }
+      ],
+      "keyBenefits": [
+        {
+          "title": "Zero capex commitment",
+          "description": "Pay only for the days you need the kit. Ideal for events, pilots, and temporary offices."
+        },
+        {
+          "title": "Pre-configured and tested",
+          "description": "Kit arrives pre-paired, calendar-synced, and test-called before it leaves our workshop."
+        },
+        {
+          "title": "On-site technical support",
+          "description": "Optional AV technician available for high-stakes sessions (board meetings, tenders, keynote calls)."
+        },
+        {
+          "title": "Full portfolio access",
+          "description": "Poly Studio, Neat Bar, Logitech Rally, Jabra PanaCast, matched to your platform and room size."
+        }
+      ],
+      "process": [
+        {
+          "title": "Scope",
+          "description": "Share the room size, platform and date, and we match the right video bar or modular system and accessories."
+        },
+        {
+          "title": "Prepare",
+          "description": "Kit is configured, updated, signed in and test-called in our workshop before it leaves."
+        },
+        {
+          "title": "Deliver",
+          "description": "We deliver, install and verify a joining call on site, with an optional technician for the session."
+        },
+        {
+          "title": "Collect",
+          "description": "After the event the kit is collected, session data is wiped, and you receive a short usage report."
+        }
+      ],
+      "deliverables": [
+        "Pre-configured video bar or modular room system",
+        "Delivery, installation, and joining-call verification",
+        "Optional on-site AV technician",
+        "Loaner accessories (headsets, remote controls, cabling)",
+        "Collection and remote wipe of session data",
+        "Post-event usage report"
+      ],
+      "idealFor": [
+        "Board meetings and shareholder events",
+        "Training programmes and workshops",
+        "Tender rooms and legal proceedings",
+        "Pilot pods before full-scale rollouts",
+        "Temporary offices and project sites"
+      ],
+      "platforms": [
+        "Microsoft Teams",
+        "Zoom",
+        "Google Meet",
+        "BYOD / USB conferencing",
+        "Wireless presentation"
+      ],
+      "brands": ["poly", "neat", "logitech", "jabra"],
+      "relatedSolutions": ["/solutions/meeting-rooms"],
+      "relatedServices": ["deployment-configuration", "relocation-office-moves", "consulting"],
+      "faqs": [
+        {
+          "question": "What video conferencing equipment can I rent?",
+          "answer": "Enterprise video bars and modular room systems such as Poly Studio, Neat Bar, Logitech Rally and Jabra PanaCast, plus headsets, remote controls and cabling. Kit is matched to your platform and room size."
+        },
+        {
+          "question": "Which platforms does the rental kit support?",
+          "answer": "Rental systems are configured for Microsoft Teams, Zoom or Google Meet, or supplied as BYOD kit that works with any laptop and meeting platform."
+        },
+        {
+          "question": "Is installation included in the rental?",
+          "answer": "Yes. Delivery, installation, a joining-call test and collection are included. An on-site AV technician can be added for high-stakes sessions such as board meetings or keynote calls."
+        },
+        {
+          "question": "What happens to our data after the rental?",
+          "answer": "Every system is signed out and wiped of accounts, call history and session data when it is collected."
+        },
+        {
+          "question": "Can we rent a system as a pilot before buying?",
+          "answer": "Yes. Renting a pilot room is a practical way to test a platform and room layout with real users before committing to a full rollout."
+        }
+      ],
+      "seo": {
+        "title": "Video Conferencing Equipment Rental UAE",
+        "description": "Rent Microsoft Teams, Zoom and BYOD video conferencing kit in Dubai, Abu Dhabi and across the UAE. Pre-configured, delivered, installed and supported.",
+        "keywords": "video conferencing rental UAE, Teams Rooms hire Dubai, Zoom room rental, conference equipment rental Abu Dhabi, AV rental Sharjah"
+      }
+    },
+    {
+      "slug": "workspace-audits",
+      "name": "Workspace Technology Audits",
+      "stage": "plan",
+      "icon": "ClipboardCheck",
+      "oneLiner": "Independent audit of your estate to surface gaps, risk, and opportunity.",
+      "h1": "Workspace technology & meeting room audits in the UAE",
+      "tagline": "Know exactly what you have, what's failing, and what to replace next.",
+      "shortDescription": "A structured audit of your meeting rooms, workspace platforms and collaboration devices, producing a heat-map of health, risk and prioritised investment.",
+      "longDescription": "You can't optimise what you can't see. Our workspace audit walks the estate room by room, benchmarks device health and utilisation, evaluates license spend, and models the cost of a refresh vs a repair. The output: a prioritised action list with quick wins, deferrable work, and clear replace-vs-retain calls.",
+      "overviewHeading": "A room-by-room picture of your estate",
+      "images": {
+        "hero": "/img/services/workspace-audits-1",
+        "heroPosition": "center 50%",
+        "heroAlt": "Meeting room with a wall-mounted display and conference table",
+        "detail": "/img/services/workspace-audits-2",
+        "detailAlt": "Utilisation analytics dashboard on a laptop screen"
+      },
+      "quickFacts": [
+        { "label": "Engagement model", "value": "Fixed-fee, room-by-room audit" },
+        { "label": "Typical timeline", "value": "3 to 6 weeks" }
+      ],
+      "challenges": [
+        {
+          "title": "No accurate inventory",
+          "description": "Rooms, devices and licences were added over years by different teams, and nobody has the full list."
+        },
+        {
+          "title": "Rooms people avoid",
+          "description": "Some spaces get booked and abandoned because the camera, audio or display keeps letting people down."
+        },
+        {
+          "title": "Licence spend without visibility",
+          "description": "You pay for room and user licences but can't see which ones are actually used."
+        }
+      ],
+      "keyBenefits": [
+        {
+          "title": "Baseline your true estate",
+          "description": "Every room, device, and licence documented. Often the first accurate list your team has."
+        },
+        {
+          "title": "Quantify hidden cost",
+          "description": "License overspend, shelf-ware, and no-show meeting rooms surfaced in monetary terms."
+        },
+        {
+          "title": "Prioritised action list",
+          "description": "Quick wins, medium-term investments, and end-of-life devices ranked by ROI and risk."
+        },
+        {
+          "title": "Vendor-neutral evaluation",
+          "description": "No incentive to recommend replacement. If it's fit for another 24 months, we'll say so."
+        }
+      ],
+      "process": [
+        {
+          "title": "Walk the estate",
+          "description": "Every room is visited to record devices, firmware, cabling and condition, with a test call in each."
+        },
+        {
+          "title": "Measure",
+          "description": "Utilisation and no-show data is pulled where sensors or booking systems exist, and licence use is reviewed."
+        },
+        {
+          "title": "Score",
+          "description": "Each room and asset is rated for health, risk and user impact, giving you a heat-map of the estate."
+        },
+        {
+          "title": "Prioritise",
+          "description": "A ranked action list of quick wins, planned investments and replace-or-retain calls per asset."
+        }
+      ],
+      "deliverables": [
+        "Physical inventory of rooms and collaboration devices",
+        "Utilisation and no-show analytics (where sensor data exists)",
+        "License spend review vs actual usage",
+        "Refresh-vs-retain recommendation per asset",
+        "Prioritised roadmap and business case",
+        "Executive briefing with C-level talking points"
+      ],
+      "idealFor": [
+        "Organisations without an accurate device inventory",
+        "IT leaders inheriting an unfamiliar estate",
+        "Facilities teams planning a workplace redesign",
+        "Finance teams pushing for licence-cost rationalisation"
+      ],
+      "platforms": [
+        "Microsoft Teams Rooms",
+        "Zoom Rooms",
+        "Room booking panels",
+        "Occupancy sensors",
+        "Headset fleets",
+        "Licence portals"
+      ],
+      "brands": ["poly", "neat", "logitech", "yealink", "jabra", "roomz"],
+      "relatedSolutions": ["/solutions/workspace-experience", "/solutions/meeting-rooms"],
+      "relatedServices": ["consulting", "technology-refresh", "managed-support"],
+      "faqs": [
+        {
+          "question": "What is a workspace technology audit?",
+          "answer": "A structured review of every meeting room, collaboration device and workspace platform you own. It documents what you have, how healthy and well used it is, and what it costs, then turns that into a prioritised action plan."
+        },
+        {
+          "question": "How long does a workspace audit take?",
+          "answer": "Most audits take 3 to 6 weeks, depending on the number of sites and rooms."
+        },
+        {
+          "question": "Will the audit disrupt our meetings?",
+          "answer": "No. Room checks are scheduled around your booking calendar, so meetings carry on as normal."
+        },
+        {
+          "question": "Do you always recommend replacing equipment?",
+          "answer": "No. If a device is fit for another 24 months, we say so. Audits often find savings through reconfiguration, firmware updates or licence clean-up rather than new hardware."
+        },
+        {
+          "question": "What do we receive at the end of the audit?",
+          "answer": "A full inventory, utilisation and licence findings, a refresh-or-retain call for every asset, a prioritised roadmap with business case, and an executive briefing for leadership."
+        }
+      ],
+      "seo": {
+        "title": "Workspace Technology & Meeting Room Audit UAE",
+        "description": "Independent audits of meeting rooms, collaboration devices and workspace platforms across the UAE. Inventory, utilisation, licence spend and a clear roadmap.",
+        "keywords": "workspace audit UAE, meeting room audit Dubai, AV estate audit, workspace technology assessment, licence audit Teams Rooms"
+      }
+    },
+    {
+      "slug": "technology-refresh",
+      "name": "Technology Refresh & Upgrades",
+      "stage": "operate",
+      "icon": "RefreshCw",
+      "oneLiner": "Plan and execute end-of-life device and platform migrations.",
+      "h1": "Meeting room & AV technology refresh in the UAE",
+      "tagline": "Refresh without the disruption. Plan, phase, and swap.",
+      "shortDescription": "Structured refresh programmes for meeting rooms, headsets and workspace platforms. End-of-life devices retired, replacements phased in, users trained on what changes.",
+      "longDescription": "Devices age. Vendors change ownership. Platforms sunset features. When a refresh is due, the question isn't just what to buy. It's how to swap without breaking the workday. We design phased migrations that pilot, prove, and roll out the new estate while retiring the old, with change comms and user training baked into the plan.",
+      "overviewHeading": "New technology in, old estate out, no lost meetings",
+      "images": {
+        "hero": "/img/services/technology-refresh-1",
+        "heroPosition": "center 50%",
+        "heroAlt": "Modern boardroom with wood panelling and new video conferencing displays",
+        "detail": "/img/services/technology-refresh-2",
+        "detailAlt": "Meeting room with a wall-mounted display and conference table ready for an upgrade"
+      },
+      "quickFacts": [
+        { "label": "Engagement model", "value": "Fixed-scope programme, delivered in waves" },
+        { "label": "Approach", "value": "Pilot first, then phased swap-outs" }
+      ],
+      "challenges": [
+        {
+          "title": "Devices reaching end of support",
+          "description": "Codecs, cameras and panels are losing vendor support, and security updates are about to stop."
+        },
+        {
+          "title": "Call quality keeps slipping",
+          "description": "Ageing headsets and room audio make hybrid meetings harder to follow, and complaints keep rising."
+        },
+        {
+          "title": "Worry about disruption",
+          "description": "Swapping dozens of rooms at once risks leaving teams without a working space in critical weeks."
+        }
+      ],
+      "keyBenefits": [
+        {
+          "title": "Zero-downtime migration",
+          "description": "Pilot rooms and departments validated before wider swap. Users always have a working room."
+        },
+        {
+          "title": "Trade-in and disposal handled",
+          "description": "Certified e-waste disposal or trade-in credit for the old estate."
+        },
+        {
+          "title": "Coordinated user comms",
+          "description": "Change comms, quick-start guides, and floor-walker support during each wave."
+        },
+        {
+          "title": "Business case documented",
+          "description": "TCO comparison, feature-parity analysis, and phasing plan approved before we start."
+        }
+      ],
+      "process": [
+        {
+          "title": "Assess",
+          "description": "Confirm what is end-of-life, compare total cost of ownership and document feature parity."
+        },
+        {
+          "title": "Pilot",
+          "description": "New kit is proven in pilot rooms or departments against agreed success criteria."
+        },
+        {
+          "title": "Swap",
+          "description": "Replacements are staged and swapped by room, floor or site, so users always have a working room."
+        },
+        {
+          "title": "Retire",
+          "description": "Old equipment is decommissioned and either recycled through certified e-waste channels or traded in."
+        }
+      ],
+      "deliverables": [
+        "Refresh business case and TCO analysis",
+        "Phased migration plan with pilot criteria",
+        "Procurement and staging of replacement kit",
+        "Coordinated swap-outs by room, floor, or site",
+        "Certified e-waste disposal or trade-in of the old estate",
+        "User change comms and training resources"
+      ],
+      "idealFor": [
+        "Meeting-room estates reaching end-of-life",
+        "Headset fleets 5+ years old with dropping call quality",
+        "Workspace platforms with unsupported firmware",
+        "Post-M&A estates consolidating onto one platform"
+      ],
+      "platforms": [
+        "Microsoft Teams Rooms",
+        "Zoom Rooms",
+        "Enterprise headsets",
+        "Room booking panels",
+        "Device firmware and licensing"
+      ],
+      "brands": ["poly", "neat", "logitech", "yealink", "jabra"],
+      "relatedSolutions": ["/solutions/meeting-rooms", "/solutions/headsets"],
+      "relatedServices": ["workspace-audits", "deployment-configuration", "training-adoption"],
+      "faqs": [
+        {
+          "question": "How do we know when it's time to refresh meeting room technology?",
+          "answer": "Common signs are devices reaching end of vendor support, rising incident rates, falling call quality and platforms dropping features. A workspace audit gives you a replace-or-retain call for every asset."
+        },
+        {
+          "question": "Will users lose access to rooms during the refresh?",
+          "answer": "No. Pilot rooms are proven first, and swaps are phased by room, floor or site, so there is always a working room available."
+        },
+        {
+          "question": "What happens to our old equipment?",
+          "answer": "It is decommissioned and either recycled through a certified e-waste partner or traded in for credit where possible."
+        },
+        {
+          "question": "Can we change platforms as part of a refresh?",
+          "answer": "Yes. Many refreshes include a platform change, such as consolidating onto Microsoft Teams Rooms after a merger. Feature parity, user training and change communications are planned into the programme."
+        },
+        {
+          "question": "Do you refresh headsets as well as meeting rooms?",
+          "answer": "Yes. Headset fleets more than five years old are a common refresh, often combined with persona-based standardisation."
+        }
+      ],
+      "seo": {
+        "title": "Meeting Room & AV Refresh Programmes UAE",
+        "description": "Phased technology refresh for meeting rooms, headsets and workspace platforms across the UAE. End-of-life devices replaced without downtime.",
+        "keywords": "AV refresh UAE, meeting room upgrade Dubai, headset fleet refresh, Teams Rooms upgrade, workspace technology migration"
+      }
+    },
+    {
+      "slug": "relocation-office-moves",
+      "name": "Relocation & Office Moves",
+      "stage": "deliver",
+      "icon": "Truck",
+      "oneLiner": "Decommission, transport, and reinstate technology when you relocate.",
+      "h1": "Office move AV & meeting room relocation in the UAE",
+      "tagline": "Move offices, not the risk of a broken meeting room.",
+      "shortDescription": "Full-lifecycle AV and workspace technology relocation: decommissioning, secure transport, reinstallation and full re-commissioning at the new address.",
+      "longDescription": "An office move can undo years of workspace investment in a weekend. We plan and execute the workspace-technology side of any relocation: cataloguing what moves and what's replaced, coordinating with movers and fit-out teams, and recommissioning every room in the new space so day-one meetings just work.",
+      "overviewHeading": "The technology side of your move, handled",
+      "images": {
+        "hero": "/img/services/relocation-office-moves-1",
+        "heroPosition": "60% 40%",
+        "heroAlt": "Employee carrying a box of equipment through a modern office during a move",
+        "detail": "/img/services/relocation-office-moves-2",
+        "detailAlt": "Staff member packing office equipment into a cardboard box"
+      },
+      "quickFacts": [
+        { "label": "Engagement model", "value": "Fixed-scope project tied to your move date" },
+        { "label": "Scope", "value": "Decommission, transport, reinstall, recommission" }
+      ],
+      "challenges": [
+        {
+          "title": "Technology is an afterthought",
+          "description": "Furniture and fit-out get detailed plans while displays, codecs and panels are boxed up at the last minute."
+        },
+        {
+          "title": "Day-one meetings fail",
+          "description": "Rooms go live with missing cables, wrong resource accounts or displays mounted in the wrong place."
+        },
+        {
+          "title": "Moving kit that should be retired",
+          "description": "Old devices are carefully transported to the new office, only to be replaced a few months later."
+        }
+      ],
+      "keyBenefits": [
+        {
+          "title": "Day-one meetings work",
+          "description": "Every room recommissioned, calendar-synced, and test-called before hand-back."
+        },
+        {
+          "title": "Coordinated with movers",
+          "description": "We schedule around your fit-out contractor, movers, and IT team. One project plan for all workstreams."
+        },
+        {
+          "title": "Right-size the move",
+          "description": "We flag devices worth leaving behind or trading in rather than moving to the new space."
+        },
+        {
+          "title": "Insured, tracked, secure",
+          "description": "Device inventory tracked door-to-door with insured transport and secure staging."
+        }
+      ],
+      "process": [
+        {
+          "title": "Plan",
+          "description": "A move-out audit and inventory decides what moves, what is retired and what the new space needs."
+        },
+        {
+          "title": "Decommission",
+          "description": "Devices are safely removed, labelled, packed and tracked, with optional storage between sites."
+        },
+        {
+          "title": "Reinstall",
+          "description": "Kit is installed at the destination, coordinated with your fit-out contractor, movers and IT team."
+        },
+        {
+          "title": "Recommission",
+          "description": "Every room is recommissioned, calendar-synced and test-called before your team's first day."
+        }
+      ],
+      "deliverables": [
+        "Move-out audit and device inventory",
+        "Decommissioning and safe removal from source rooms",
+        "Insured transport with device tracking",
+        "Reinstallation at destination office",
+        "Full re-commissioning and joining-call verification",
+        "Optional storage between move-out and move-in"
+      ],
+      "idealFor": [
+        "HQ or regional office relocations",
+        "Office consolidations post-M&A",
+        "Landlord-led building moves",
+        "Growth-driven expansions to new floors or sites"
+      ],
+      "platforms": [
+        "Meeting room systems",
+        "Displays and mounts",
+        "Room booking panels",
+        "Occupancy sensors",
+        "Headset fleets"
+      ],
+      "brands": ["poly", "neat", "logitech", "yealink", "roomz"],
+      "relatedSolutions": ["/solutions/meeting-rooms", "/solutions/workspace-experience"],
+      "relatedServices": ["technology-refresh", "deployment-configuration", "workspace-audits"],
+      "faqs": [
+        {
+          "question": "When should we involve you in an office move?",
+          "answer": "As early as possible, ideally while the new floor plan is being designed. That leaves time to plan data points, power, display positions and acoustics for each room instead of retrofitting them."
+        },
+        {
+          "question": "Do you coordinate with our movers and fit-out contractor?",
+          "answer": "Yes. We work to one project plan with your movers, fit-out contractor and IT team, so technology work is scheduled around the build and the move date."
+        },
+        {
+          "question": "Is our equipment insured during the move?",
+          "answer": "Yes. Devices are inventoried and tracked door to door, with insured transport and secure staging."
+        },
+        {
+          "question": "Can you store equipment between move-out and move-in?",
+          "answer": "Yes. Optional storage is available when there is a gap between leaving the old office and the new space being ready."
+        },
+        {
+          "question": "Should we move old equipment or replace it?",
+          "answer": "It depends on age, condition and support status. We flag devices worth leaving behind or trading in, so you are not paying to move kit that will be replaced soon after."
+        }
+      ],
+      "seo": {
+        "title": "Office Move AV & Meeting Room Relocation UAE",
+        "description": "Office relocation services for AV and workspace technology across the UAE. Decommission, transport, reinstall and recommission every room for day one.",
+        "keywords": "office move AV UAE, meeting room relocation Dubai, IT office relocation Abu Dhabi, AV decommissioning, workspace relocation Sharjah"
+      }
+    },
+    {
+      "slug": "training-adoption",
+      "name": "Training & User Adoption",
+      "stage": "operate",
+      "icon": "GraduationCap",
+      "oneLiner": "Turn deployed technology into daily habit through structured enablement.",
+      "h1": "Workplace technology training & user adoption in the UAE",
+      "tagline": "Technology only pays back when people actually use it.",
+      "shortDescription": "Role-based training and change management that lifts adoption of meeting rooms, workspace platforms and collaboration tools, measured by real usage.",
+      "longDescription": "The best-designed meeting room is worthless if users default to Zooming from their laptop. We build role-based training and adoption programmes tailored to how your teams actually work: short walkthrough videos, floor-walker support during the first two weeks, executive champion sessions and adoption dashboards.",
+      "overviewHeading": "Adoption measured in usage, not attendance",
+      "images": {
+        "hero": "/img/services/training-adoption-1",
+        "heroPosition": "center 45%",
+        "heroAlt": "Trainer leading a session for staff working on laptops around a conference table",
+        "detail": "/img/services/training-adoption-2",
+        "detailAlt": "Presenter walking colleagues through a new workplace tool in a modern office"
+      },
+      "quickFacts": [
+        { "label": "Engagement model", "value": "Fixed-scope enablement bundle or ongoing adoption partner" },
+        { "label": "Measured by", "value": "30, 60 and 90-day adoption reviews" }
+      ],
+      "challenges": [
+        {
+          "title": "People default to their laptop",
+          "description": "Users skip the room system and join from their own device, so the investment sits idle."
+        },
+        {
+          "title": "One-size-fits-all training",
+          "description": "Executives, assistants and IT champions sit through the same generic session, and most of it doesn't apply."
+        },
+        {
+          "title": "Know-how leaves with the installer",
+          "description": "After handover nobody internal can answer quick questions or onboard new starters."
+        }
+      ],
+      "keyBenefits": [
+        {
+          "title": "Adoption measured, not assumed",
+          "description": "We track real room-utilisation and platform-engagement before and after training. Outcome-based, not attendance-based."
+        },
+        {
+          "title": "Role-based content",
+          "description": "Executives, assistants, IT champions and end users each get material that matches their day."
+        },
+        {
+          "title": "Bite-sized formats",
+          "description": "60-second video walk-throughs and one-page cheat sheets, designed for people with 30 seconds to spare."
+        },
+        {
+          "title": "Champion network",
+          "description": "We train and coach internal champions so knowledge stays in your business after we exit."
+        }
+      ],
+      "process": [
+        {
+          "title": "Map",
+          "description": "Personas and daily journeys are mapped to see where people struggle with rooms, booking and collaboration tools."
+        },
+        {
+          "title": "Build",
+          "description": "Role-based content: short video walkthroughs per room type, cheat sheets and one-pagers."
+        },
+        {
+          "title": "Launch",
+          "description": "Live sessions and floor-walker support during go-live weeks, plus executive and champion coaching."
+        },
+        {
+          "title": "Measure",
+          "description": "Adoption dashboards and 30, 60 and 90-day reviews track real usage, not attendance."
+        }
+      ],
+      "deliverables": [
+        "Persona and journey mapping",
+        "Role-based training curriculum",
+        "Short-form video walkthroughs (per room type)",
+        "Quick-reference cheat sheets and one-pagers",
+        "Live floor-walker support during go-live weeks",
+        "Adoption dashboard and 30/60/90-day reviews"
+      ],
+      "idealFor": [
+        "Post-deployment enablement programmes",
+        "Platform migrations (Zoom to Teams, Google to Microsoft)",
+        "New office openings",
+        "Organisations with distributed or hybrid workforces"
+      ],
+      "platforms": [
+        "Microsoft Teams Rooms",
+        "Zoom Rooms",
+        "Google Meet",
+        "Room booking apps",
+        "Hot desking platforms",
+        "ERP, HRMS and CRM apps"
+      ],
+      "brands": [],
+      "relatedSolutions": ["/solutions/workspace-experience", "/solutions/business-apps"],
+      "relatedServices": ["deployment-configuration", "technology-refresh", "managed-support"],
+      "faqs": [
+        {
+          "question": "What does a user adoption programme include?",
+          "answer": "Persona mapping, a role-based curriculum, short video walkthroughs, quick-reference guides, floor-walker support during go-live, and adoption reviews at 30, 60 and 90 days."
+        },
+        {
+          "question": "How do you measure user adoption?",
+          "answer": "We compare room utilisation and platform engagement data before and after training, rather than counting attendance."
+        },
+        {
+          "question": "Can you train users on Microsoft Teams Rooms and Zoom Rooms?",
+          "answer": "Yes. Content is built per room type and platform, covering how to join, share content, use the touch controller and get help."
+        },
+        {
+          "question": "Do you support platform migrations?",
+          "answer": "Yes. Moves such as Zoom to Microsoft Teams, or Google to Microsoft, need change communications and training alongside the technical cut-over, and we plan both together."
+        },
+        {
+          "question": "Is training delivered in person?",
+          "answer": "Live sessions and floor-walker support are delivered on site at your offices across the UAE, backed by short videos and guides people can use any time."
+        }
+      ],
+      "seo": {
+        "title": "User Adoption & Teams Rooms Training UAE",
+        "description": "Role-based training and user adoption programmes for meeting rooms, workspace platforms and collaboration tools across the UAE. Measured by real usage.",
+        "keywords": "user adoption UAE, Microsoft Teams Rooms training Dubai, workplace technology training, change management, Zoom Rooms training"
+      }
+    }
+  ]
+}

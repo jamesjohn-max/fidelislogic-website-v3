@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <!-- Google tag (gtag.js) — loaded dynamically after cookie consent.
+             dataLayer is initialised early so analytics calls made before
+             consent are queued safely without throwing. See
+             /app/frontend/src/lib/cookieConsent.js for the loader. -->
+        <script>
+          window.dataLayer = window.dataLayer || [];
+          if (typeof window.gtag !== 'function') {
+            window.gtag = function () { window.dataLayer.push(arguments); };
+          }
+        </script>
+
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+        <!-- Pre-rendered pages put the route's H1 and summary inside #root for
+             crawlers and visitors without JavaScript. With JavaScript on, keep
+             it hidden so nobody sees it flash unstyled before React replaces it. -->
+        <script>document.documentElement.setAttribute("data-js", "");</script>
+        <style>[data-js] #__seo_prerender { display: none; }</style>
+        <meta name="theme-color" content="#2563eb" />
+        <meta name="author" content="Fidelis Logic LLC" />
+        <meta name="google-site-verification" content="Mq-QVRz1y-WOO42dY8uae0-o86HgdrD4wq1tv2lxKa0" />
+        
+        <!-- Favicons -->
+        <link rel="icon" type="image/x-icon" href="%PUBLIC_URL%/favicon.ico" />
+        <link rel="icon" type="image/png" sizes="16x16" href="%PUBLIC_URL%/favicon-16x16.png" />
+        <link rel="icon" type="image/png" sizes="32x32" href="%PUBLIC_URL%/favicon-32x32.png" />
+        <link rel="icon" type="image/png" sizes="192x192" href="%PUBLIC_URL%/favicon-192x192.png" />
+        <link rel="apple-touch-icon" sizes="180x180" href="%PUBLIC_URL%/apple-touch-icon.png" />
+        
+        <!-- Preconnect for performance -->
+        <link rel="preconnect" href="https://images.unsplash.com" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet" />
+        
+        <!-- Default title (will be overridden by React Helmet) -->
+       <title>Fidelis Logic | UAE IT Consulting & Modern Workplace Solutions</title>
+        <meta name="description" content="Fidelis Logic helps UAE organizations plan, deploy, and support modern workplace technology including meeting rooms, workspace platforms, enterprise headsets, and business applications." />
+        <!-- No canonical or og:url here: this file is served for every URL that
+             has no pre-rendered page, so a fixed value would point them all at
+             the home page. scripts/prerender-seo.mjs writes each route's own
+             into its page at build time. -->
+        <meta property="og:title" content="Fidelis Logic | UAE IT Consulting & Modern Workplace Solutions" />
+        <meta property="og:description" content="Vendor-neutral UAE consulting for meeting rooms, workspace platforms, headsets, and business applications." />
+        <meta property="og:type" content="website" />
+        <!-- Static fallback preview. react-helmet sets a per-route og:image at
+             runtime, but social crawlers (Facebook, LinkedIn, WhatsApp, Slack)
+             do not execute JS — without this, shared links have no image.
+             data-rh="true" hands these to react-helmet, which removes the tags
+             it owns before writing its own; without it the runtime tag is
+             *added* alongside this one and every non-home route ends up
+             advertising two different og:images. -->
+        <meta data-rh="true" property="og:image" content="https://fidelislogic.com/img/social/og-home.jpg" />
+        <meta data-rh="true" property="og:image:width" content="1200" />
+        <meta data-rh="true" property="og:image:height" content="630" />
+        <meta data-rh="true" property="og:image:alt" content="A modern workplace with a Microsoft Teams Room display and open-plan desks" />
+        <meta data-rh="true" name="twitter:card" content="summary_large_image" />
+        <meta data-rh="true" name="twitter:image" content="https://fidelislogic.com/img/social/og-home.jpg" />
+        
+        <script src="https://assets.emergent.sh/scripts/emergent-main.js"></script>
+        <!--
+        These two scripts have been added for the Visual Edits, please do not edit or remove them
+        -->
+        <script>
+            // Only load visual edit scripts when inside an iframe
+            if (window.self !== window.top) {
+                // Load debug monitor script
+                var debugMonitorScript = document.createElement('script');
+                debugMonitorScript.src = 'https://assets.emergent.sh/scripts/debug-monitor.js';
+                document.head.appendChild(debugMonitorScript);
+
+                // Configure Tailwind
+                window.tailwind = window.tailwind || {};
+                tailwind.config = {
+                    corePlugins: { preflight: false },
+                };
+
+                // Load Tailwind CDN
+                var tailwindScript = document.createElement('script');
+                tailwindScript.src = 'https://cdn.tailwindcss.com';
+                document.head.appendChild(tailwindScript);
+            }
+        </script>
+    </head>
+    <body> 
+    
+<!-- <header> <h1>Modern Workplace Consulting in UAE</h1> </header>   -->
+    
+        <div id="root"></div>
+        <noscript>
+            <nav aria-label="Fidelis Logic">
+                <p><a href="/">Fidelis Logic</a> is a vendor-neutral modern workplace technology consultancy in the UAE.</p>
+                <ul>
+                    <li><a href="/solutions">Solutions</a></li>
+                    <li><a href="/services">Services</a></li>
+                    <li><a href="/brands">Brands</a></li>
+                    <li><a href="/blog">Blog</a></li>
+                    <li><a href="/deals">Smart Deals</a></li>
+                    <li><a href="/about">About</a></li>
+                    <li><a href="/contact">Contact</a></li>
+                </ul>
+                <p>Email <a href="mailto:info@fidelislogic.com">info@fidelislogic.com</a> or call <a href="tel:+971523607270">+971 52 360 7270</a>. The Room Planner and contact form need JavaScript.</p>
+            </nav>
+        </noscript>
+        <script>
+            !(function (t, e) {
+                var o, n, p, r;
+                e.__SV ||
+                    ((window.posthog = e),
+                    (e._i = []),
+                    (e.init = function (i, s, a) {
+                        function g(t, e) {
+                            var o = e.split(".");
+                            2 == o.length && ((t = t[o[0]]), (e = o[1])),
+                                (t[e] = function () {
+                                    t.push(
+                                        [e].concat(
+                                            Array.prototype.slice.call(
+                                                arguments,
+                                                0,
+                                            ),
+                                        ),
+                                    );
+                                });
+                        }
+                        ((p = t.createElement("script")).type =
+                            "text/javascript"),
+                            (p.crossOrigin = "anonymous"),
+                            (p.async = !0),
+                            (p.src =
+                                s.api_host.replace(
+                                    ".i.posthog.com",
+                                    "-assets.i.posthog.com",
+                                ) + "/static/array.js"),
+                            (r =
+                                t.getElementsByTagName(
+                                    "script",
+                                )[0]).parentNode.insertBefore(p, r);
+                        var u = e;
+                        for (
+                            void 0 !== a ? (u = e[a] = []) : (a = "posthog"),
+                                u.people = u.people || [],
+                                u.toString = function (t) {
+                                    var e = "posthog";
+                                    return (
+                                        "posthog" !== a && (e += "." + a),
+                                        t || (e += " (stub)"),
+                                        e
+                                    );
+                                },
+                                u.people.toString = function () {
+                                    return u.toString(1) + ".people (stub)";
+                                },
+                                o =
+                                    "init me ws ys ps bs capture je Di ks register register_once register_for_session unregister unregister_for_session Ps getFeatureFlag getFeatureFlagPayload isFeatureEnabled reloadFeatureFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSurveysLoaded onSessionId getSurveys getActiveMatchingSurveys renderSurvey canRenderSurvey canRenderSurveyAsync identify setPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset get_distinct_id getGroups get_session_id get_session_replay_url alias set_config startSessionRecording stopSessionRecording sessionRecordingStarted captureException loadToolbar get_property getSessionProperty Es $s createPersonProfile Is opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing clear_opt_in_out_capturing Ss debug xs getPageViewId captureTraceFeedback captureTraceMetric".split(
+                                        " ",
+                                    ),
+                                n = 0;
+                            n < o.length;
+                            n++
+                        )
+                            g(u, o[n]);
+                        e._i.push([i, s, a]);
+                    }),
+                    (e.__SV = 1));
+            })(document, window.posthog || []);
+            posthog.init("phc_xAvL2Iq4tFmANRE7kzbKwaSqp1HJjN7x48s3vr0CMjs", {
+                api_host: "https://us.i.posthog.com",
+                person_profiles: "identified_only", // or 'always' to create profiles for anonymous users as well,
+                session_recording: {
+                    recordCrossOriginIframes: true,
+                    capturePerformance: false,
+                },
+            });
+        </script>
+    </body>
+</html>
