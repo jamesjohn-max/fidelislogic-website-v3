@@ -254,6 +254,17 @@ export function screenCentreHeight(screen, room) {
   return bottom + h / 2;
 }
 
+// Which edge of its display a camera or video bar mounted on it starts on: whichever
+// puts the lens nearer seated eye height, so the far end sees faces rather than the
+// tops of heads. A D-shape's flat end sits against the screen wall, where a lens below
+// the screen would look along the table top, so there it goes above.
+export function bestMountSide(display, room, layout) {
+  if (layout === "dshape") return "above";
+  const half = displayImageHeight(display.sizeInches ?? 65, display.aspect) / 2;
+  const centre = screenCentreHeight(display, room);
+  return Math.abs(centre + half - SEATED_EYE_M) < Math.abs(centre - half - SEATED_EYE_M) ? "above" : "below";
+}
+
 // Seats that face the main display but look at it through someone else: another seat
 // within a head's width of the line to the screen, and nearer the screen than they are.
 // Seats turned away from it (a boardroom's sides, facing across the table) aren't
@@ -1453,7 +1464,8 @@ export function createPlacedDevice(category, ctx, payload = {}) {
     const tableCenter = tableCenterPoint(layout, room, table, tableOffset);
     // Aimed for coverage when it was placed to fill a gap; otherwise at the table.
     const angle = payload.isTableCam ? 0 : raw.angle ?? cameraFacingToward({ x: resolved.x, y: resolved.y }, tableCenter);
-    item = { ...item, fov: payload.fov, isTableCam: !!payload.isTableCam, angle, ...(raw.onScreen && { mountedOn: raw.onScreen }) };
+    const display = raw.onScreen && ctx.devices.display.find((d) => d.id === raw.onScreen);
+    item = { ...item, fov: payload.fov, isTableCam: !!payload.isTableCam, angle, ...(display && { mountedOn: display.id, mountSide: bestMountSide(display, room, layout) }) };
   }
   return item;
 }

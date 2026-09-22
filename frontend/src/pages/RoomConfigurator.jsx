@@ -37,7 +37,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popove
 import { api } from "../lib/api";
 import { initialHistory, planReducer } from "../lib/roomPlanState";
 import { ROOM_TEMPLATES, emptyDevices } from "../lib/roomTemplates";
-import { loadDraft, saveDraft, clearDraft, loadPhotos, savePhotos } from "../lib/roomPlannerDraft";
+import { loadDraft, saveDraft, clearDraft, loadPhotos, savePhotos, hasPlanLink, readPlanLink, planLink } from "../lib/roomPlannerDraft";
 // three.js only loads when someone opens the 3D view.
 const RoomViewer3D = lazy(() => import("../components/roomConfigurator/room3d/RoomViewer3D"));
 import {
@@ -75,11 +75,13 @@ import {
   addSpreadDevices,
   resolvePlacement,
   followMountedCameras,
+  refLabel,
 } from "../lib/roomConfiguratorEngine";
 
-// A customer's plan shows the room, its furniture and its doors, no AV devices.
+// A customer's plan shows the room, its furniture, its doors and its screen, no other
+// AV devices.
 const NO_DEVICES = emptyDevices();
-const doorsOnly = (devices) => ({ ...NO_DEVICES, door: devices.door });
+const customerDevices = (devices) => ({ ...NO_DEVICES, door: devices.door, display: devices.display, allInOne: devices.allInOne });
 const CONTROL_DEVICES = ["touchPanel", "contentSharing", "bookingPanel"];
 // Sections whose values a layout change resets (table size, seats), so they're
 // marked as not checked again.
@@ -187,6 +189,41 @@ function PlanViewToggle({ value, onChange }) {
   );
 }
 
+// Which side of its display each camera or video bar mounted on one sits on.
+function MountSideSwitch({ devices, onChange }) {
+  const mounted = ["camera", "videoBar"].flatMap((category) =>
+    devices[category]
+      .map((item, i) => ({ item, label: refLabel(category, i), category, side: item.mountSide || (category === "videoBar" ? "below" : "above") }))
+      .filter(({ item }) => item.mountedOn)
+  );
+  if (!mounted.length) return null;
+  return (
+    <div className="mt-3 flex flex-col gap-2">
+      {mounted.map(({ category, item, label, side: current }) => (
+        <div key={item.id} className="flex items-center justify-between gap-3 text-xs font-medium text-white/70">
+          <span>{label} on the display</span>
+          <div role="radiogroup" aria-label={`${label} position on the display`} className="flex shrink-0 rounded-lg border border-white/[0.08] bg-white/[0.03] p-0.5">
+            {["above", "below"].map((side) => (
+              <button
+                key={side}
+                type="button"
+                role="radio"
+                aria-checked={current === side}
+                onClick={() => onChange(category, item.id, side)}
+                className={`min-h-[28px] rounded-md px-3 text-xs font-semibold capitalize transition-[background-color,color] duration-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 ${
+                  current === side ? "bg-blue-600 text-white" : "text-white/60 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                {side}
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // A contextual next step on the review screen: the plan is done, so offer the
 // conversation rather than a generic promotion (blueprint sections 4 and 9).
 // The link carries no plan content — only the fact that it came from the planner.
@@ -208,8 +245,10 @@ const ConsultationHandoff = ({ audience }) => (
 // `with3d` adds the 3D view of the room on the
 // review step where you can sit in each seat and check its sightlines.
 export const RoomConfigurator = ({ with3d = false }) => {
-  // A draft saved in this browser picks up where the last visit left off.
-  const [draft] = useState(loadDraft);
+  // A draft saved in this browser picks up where the last visit left off, unless this
+  // visit came from a shared link, which loads that plan instead (see below).
+  const [openedFromLink] = useState(hasPlanLink);
+  const [draft] = useState(() => (openedFromLink ? null : loadDraft()));
   const [history, dispatch] = useReducer(planReducer, draft?.plan, (plan) => initialHistory(plan));
   const plan = history.present;
   const {
@@ -282,6 +321,7 @@ export const RoomConfigurator = ({ with3d = false }) => {
   const [shownErrors, setShownErrors] = useState(() => new Set());
   const [roomImages, setRoomImages] = useState([]);
   const diagramRef = useRef(null);
+  const planRef = useRef(null);
   // Blob preview URLs need revoking on removal/unmount; a ref keeps the cleanup
   // effect below from needing roomImages in its dependency array.
   const roomImagesRef = useRef(roomImages);
@@ -342,6 +382,28 @@ export const RoomConfigurator = ({ with3d = false }) => {
 
   useEffect(() => {
     let cancelled = false;
+    if (openedFromLink) {
+      // The shared plan replaces this browser's draft, photos included.
+      photosReady.current = true;
+      readPlanLink().then((shared) => {
+        if (cancelled) return;
+        window.history.replaceState(null, "", window.location.pathname + window.location.search);
+        const sharedSteps = STEPS_BY_AUDIENCE[shared?.plan.audience];
+        if (!sharedSteps) {
+          notify("Couldn't open that room plan", { description: "The link looks incomplete. Ask for it to be sent again." });
+          return;
+        }
+        dispatch({ type: "reset", plan: shared.plan });
+        setRoomImages([]);
+        setCheckedSections(new Set(shared.checkedSections));
+        setStepIndex(sharedSteps.length - 1);
+        setVisitedSteps(new Set(sharedSteps.map((_, i) => i)));
+        if (with3d) setPlanView("3d");
+        stepMovedRef.current = true;
+        notify("Shared room plan opened", { id: "rc-link-opened", description: "It's now saved in this browser. Photos aren't included in links." });
+      });
+      return () => { cancelled = true; };
+    }
     loadPhotos().then((photos) => {
       if (cancelled) return;
       if (photos.length) setRoomImages(photos.map(({ id, file }) => ({ id, file, previewUrl: URL.createObjectURL(file) })));
@@ -655,10 +717,13 @@ export const RoomConfigurator = ({ with3d = false }) => {
           views3d = [];
         }
       }
+      // Without link support (an old browser) the report goes without one.
+      const shareUrl = await planLink(plan, [...checkedSections]).catch(() => null);
       await exportRoomConfigPdf({
+        shareUrl,
         views3d,
         includeRecommendations,
-        state: customer ? { ...state, devices: doorsOnly(state.devices) } : state,
+        state: customer ? { ...state, devices: customerDevices(state.devices) } : state,
         audience,
         unconfirmed: new Set(unchecked.filter(({ section }) => section.defaults).map(({ step: st, section }) => `${st.id}:${section.id}`)),
         layoutResult,
@@ -1102,6 +1167,7 @@ export const RoomConfigurator = ({ with3d = false }) => {
               {...group("devices")}
             >
               <DeviceList categories={["display", "allInOne", "camera", "videoBar"]} {...deviceListProps} />
+              <MountSideSwitch devices={devices} onChange={(category, id, side) => updateDevice(category, id, (item) => ({ ...item, mountSide: side }))} />
               <RecommendationList recommendations={recsFor("video")} onAddDevice={handleAddDevice} />
             </StepGroup>
             <StepGroup
@@ -1209,7 +1275,7 @@ export const RoomConfigurator = ({ with3d = false }) => {
   };
 
   // What the 3D view is built from, kept stable so it only rebuilds on a real change.
-  const devices3d = useMemo(() => (isCustomer ? doorsOnly(devices) : devices), [isCustomer, devices]);
+  const devices3d = useMemo(() => (isCustomer ? customerDevices(devices) : devices), [isCustomer, devices]);
   const finishes3d = useMemo(() => ({ wallMaterials, floorType, ceilingType, tableTopMaterial }), [wallMaterials, floorType, ceilingType, tableTopMaterial]);
   const show3d = with3d && isReview && planView === "3d";
 
@@ -1234,7 +1300,7 @@ export const RoomConfigurator = ({ with3d = false }) => {
     layout,
     layoutResult,
     tableOffset,
-    devices: isCustomer ? doorsOnly(devices) : devices,
+    devices: isCustomer ? customerDevices(devices) : devices,
     removedChairIndices,
     chairOffsets,
     micPickup: { reach: dedicatedMicReach(audioPreference, room), label: micRangeLabel(audioPreference) },
@@ -1331,7 +1397,7 @@ export const RoomConfigurator = ({ with3d = false }) => {
           {/* Once it appears, the plan stays beside every step, and fully interactive,
               so each choice shows up on it immediately. */}
           {showPlan && (
-            <section aria-label="Room plan" className="rc-plan-enter flex min-w-0 flex-col lg:min-h-0">
+            <section ref={planRef} aria-label="Room plan" className="rc-plan-enter flex min-w-0 flex-col lg:min-h-0">
               {with3d && isReview && <PlanViewToggle value={planView} onChange={setPlanView} />}
               {show3d ? (
                 /* 2D gets the bar through RoomCanvas, whose stage sizing budgets
@@ -1423,15 +1489,32 @@ export const RoomConfigurator = ({ with3d = false }) => {
               progress={isReview ? null : stepProgress}
               primaryAction={
                 isReview && (
+                  <div className="flex items-center gap-2">
+                  {/* The same as picking "3D view" above the plan, brought into view on
+                      a phone, where the plan sits above this panel. */}
+                  {with3d && planView !== "3d" && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPlanView("3d");
+                        if (!window.matchMedia("(min-width: 1024px)").matches) planRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+                      }}
+                      className="flex min-h-[44px] items-center gap-2 whitespace-nowrap rounded-lg border border-blue-500/50 bg-blue-500/10 px-3.5 text-sm font-semibold text-blue-200 transition-[background-color,border-color,transform] duration-100 hover:border-blue-400 hover:bg-blue-500/20 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 active:scale-[0.97]"
+                    >
+                      <Box aria-hidden="true" className="h-4 w-4" />
+                      3D view
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={requestExport}
                     disabled={exporting}
-                    className="flex min-h-[44px] items-center gap-2 rounded-lg bg-blue-600 px-5 text-sm font-semibold text-white shadow-sm transition-[background-color,transform] duration-100 hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-wait disabled:opacity-70 active:scale-[0.97] active:bg-blue-600"
+                    className="flex min-h-[44px] items-center gap-2 whitespace-nowrap rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition-[background-color,transform] duration-100 hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-wait disabled:opacity-70 active:scale-[0.97] active:bg-blue-600"
                   >
                     {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
                     {exporting ? "Generating PDF…" : "Export PDF"}
                   </button>
+                  </div>
                 )
               }
             >

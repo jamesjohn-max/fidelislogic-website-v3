@@ -67,7 +67,7 @@ export function ReviewSummary({ state, audience, details, photoCount, onEditStep
     />
   );
 
-  // A customer's plan is just the room and its furniture — no devices.
+  // A customer's plan is just the room, its furniture and its screen.
   if (audience === "customer") {
     return (
       <ul className="-my-1 divide-y divide-white/[0.07]">
@@ -75,7 +75,7 @@ export function ReviewSummary({ state, audience, details, photoCount, onEditStep
         <SummaryRow
           title="Room"
           onEdit={() => onEditStep("room")}
-          facts={[`${room.length.toFixed(1)} × ${room.width.toFixed(1)} × ${room.height.toFixed(1)} m`, floor, ceiling]}
+          facts={[`${room.length.toFixed(1)} × ${room.width.toFixed(1)} × ${room.height.toFixed(1)} m`, floor, ceiling, ...devices.display.map((d) => `${displaySpec(d)} display`)]}
         />
         <SummaryRow
           title="Layout"

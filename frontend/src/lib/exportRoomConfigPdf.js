@@ -189,6 +189,25 @@ function drawSectionTitle(doc, y, label) {
   return y + 4.5;
 }
 
+// A link that reopens this exact room in Room Planner, 3D view included, on any
+// computer: for whoever this report is sent to.
+function drawShareLink(doc, y, url) {
+  const label = "Open this room in the Room Planner 3D view";
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  setText(doc, BRAND_BLUE);
+  doc.textWithLink(label, MARGIN, y, { url });
+  const labelW = doc.getTextWidth(label);
+  setDraw(doc, BRAND_BLUE);
+  doc.setLineWidth(0.2);
+  doc.line(MARGIN, y + 0.8, MARGIN + labelW, y + 0.8);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  setText(doc, SLATE_500);
+  doc.text("  ·  loads this configuration as it was exported", MARGIN + labelW, y);
+  return y + 7;
+}
+
 // --- stat cards (Room name / Seating capacity / Room size / Table & seating) -------------
 
 function drawStatCards(doc, y, state, roomName) {
@@ -546,7 +565,7 @@ function drawRoom3dImage(doc, y, height, canvas) {
 // repeating facts (layout, seating, device count) already covered by the stat cards
 // and Configuration Summary elsewhere on the page.
 // A customer's plan has no devices (and theater seating no tables).
-const customerLegend = (layout) => ["chair", layout !== "theater" && "table", "wall"].filter(Boolean);
+const customerLegend = (layout) => ["device", "chair", layout !== "theater" && "table", "wall"].filter(Boolean);
 
 function drawDiagramLegendRow(doc, x, y, kinds = ["device", "chair", "table", "wall"]) {
   const items = [
@@ -784,6 +803,7 @@ function layoutSummaryGrid(doc, state, audience, unconfirmed = new Set()) {
           ["Floor", floorType || NOT_SPECIFIED],
           ["Ceiling", ceilingType || NOT_SPECIFIED],
         ]),
+        ...devices.display.map((d) => ["Display", `${displaySpec(d)}${d.autoSize ? ", sized for the room" : ""}`]),
       ]],
       ["Furniture", furnitureRows],
     ];
@@ -904,6 +924,8 @@ const DEFAULT_NOTE = "(default) — a starting value nobody changed or confirmed
 
 // --- device placement table ---------------------------------------------------------------
 
+const onDisplayText = (item) => (item.mountedOn && item.mountSide ? `, ${item.mountSide} the display` : "");
+
 function deviceSpecText(category, item) {
   switch (category) {
     case "display": return `${displaySpec(item)} display`;
@@ -911,8 +933,8 @@ function deviceSpecText(category, item) {
     case "camera":
       return item.isTableCam
         ? `360° camera — built-in mics (~${TABLE_CAM_MIC_RANGE_M}m), no speaker; paired with a video bar or all-in-one display`
-        : `${item.fov}° FOV camera`;
-    case "videoBar": return `${item.fov}° FOV video bar`;
+        : `${item.fov}° FOV camera${onDisplayText(item)}`;
+    case "videoBar": return `${item.fov}° FOV video bar${onDisplayText(item)}`;
     case "microphone": return "Microphone";
     case "speaker": return "Speaker";
     case "touchPanel": return "Touch panel";
@@ -1135,7 +1157,7 @@ export function reportFileName(companyName, roomName) {
 
 // `audience` "customer" makes the shorter report a customer hands to their technology
 // partner: the room, its table, photos and notes — no seating plan, devices or advice.
-export async function exportRoomConfigPdf({ state, layoutResult, removedChairIndices, chairOffsets, roomName, customerName, createdBy, diagramElement, images = [], audience = "reseller", unconfirmed = new Set(), views3d = [], includeRecommendations = true }) {
+export async function exportRoomConfigPdf({ state, layoutResult, removedChairIndices, chairOffsets, roomName, customerName, createdBy, diagramElement, images = [], audience = "reseller", unconfirmed = new Set(), views3d = [], includeRecommendations = true, shareUrl = null }) {
   const customer = audience === "customer";
   const reportTitle = customer ? "Meeting Room Details" : "Meeting Room Configuration";
   if (!state || !layoutResult) throw new Error("Nothing to export — the room configuration wasn't found.");
@@ -1153,6 +1175,7 @@ export async function exportRoomConfigPdf({ state, layoutResult, removedChairInd
 
   let y = drawHeader(doc, meta, `${reportTitle} for: ${customerName}`);
   y = drawStatCards(doc, y, state, roomName);
+  if (shareUrl) y = drawShareLink(doc, y, shareUrl);
 
   // Page flow: each section checks it fits above the footer before drawing, and
   // otherwise starts a new page under a compact continuation header — a section is

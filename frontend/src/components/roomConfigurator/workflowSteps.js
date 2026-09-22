@@ -68,7 +68,7 @@ export const STEPS_BY_AUDIENCE = {
       title: "Tables and layout",
       description: "How the room is furnished — its tables, their size and top — as it is today, or as you'd like it.",
       defaultGroup: "shape",
-      planHint: "Drag the tables, seating or door to where they are in the room.",
+      planHint: "Drag the tables, seating, door or display to where they are in the room.",
     },
     {
       ...DETAILS,

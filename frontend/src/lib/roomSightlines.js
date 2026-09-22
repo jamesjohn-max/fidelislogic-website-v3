@@ -81,20 +81,22 @@ export function placedScreens(devices, room) {
   return [...devices.display.map((d, i) => screen("display", d, i)), ...devices.allInOne.map((d, i) => screen("allInOne", d, i))];
 }
 
-// Every camera, with where it is in 3D: a camera on a screen sits on top of it, a video
-// bar just below it, one built into an all-in-one in its top bezel, a 360° camera on
-// the table, anything else on its wall at head height.
+// Every camera, with where it is in 3D: a camera or video bar on a screen sits on the
+// side of it its `mountSide` says (plans from before that: a camera on top, a video bar
+// below), one built into an all-in-one in its top bezel, a 360° camera on the table,
+// anything else on its wall at head height.
 export function placedCameras(devices, screens) {
   const onScreen = (item) => screens.find((s) => s.id === item.mountedOn) || screens.find((s) => Math.hypot(s.x - item.x, s.y - item.y) < 0.15);
+  const onEdge = (s, item, fallback, gap) => ((item.mountSide || fallback) === "above" ? s.bottom + s.height + gap : s.bottom - gap);
   const cams = [];
   devices.camera.forEach((c, i) => {
     const s = onScreen(c);
-    const z = c.isTableCam ? HEIGHTS.table + 0.25 : s ? s.bottom + s.height + 0.07 : 1.8;
+    const z = c.isTableCam ? HEIGHTS.table + 0.25 : s ? onEdge(s, c, "above", 0.07) : 1.8;
     cams.push({ id: c.id, code: refCode("camera", i), kind: c.isTableCam ? "tableCam" : "camera", x: c.x, y: c.y, z, angle: c.angle || 0, fov: c.isTableCam ? 360 : c.fov, onScreen: !!s });
   });
   devices.videoBar.forEach((v, i) => {
     const s = onScreen(v);
-    const z = s ? s.bottom - 0.08 : 1.0;
+    const z = s ? onEdge(s, v, "below", 0.08) : 1.0;
     cams.push({ id: v.id, code: refCode("videoBar", i), kind: "videoBar", x: v.x, y: v.y, z, angle: v.angle || 0, fov: v.fov, onScreen: !!s });
   });
   devices.allInOne.forEach((d, i) => {

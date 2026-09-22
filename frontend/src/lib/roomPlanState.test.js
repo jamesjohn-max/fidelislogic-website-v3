@@ -139,3 +139,17 @@ describe("undo history", () => {
     expect(planReducer(state, { type: "undo" }).present.additionalNotes).toBe(initialPlan().additionalNotes);
   });
 });
+
+describe("customer display", () => {
+  test("a customer's plan gets a display sized for the room, and it follows the room", () => {
+    const start = update(initialHistory(), { audience: "customer" });
+    const [display] = start.present.devices.display;
+    expect(display).toMatchObject({ autoPlace: true, autoSize: true, mount: "wall" });
+    const bigger = update(start, withRoom(12, 8));
+    expect(bigger.present.devices.display[0].sizeInches).toBeGreaterThan(display.sizeInches);
+  });
+
+  test("a reseller's plan still starts without one", () => {
+    expect(update(initialHistory(), { audience: "reseller" }).present.devices.display).toHaveLength(0);
+  });
+});

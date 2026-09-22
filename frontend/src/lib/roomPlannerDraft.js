@@ -16,17 +16,14 @@ export function loadDraft() {
   try {
     const draft = JSON.parse(localStorage.getItem(DRAFT_KEY));
     if (!draft || draft.v !== DRAFT_VERSION || !draft.plan || Date.now() - draft.savedAt > DRAFT_MAX_AGE_MS) return null;
-    // Anything added to the plan since the draft was saved starts at its default.
-    const blank = initialPlan();
-    return {
-      savedAt: draft.savedAt,
-      plan: { ...blank, ...draft.plan, devices: { ...emptyDevices(), ...draft.plan.devices } },
-      ui: draft.ui || {},
-    };
+    return { savedAt: draft.savedAt, plan: restorePlan(draft.plan), ui: draft.ui || {} };
   } catch {
     return null;
   }
 }
+
+// Anything added to the plan since it was saved starts at its default.
+const restorePlan = (plan) => ({ ...initialPlan(), ...plan, devices: { ...emptyDevices(), ...plan.devices } });
 
 export function saveDraft(plan, ui) {
   try {
@@ -91,5 +88,47 @@ export async function loadPhotos() {
     return rows.sort((a, b) => a.order - b.order).map(({ id, file }) => ({ id, file }));
   } catch {
     return [];
+  }
+}
+
+// --- shared links -------------------------------------------------------------------
+
+// A link that opens Room Planner on another computer with this plan loaded, for the PDF.
+// The plan travels compressed in the link's #fragment, which browsers never send to the
+// server, so it stays as private as the PDF it's in. Photos don't fit in a link.
+const LINK_PREFIX = "#plan=";
+
+const toBase64Url = (bytes) => btoa(Array.from(bytes, (b) => String.fromCharCode(b)).join("")).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const fromBase64Url = (text) => Uint8Array.from(atob(text.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
+const pipe = async (bytes, transform) => new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(transform)).arrayBuffer());
+
+export async function planLink(plan, checkedSections = []) {
+  const json = new TextEncoder().encode(JSON.stringify({ v: DRAFT_VERSION, plan, checkedSections }));
+  const packed = await pipe(json, new CompressionStream("deflate-raw"));
+  return `${window.location.origin}${window.location.pathname}${LINK_PREFIX}${toBase64Url(packed)}`;
+}
+
+export const hasPlanLink = () => typeof window !== "undefined" && window.location.hash.startsWith(LINK_PREFIX);
+
+const finite = (v) => typeof v === "number" && Number.isFinite(v);
+// A link can be mistyped, truncated or tampered with: only a plan whose room and devices
+// are the right shape is loaded.
+function validPlan(plan) {
+  if (!plan || typeof plan !== "object" || !plan.room || !["length", "width", "height"].every((k) => finite(plan.room[k]))) return false;
+  const devices = plan.devices || {};
+  return Object.values(devices).every((list) => Array.isArray(list) && list.every((d) => d && finite(d.x) && finite(d.y)));
+}
+
+// The plan in this page's link ({ plan, checkedSections }), or null if there isn't one
+// or it can't be read.
+export async function readPlanLink() {
+  if (!hasPlanLink()) return null;
+  try {
+    const packed = fromBase64Url(window.location.hash.slice(LINK_PREFIX.length));
+    const shared = JSON.parse(new TextDecoder().decode(await pipe(packed, new DecompressionStream("deflate-raw"))));
+    if (shared?.v !== DRAFT_VERSION || !validPlan(shared.plan)) return null;
+    return { plan: restorePlan(shared.plan), checkedSections: Array.isArray(shared.checkedSections) ? shared.checkedSections.filter((k) => typeof k === "string") : [] };
+  } catch {
+    return null;
   }
 }
