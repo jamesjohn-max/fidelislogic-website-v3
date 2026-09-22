@@ -28,7 +28,7 @@ const PALETTES = {
     tableFill: "#1C2840", tableStroke: "#64748B", tableFillSel: "#1E3A8A", tableStrokeSel: "#60A5FA", podTick: "#64748B",
     chairSeat: "#27344A", chairAccent: "#3E4D66", chairStroke: "#8391A7", chairSeatSel: "#1E3A8A", chairAccentSel: "#3B82F6", chairStrokeSel: "#93C5FD",
     device: "#2563EB", deviceStroke: "#60A5FA", deviceAccent: "#DBEAFE", deviceSel: "#3B82F6", deviceStrokeSel: "#BFDBFE", deviceAccentSel: "#EFF6FF",
-    doorArc: "#64748B", select: "#60A5FA", fov: "#3B82F6", fovLabel: "#93C5FD",
+    select: "#60A5FA", fov: "#3B82F6", fovLabel: "#93C5FD",
     label: "#CBD5E1", halo: "#111A2A", rulerMinor: "#334155", rulerMajor: "#64748B", rulerLabel: "#7C8BA1",
     handleFill: "#0B1220", badgeFill: "#E2E8F0", badgeText: "#0F172A", badgeStroke: "#0B1220", coord: "#F1F5F9",
   },
@@ -37,7 +37,7 @@ const PALETTES = {
     tableFill: "#E3E9F1", tableStroke: "#5B6B82", tableFillSel: "#DBEAFE", tableStrokeSel: "#2563EB", podTick: "#94A3B8",
     chairSeat: "#EEF1F6", chairAccent: "#B9C3D1", chairStroke: "#7C8BA1", chairSeatSel: "#DBEAFE", chairAccentSel: "#93C5FD", chairStrokeSel: "#2563EB",
     device: "#2563EB", deviceStroke: "#1D4ED8", deviceAccent: "#E2E8F0", deviceSel: "#2563EB", deviceStrokeSel: "#1D4ED8", deviceAccentSel: "#DBEAFE",
-    doorArc: "#94A3B8", select: "#2563EB", fov: "#2563EB", fovLabel: "#1D4ED8",
+    select: "#2563EB", fov: "#2563EB", fovLabel: "#1D4ED8",
     label: "#334155", halo: "#FFFFFF", rulerMinor: "#CBD5E1", rulerMajor: "#64748B", rulerLabel: "#94A3B8",
     handleFill: "#FFFFFF", badgeFill: "#0F172A", badgeText: "#FFFFFF", badgeStroke: "#FFFFFF", coord: "#0F172A",
   },
@@ -218,16 +218,13 @@ const ContentSharingIcon = ({ selected }) => {
 };
 
 // Architectural door symbol: a slab drawn parallel to whichever wall it's snapped to
-// (our rotation maps local-x to the wall direction on every edge), plus a handle and
-// a dashed swing arc hinting at the opening direction.
+// (our rotation maps local-x to the wall direction on every edge), plus a handle.
 const DoorIcon = ({ selected }) => {
   const w = 0.9;
   const thickness = 0.1;
-  const c = usePalette();
   const { fill, stroke, accent } = useDeviceColors(selected);
   return (
     <g>
-      <path d={`M ${w / 2} 0 A ${w} ${w} 0 0 0 ${-w / 2} ${-w}`} fill="none" stroke={selected ? accent : c.doorArc} strokeWidth={1} strokeDasharray="4 3" vectorEffect="non-scaling-stroke" />
       <rect x={-w / 2} y={-thickness / 2} width={w} height={thickness} rx={0.02} fill={fill} stroke={stroke} strokeWidth={1} vectorEffect="non-scaling-stroke" />
       <circle cx={w / 2 - 0.16} cy={0} r={0.03} fill={accent} />
     </g>

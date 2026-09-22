@@ -59,3 +59,20 @@ describe("roomSightlines", () => {
     expect(roomSightlineSummary(ctx).unseen).toBe(1);
   });
 });
+
+describe("camera on the display", () => {
+  const { bestMountSide, createPlacedDevice } = require("./roomConfiguratorEngine");
+  const room = { length: 6, width: 4.5, height: 2.8 };
+  const display = { id: "d1", x: 0, y: 2.25, angle: 90, mount: "wall", sizeInches: 65 };
+  const ctx = { room, layout: "rectangular", table: { length: 3, width: 1.2, orientation: 0 }, tableOffset: { x: 0, y: 0 }, devices: { display: [display], allInOne: [], camera: [], videoBar: [] }, seats: [] };
+
+  test("the first one goes on the edge nearer seated eye height, and the switch moves it", () => {
+    const bar = createPlacedDevice("videoBar", ctx, { fov: 120 });
+    expect(bar).toMatchObject({ mountedOn: "d1", mountSide: "below" });
+    expect(bestMountSide(display, room, "dshape")).toBe("above");
+    const screens = placedScreens({ display: [display], allInOne: [] }, room);
+    const z = (side) => placedCameras({ camera: [], videoBar: [{ ...bar, mountSide: side }], allInOne: [] }, screens)[0].z;
+    expect(z("above")).toBeGreaterThan(screens[0].bottom + screens[0].height);
+    expect(z("below")).toBeLessThan(screens[0].bottom);
+  });
+});

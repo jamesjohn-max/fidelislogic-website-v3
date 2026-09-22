@@ -1,5 +1,6 @@
 import {
   CLASSROOM_DESK_DEPTH,
+  buildDefaultDevices,
   DEFAULT_SEATING_DENSITY,
   clamp,
   clampTableOffset,
@@ -86,8 +87,19 @@ function keepIds(prevDevices, nextDevices) {
   );
 }
 
+// A customer's plan always has a screen to plan the room around: a display sized for
+// the room, on the front wall, that follows the room and layout until moved by hand (see
+// refreshAutoDevices).
+export function withCustomerDisplay(p) {
+  if (p.audience !== "customer" || p.devices.display.length || p.devices.allInOne.length) return p;
+  const devices = { ...p.devices, display: buildDefaultDevices(p.room, p.layout, p.table).display };
+  return { ...p, devices: refreshAutoDevices(devices, p.room, p.layout, p.table, p.tableOffset) };
+}
+
 // Puts a changed plan back in order, given what it was before the change.
-export function settle(prev, next) {
+export const settle = (prev, next) => withCustomerDisplay(settleFurnitureAndDevices(prev, next));
+
+function settleFurnitureAndDevices(prev, next) {
   let p = next;
   const furnitureChanged =
     prev.room !== p.room || prev.layout !== p.layout || prev.table !== p.table || prev.chairCount !== p.chairCount || prev.seatingDensity !== p.seatingDensity;
@@ -210,7 +222,7 @@ export function fitOccupancy(plan) {
   return plan.chairCount > max ? settle(plan, { ...plan, chairCount: max }) : plan;
 }
 
-export const initialHistory = (plan = initialPlan()) => ({ past: [], present: fitOccupancy(plan), future: [], coalesce: null });
+export const initialHistory = (plan = initialPlan()) => ({ past: [], present: withCustomerDisplay(fitOccupancy(plan)), future: [], coalesce: null });
 
 // Actions:
 //   { type: "update", patch }       patch is an object or (plan) => object. A patch
