@@ -28,8 +28,8 @@ export const siteImages = {
     base: "/img/room-planner/preview",
     widths: [768, 1280],
     width: 1280,
-    height: 674,
-    alt: "The Room Planner's 3D view of a ten-seat boardroom, beside the review panel listing the room's dimensions, finishes and layout, ready to export as a PDF.",
+    height: 800,
+    alt: "The Room Planner's 3D view of a nine-seat boardroom, with a sightline from one seat to the display, beside the review panel listing the room's configuration, ready to export as a PDF.",
   },
 
   // Audience journeys: shown on the gateway cards and as the header image of

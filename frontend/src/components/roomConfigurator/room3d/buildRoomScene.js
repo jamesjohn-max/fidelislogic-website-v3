@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { HEIGHTS, dirVector } from "../../../lib/roomSightlines";
-import { AUDIO_PREFERENCES, SOUNDBAR_AUDIO } from "../../../lib/roomConfiguratorEngine";
+import { AUDIO_PREFERENCES, SOUNDBAR_AUDIO, nearestEdge } from "../../../lib/roomConfiguratorEngine";
 import { createPeopleKit } from "./buildPerson";
 import { ROOMZ_SIZE, WIRED_SIZE, buildRoomzScheduler, buildWiredRoomPanel, roomzTexture, wiredPanelTexture } from "./roomzScheduler";
 import {
@@ -34,6 +34,14 @@ const mat = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, rough
 // The wall something faces out from, by the way it faces (0° = up the plan): a thing
 // facing up the plan hangs on the bottom wall, and so on.
 const wallFacing = (angle) => ["bottom", "left", "top", "right"][Math.round((((angle % 360) + 360) % 360) / 90) % 4];
+
+// Which way something mounted on a wall faces into the room, taken from the wall it
+// actually sits on rather than the angle stored with it. A door and its room scheduler
+// are read from the corridor, so their sign and screen have to face out of the room
+// whichever wall the door was dragged to (and however it was turned on the plan).
+const WALL_INTO_ROOM = { top: 180, bottom: 0, left: 90, right: 270 };
+const wallOf = (item, room) => item.edge || nearestEdge(item.x, item.y, room);
+const facingIntoRoom = (item, room) => WALL_INTO_ROOM[wallOf(item, room)];
 
 // Where the overview camera starts: raised over the corner that keeps the main
 // screen's wall and the door's wall in view (those two are never cut away), looking
@@ -405,7 +413,7 @@ function buildDoor(d, room, materials, plate) {
     group.add(sign);
   }
   group.position.copy(toWorld(room, d.x, d.y, 0));
-  faceAngle(group, d.angle || 0);
+  faceAngle(group, facingIntoRoom(d, room));
   return group;
 }
 
@@ -419,16 +427,6 @@ const outOfRoom = (angle) => {
   const r = (angle * Math.PI) / 180;
   return { x: -Math.sin(r), y: Math.cos(r) };
 };
-
-// Where a door's scheduler goes when the plan doesn't place one: beside the door on
-// its handle side, or the other side if that's too near a corner.
-function schedulerBesideDoor(d, room) {
-  const a = alongWall(d.angle || 0);
-  const at = (sign) => ({ x: d.x + a.x * 0.8 * sign, y: d.y + a.y * 0.8 * sign });
-  const fits = (p) => p.x >= 0.3 && p.x <= room.length - 0.3 && p.y >= 0.3 && p.y <= room.width - 0.3;
-  const p = fits(at(1)) ? at(1) : at(-1);
-  return { ...p, angle: d.angle || 0, edge: d.edge || wallFacing(d.angle || 0) };
-}
 
 // The room's panel on the corridor side of the wall, facing out, from a plan position
 // on the wall facing into the room: a wireless ROOMZ scheduler, or a wired generic
@@ -532,7 +530,7 @@ function seatLook(seat, screens) {
 // Returns the scene plus handles the viewer needs: the walls (to cut away the ones
 // between the camera and the room), each seat's chair and person, the ceiling, the
 // floor-level overlays and the things you can pick.
-export function buildRoomScene({ room, layoutResult, tableOffset, seats, seatSources, screens, cameras, devices, finishes, audioPreference, roomName, defaultScheduler = true }) {
+export function buildRoomScene({ room, layoutResult, tableOffset, seats, seatSources, screens, cameras, devices, finishes, audioPreference, roomName }) {
   const scene = new THREE.Scene();
   const disposables = [];
   const textures = {};
@@ -686,19 +684,14 @@ export function buildRoomScene({ room, layoutResult, tableOffset, seats, seatSou
     const door = buildDoor(d, room, materials, plate);
     scene.add(door);
     // Always shown, even when the overview lifts its wall away.
-    wallItems.push({ object: door, wall: d.edge || wallFacing(d.angle || 0), always: true });
+    wallItems.push({ object: door, wall: wallOf(d, room), always: true });
   });
 
-  // Room schedulers: wherever the plan puts its booking panels (always on the corridor
-  // side, where people check the room). With none placed, a ROOMZ goes outside the door
-  // as the usual starting point — but only where the plan asks about room control, so a
-  // customer's room is never shown equipment they weren't offered.
+  // Room schedulers: wherever the plan puts its booking panels, on the corridor side
+  // where people check the room. Only ones actually on the plan are shown — a room is
+  // never given equipment nobody chose.
   const mainDoor = devices.door[0] || null;
-  const schedulerSpots = devices.bookingPanel.length
-    ? devices.bookingPanel.map((b) => ({ x: b.x, y: b.y, angle: b.angle || 0, edge: b.edge || wallFacing(b.angle || 0), wired: !!b.wired }))
-    : defaultScheduler && mainDoor
-    ? [schedulerBesideDoor(mainDoor, room)]
-    : [];
+  const schedulerSpots = devices.bookingPanel.map((b) => ({ x: b.x, y: b.y, angle: facingIntoRoom(b, room), edge: wallOf(b, room), wired: !!b.wired }));
   // A panel's face is drawn once per kind in the room.
   const panelTextures = {};
   if (schedulerSpots.some((spot) => !spot.wired)) panelTextures.roomz = roomzTexture(name);
@@ -715,14 +708,14 @@ export function buildRoomScene({ room, layoutResult, tableOffset, seats, seatSou
   // way is out of the room and along its wall (world directions).
   let entrance = null;
   if (mainDoor) {
-    const angle = mainDoor.angle || 0;
+    const angle = facingIntoRoom(mainDoor, room);
     const out = outOfRoom(angle), along = alongWall(angle);
     const nearest = schedulers.reduce(
       (best, sc) => (!best || Math.hypot(sc.spot.x - mainDoor.x, sc.spot.y - mainDoor.y) < Math.hypot(best.spot.x - mainDoor.x, best.spot.y - mainDoor.y) ? sc : best),
       null
     );
     entrance = {
-      wall: mainDoor.edge || wallFacing(angle),
+      wall: wallOf(mainDoor, room),
       door: toWorld(room, mainDoor.x, mainDoor.y, 0),
       scheduler: nearest ? nearest.object.position.clone() : null,
       schedulerWired: !!nearest?.spot.wired,

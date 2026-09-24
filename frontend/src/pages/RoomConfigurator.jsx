@@ -72,6 +72,8 @@ import {
   rotatePoint,
   placedSeats,
   createPlacedDevice,
+  faceChairsToScreen,
+  screensOf,
   addSpreadDevices,
   resolvePlacement,
   followMountedCameras,
@@ -564,7 +566,18 @@ export const RoomConfigurator = ({ with3d = false }) => {
       }
       const devices = { ...p.devices, [category]: p.devices[category].map((d) => (d.id === id ? next : d)) };
       // A display carries the cameras mounted on it.
-      return { devices: category === "display" ? followMountedCameras(devices, next, p) : devices };
+      const moved = { devices: category === "display" ? followMountedCameras(devices, next, p) : devices };
+      // Moving the room's main screen turns any chair left with its back to it, in the
+      // same step, so an undo puts both the screen and the chairs back. A boardroom
+      // that empties the screen's side of the table instead (see withScreenEdge) lays
+      // its seats out again from scratch, so there's nothing to turn.
+      const reseats = p.layout === "rectangular" && p.table.screenEndFree;
+      if (reseats || next.id !== screensOf(p.devices)[0]?.id) return moved;
+      const chairOffsets = faceChairsToScreen(
+        { chairs: layoutResult.chairs, room: p.room, tableOffset: p.tableOffset, removedChairIndices, chairOffsets: p.chairOffsets },
+        next
+      );
+      return chairOffsets === p.chairOffsets ? moved : { ...moved, chairOffsets };
     });
   };
 
@@ -707,11 +720,12 @@ export const RoomConfigurator = ({ with3d = false }) => {
             finishes: finishes3d,
             audioPreference,
             roomName,
-            defaultScheduler: !customer,
           });
+          // The whole room first — the picture that shows the plan — then the entrance
+          // with its room scheduler.
           views3d = [
-            shots?.outside && { title: "3D View: Outside the Room", canvas: shots.outside },
             shots?.overview && { title: "3D View: The Whole Room", canvas: shots.overview },
+            shots?.outside && { title: "3D View: The Entrance and Room Scheduler", canvas: shots.outside },
           ].filter(Boolean);
         } catch {
           views3d = [];
@@ -1425,7 +1439,6 @@ export const RoomConfigurator = ({ with3d = false }) => {
                       audioPreference={audioPreference}
                       roomName={reportDetails.roomName}
                       analysis={!isCustomer}
-                      defaultScheduler={!isCustomer}
                     />
                   </Suspense>
                   </div>

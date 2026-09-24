@@ -358,11 +358,36 @@ export function seatingSpacingSummary(layout, density) {
   return `${m(d.tableSeat)} per seat`;
 }
 
-// A boardroom table's short end nearest the screen (the front wall faces it): the left
-// edge of a landscape table, the top edge of a portrait one. With `screenEndFree` set,
-// no one sits there with their back to the screen and camera.
+// A boardroom table's short end toward the front wall: the left edge of a landscape
+// table, the top edge of a portrait one. Where a screen has been placed, the side
+// nearest it (`table.screenEdge`) is used instead — see tableEdgeNearest.
 const rectScreenEdge = (table) => (table.orientation === 0 ? "left" : "top");
-const screenEndLength = (table, inset = 0.4) => Math.max(table.width + inset * 2 - 2 * CORNER_GAP, 0.2);
+export const RECT_EDGES = ["top", "right", "bottom", "left"];
+
+// With `screenEndFree` set, the side of the table nearest the screen is left clear, so
+// nobody sits with their back to it and everyone else looks past an empty edge.
+export const freeRectEdge = (table) =>
+  table.screenEndFree ? (RECT_EDGES.includes(table.screenEdge) ? table.screenEdge : rectScreenEdge(table)) : null;
+
+// How long one edge of the table's seating ring is — a long side or a short end.
+const freeEdgeLength = (table, edge, inset = 0.4) => {
+  const boxW = table.orientation === 0 ? table.length : table.width;
+  const boxH = table.orientation === 0 ? table.width : table.length;
+  const span = edge === "top" || edge === "bottom" ? boxW : boxH;
+  return Math.max(span + inset * 2 - 2 * CORNER_GAP, 0.2);
+};
+
+// Which side of a boardroom table a point (the room's main screen) is off, measured
+// against the table's own proportions so a long table counts its short end only when
+// the screen is really beyond it rather than just off to that side.
+export function tableEdgeNearest(table, center, point) {
+  const boxW = table.orientation === 0 ? table.length : table.width;
+  const boxH = table.orientation === 0 ? table.width : table.length;
+  const dx = (point.x - center.x) / Math.max(boxW / 2, 0.1);
+  const dy = (point.y - center.y) / Math.max(boxH / 2, 0.1);
+  if (Math.abs(dx) >= Math.abs(dy)) return dx >= 0 ? "right" : "left";
+  return dy >= 0 ? "bottom" : "top";
+}
 
 function rectPerimeterLength(w, h, inset = 0.4, cornerGap = CORNER_GAP) {
   const W = w + inset * 2;
@@ -411,8 +436,8 @@ function rectPerimeterPositions(w, h, count, inset = 0.4, cornerGap = CORNER_GAP
   const total = topLen + sideLen + bottomLen + leftLen;
   const pts = [];
   if (freeEdge) {
-    // One short end kept free (the screen end): the chairs share the other three edges
-    // evenly, running from one corner of the free end round to the other.
+    // One edge kept free (the one the screen is on): the chairs share the other three
+    // evenly, running from one corner of the free edge round to the other.
     const edges = [
       { id: "top", len: topLen, at: (t) => ({ x: -topLen / 2 + t, y: -H / 2, angle: 180 }) },
       { id: "right", len: sideLen, at: (t) => ({ x: W / 2, y: -sideLen / 2 + t, angle: 270 }) },
@@ -707,7 +732,8 @@ export function getMaxChairsForLayout(layout, room, table, density = DEFAULT_SEA
       const { across, depth } = uShapeDims(table);
       perimeter = uShapePerimeterLength(across, depth);
     } else {
-      perimeter = rectPerimeterLength(boxW, boxH, 0.4) - (table.screenEndFree ? screenEndLength(table) : 0);
+      const free = freeRectEdge(table);
+      perimeter = rectPerimeterLength(boxW, boxH, 0.4) - (free ? freeEdgeLength(table, free) : 0);
     }
     return Math.max(MIN_CHAIRS, Math.floor(perimeter / densitySpacing(density).tableSeat));
   }
@@ -1094,7 +1120,7 @@ export function generateLayout(layoutType, room, table, chairCount, podOverrides
     }
     case "rectangular":
     default: {
-      const chairs = rectPerimeterPositions(boxW, boxH, chairCount, 0.4, CORNER_GAP, table.screenEndFree ? rectScreenEdge(table) : null);
+      const chairs = rectPerimeterPositions(boxW, boxH, chairCount, 0.4, CORNER_GAP, freeRectEdge(table));
       return { tableShape: { type: "rect", w: boxW, h: boxH }, chairs, groupBounds: symmetricBounds(boxW + 1.7, boxH + 1.7) };
     }
   }
@@ -1442,6 +1468,30 @@ export function placedSeats(chairs, room, tableOffset = { x: 0, y: 0 }, removedI
     const o = chairOffsets[i] || {};
     return [{ x: cx + c.x + (o.dx || 0), y: cy + c.y + (o.dy || 0), angle: o.angle ?? c.angle ?? 0 }];
   });
+}
+
+// How far a chair can be turned from the screen before its back is to it.
+export const BACK_TO_SCREEN_DEG = 100;
+
+// Chairs left looking away from a screen, turned to face it — for after that screen is
+// moved to another part of the room, so nobody ends up sitting with their back to it.
+// Their places don't change, only the way they face (stored per chair in `chairOffsets`,
+// the same as turning one by hand). Returns the offsets unchanged when everyone already
+// sees it.
+export function faceChairsToScreen({ chairs, room, tableOffset = { x: 0, y: 0 }, removedChairIndices = new Set(), chairOffsets = {} }, screen) {
+  if (!screen) return chairOffsets;
+  const cx = room.length / 2 + tableOffset.x;
+  const cy = room.width / 2 + tableOffset.y;
+  let next = chairOffsets;
+  chairs.forEach((c, i) => {
+    if (removedChairIndices.has(i)) return;
+    const o = chairOffsets[i] || {};
+    const toScreen = angleFromVector(screen.x - (cx + c.x + (o.dx || 0)), screen.y - (cy + c.y + (o.dy || 0)));
+    if (angleGap(o.angle ?? c.angle ?? 0, toScreen) <= BACK_TO_SCREEN_DEG) return;
+    if (next === chairOffsets) next = { ...chairOffsets };
+    next[i] = { ...o, angle: rotateBy(Math.round(toScreen / ROTATE_STEP) * ROTATE_STEP, 0) };
+  });
+  return next;
 }
 
 // A new device of `category`, dropped at its automatic spot (see autoPlacement) and
