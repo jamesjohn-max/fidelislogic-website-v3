@@ -6,15 +6,15 @@ import { placedCameras, placedScreens } from "../../../lib/roomSightlines";
 export const SNAPSHOT_WATERMARK = "Made using Room Planner from Fidelis Logic";
 
 // Stills of the finished room for the PDF report, rendered off screen at print size:
-//   outside  standing in the corridor by the entrance: the door with the room's name,
-//            the ROOMZ scheduler beside it (and again close up, inset), and the rest of
-//            the wall made see-through so the people and equipment inside show;
 //   overview the whole room from above a corner, near walls and ceiling lifted off, so
-//            everyone seated and every device shows.
+//            everyone seated and every device shows;
+//   outside  standing back in the corridor by the entrance: the door with the room's
+//            name, any room scheduler beside it (and again close up, inset), and the
+//            rest of the wall made see-through so the whole room shows behind them.
 // Each is marked in its top-left corner with where it was made. Returns
 // { outside, overview } as 2D canvases (outside is null when the plan has no door),
 // or null when the browser can't render 3D.
-export async function renderRoomSnapshots({ room, layoutResult, tableOffset, seats, devices, finishes, audioPreference, roomName, defaultScheduler = true }) {
+export async function renderRoomSnapshots({ room, layoutResult, tableOffset, seats, devices, finishes, audioPreference, roomName }) {
   let renderer;
   try {
     renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
@@ -23,7 +23,7 @@ export async function renderRoomSnapshots({ room, layoutResult, tableOffset, sea
   }
   const screens = placedScreens(devices, room);
   const cameras = placedCameras(devices, screens);
-  const built = buildRoomScene({ room, layoutResult, tableOffset, seats, screens, cameras, devices, finishes, audioPreference, roomName, defaultScheduler });
+  const built = buildRoomScene({ room, layoutResult, tableOffset, seats, screens, cameras, devices, finishes, audioPreference, roomName });
   const extras = [];
   try {
     renderer.setPixelRatio(1);
@@ -67,6 +67,40 @@ function capture(renderer, scene, camera, width, height) {
   return c;
 }
 
+// Zooms a positioned camera out (or in) until every one of `points` is in the picture,
+// keeping the picture's proportions: the view is offset to the box those points cover.
+function frameToPoints(camera, points, W, H, margin = 0.06) {
+  const px = points.map((c) => {
+    const p = c.clone().project(camera);
+    return { x: ((p.x + 1) / 2) * W, y: ((1 - p.y) / 2) * H };
+  });
+  let x0 = Math.min(...px.map((p) => p.x)), x1 = Math.max(...px.map((p) => p.x));
+  let y0 = Math.min(...px.map((p) => p.y)), y1 = Math.max(...px.map((p) => p.y));
+  const m = margin * Math.max(x1 - x0, y1 - y0);
+  x0 -= m; x1 += m; y0 -= m; y1 += m;
+  let bw = x1 - x0, bh = y1 - y0;
+  if (bw / bh > W / H) {
+    const nh = bw / (W / H);
+    y0 -= (nh - bh) / 2;
+    bh = nh;
+  } else {
+    const nw = bh * (W / H);
+    x0 -= (nw - bw) / 2;
+    bw = nw;
+  }
+  camera.setViewOffset(W, H, x0, y0, bw, bh);
+}
+
+// The room's outline in 3D: its floor corners and the tops of its walls.
+function roomCorners(room) {
+  const hx = room.length / 2 + WALL_T, hz = room.width / 2 + WALL_T;
+  const pts = [];
+  [-1, 1].forEach((sx) => [-1, 1].forEach((sz) => {
+    pts.push(new THREE.Vector3(sx * hx, 0, sz * hz), new THREE.Vector3(sx * hx, room.height, sz * hz));
+  }));
+  return pts;
+}
+
 function renderOutside(renderer, built, room, extras) {
   const { scene, walls, materials } = built;
   const { wall, door, scheduler, schedulerWired, out, along } = built.entrance;
@@ -105,18 +139,26 @@ function renderOutside(renderer, built, room, extras) {
   built.ceiling.visible = true;
   materials.ceilingDevice.opacity = 1;
 
-  // Stand in the corridor off to the side of the entrance away from the room's middle,
-  // so the view takes in the door and scheduler up close and looks on across the room
-  // through the glass.
+  // Stand well back in the corridor, off to the side of the entrance away from the
+  // room's middle, looking at the door and its scheduler with the whole room behind
+  // them through the glass. How far back follows the room's size, so a big room still
+  // fits in the frame; the inset below keeps the scheduler legible.
   const doorFace = door.clone().addScaledVector(out, WALL_T);
-  const focus = (scheduler ? doorFace.clone().lerp(scheduler.clone(), 0.4) : doorFace.clone()).setY(1.12);
+  const entrance = scheduler ? doorFace.clone().lerp(scheduler.clone(), 0.4) : doorFace.clone();
+  // Aim between the entrance and the middle of the room, so both are in the picture.
+  const focus = entrance.clone().lerp(new THREE.Vector3(0, 0, 0), 0.45).setY(1.12);
   const middle = new THREE.Vector3().sub(door).dot(along);
   const away = middle > 0 ? -1 : 1;
   const tilt = 0.5;
   const dir = out.clone().multiplyScalar(Math.cos(tilt)).addScaledVector(along, away * Math.sin(tilt)).normalize();
-  const camera = new THREE.PerspectiveCamera(52, W / H, 0.05, 200);
-  camera.position.copy(focus).addScaledVector(dir, 2.9).setY(1.5);
+  const camera = new THREE.PerspectiveCamera(58, W / H, 0.05, 200);
+  // Back off by the room's own diagonal, then frame to whatever is still outside the
+  // picture, so the whole room, the door and its scheduler are always all in it.
+  const back = Math.min(Math.max(0.62 * Math.hypot(room.length, room.width), 4.2), 11);
+  camera.position.copy(focus).addScaledVector(dir, back).setY(1.75);
   camera.lookAt(focus);
+  camera.updateMatrixWorld();
+  frameToPoints(camera, [...roomCorners(room), doorFace, ...(scheduler ? [scheduler] : [])], W, H, 0.08);
   camera.updateMatrixWorld();
   front.position.copy(camera.position).add(new THREE.Vector3(0, 2.5, 0));
   front.target.position.copy(focus);
@@ -186,34 +228,11 @@ function renderOverview(renderer, built, room, screens, doors) {
   camera.updateMatrixWorld();
   cutAwayWalls(built.walls, camera.position, true, built.wallItems);
 
-  // Crop to the room: project its corners (floor, and the tops of the walls still
-  // standing) and zoom the view to just that box, at the picture's proportions.
-  const hx = room.length / 2 + WALL_T, hz = room.width / 2 + WALL_T;
-  const corners = [];
-  [-1, 1].forEach((sx) => [-1, 1].forEach((sz) => {
-    corners.push(new THREE.Vector3(sx * hx, 0, sz * hz));
-    const standing = built.walls.some((w) => w.visible && w.userData.normal.dot(new THREE.Vector3(sx, 0, sz)) > 0);
-    if (standing) corners.push(new THREE.Vector3(sx * hx, room.height, sz * hz));
-  }));
-  const px = corners.map((c) => {
-    const p = c.clone().project(camera);
-    return { x: ((p.x + 1) / 2) * W, y: ((1 - p.y) / 2) * H };
-  });
-  let x0 = Math.min(...px.map((p) => p.x)), x1 = Math.max(...px.map((p) => p.x));
-  let y0 = Math.min(...px.map((p) => p.y)), y1 = Math.max(...px.map((p) => p.y));
-  const m = 0.05 * Math.max(x1 - x0, y1 - y0);
-  x0 -= m; x1 += m; y0 -= m; y1 += m;
-  let bw = x1 - x0, bh = y1 - y0;
-  if (bw / bh > W / H) {
-    const nh = bw / (W / H);
-    y0 -= (nh - bh) / 2;
-    bh = nh;
-  } else {
-    const nw = bh * (W / H);
-    x0 -= (nw - bw) / 2;
-    bw = nw;
-  }
-  camera.setViewOffset(W, H, x0, y0, bw, bh);
+  // Crop to the room: its floor corners, and the tops of the walls still standing.
+  const corners = roomCorners(room).filter(
+    (c) => c.y === 0 || built.walls.some((w) => w.visible && w.userData.normal.dot(new THREE.Vector3(Math.sign(c.x), 0, Math.sign(c.z))) > 0)
+  );
+  frameToPoints(camera, corners, W, H, 0.05);
 
   const canvas = capture(renderer, built.scene, camera, W, H);
   drawWatermark(canvas.getContext("2d"), W);

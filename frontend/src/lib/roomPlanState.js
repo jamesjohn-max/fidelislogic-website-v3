@@ -8,9 +8,12 @@ import {
   generateLayout,
   getChairLimits,
   getTableLimits,
+  mainScreen,
   refreshAutoDevices,
   respreadAutoDevices,
   seatingArea,
+  tableCenterPoint,
+  tableEdgeNearest,
 } from "./roomConfiguratorEngine";
 import { ROOM_TEMPLATES, buildTemplateDevices, buildTemplatePlan, emptyDevices } from "./roomTemplates";
 
@@ -89,15 +92,40 @@ function keepIds(prevDevices, nextDevices) {
 
 // A customer's plan always has a screen to plan the room around: a display sized for
 // the room, on the front wall, that follows the room and layout until moved by hand (see
-// refreshAutoDevices).
-export function withCustomerDisplay(p) {
-  if (p.audience !== "customer" || p.devices.display.length || p.devices.allInOne.length) return p;
-  const devices = { ...p.devices, display: buildDefaultDevices(p.room, p.layout, p.table).display };
+// refreshAutoDevices). It's marked `autoAdded`, so switching to the reseller path — where
+// every device is chosen deliberately — takes it away again.
+export function syncCustomerDisplay(p) {
+  const customer = p.audience === "customer";
+  if (!customer) {
+    const display = p.devices.display.filter((d) => !d.autoAdded);
+    return display.length === p.devices.display.length ? p : { ...p, devices: { ...p.devices, display } };
+  }
+  if (p.devices.display.length || p.devices.allInOne.length) return p;
+  const [display] = buildDefaultDevices(p.room, p.layout, p.table).display;
+  const devices = { ...p.devices, display: [{ ...display, autoAdded: true }] };
   return { ...p, devices: refreshAutoDevices(devices, p.room, p.layout, p.table, p.tableOffset) };
 }
 
-// Puts a changed plan back in order, given what it was before the change.
-export const settle = (prev, next) => withCustomerDisplay(settleFurnitureAndDevices(prev, next));
+// Which side of a boardroom table is left clear of chairs: the one the room's main
+// screen is on, re-read whenever that screen or the table moves. The seats are then
+// laid out again around the other three sides, so the screen's side is empty and
+// everyone has a clear view of it (see freeRectEdge).
+function withScreenEdge(p) {
+  if (p.layout !== "rectangular" || !p.table.screenEndFree) return p;
+  const screen = mainScreen(p.devices);
+  const screenEdge = screen ? tableEdgeNearest(p.table, tableCenterPoint(p.layout, p.room, p.table, p.tableOffset), screen) : undefined;
+  return screenEdge === p.table.screenEdge ? p : { ...p, table: { ...p.table, screenEdge } };
+}
+
+// Puts a changed plan back in order, given what it was before the change. The screen's
+// side of the table is read from where everything ended up (the table group is kept
+// inside the walls first, and an auto-placed screen follows the room), so when it turns
+// out to be a different side the plan is settled once more around the new seating.
+export function settle(prev, next) {
+  const p = syncCustomerDisplay(settleFurnitureAndDevices(prev, syncCustomerDisplay(next)));
+  const reseated = withScreenEdge(p);
+  return reseated === p ? p : syncCustomerDisplay(settleFurnitureAndDevices(p, reseated));
+}
 
 function settleFurnitureAndDevices(prev, next) {
   let p = next;
@@ -222,7 +250,7 @@ export function fitOccupancy(plan) {
   return plan.chairCount > max ? settle(plan, { ...plan, chairCount: max }) : plan;
 }
 
-export const initialHistory = (plan = initialPlan()) => ({ past: [], present: withCustomerDisplay(fitOccupancy(plan)), future: [], coalesce: null });
+export const initialHistory = (plan = initialPlan()) => ({ past: [], present: syncCustomerDisplay(fitOccupancy(plan)), future: [], coalesce: null });
 
 // Actions:
 //   { type: "update", patch }       patch is an object or (plan) => object. A patch

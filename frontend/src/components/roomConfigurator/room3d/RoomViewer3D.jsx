@@ -118,7 +118,7 @@ function SeatReport({ experience, analysis }) {
   );
 }
 
-export default function RoomViewer3D({ room, layoutResult, tableOffset, seats, devices, finishes, audioPreference, roomName, analysis = true, defaultScheduler = true }) {
+export default function RoomViewer3D({ room, layoutResult, tableOffset, seats, devices, finishes, audioPreference, roomName, analysis = true }) {
   const containerRef = useRef(null);
   const three = useRef(null);
   const [error, setError] = useState(null);
@@ -245,11 +245,11 @@ export default function RoomViewer3D({ room, layoutResult, tableOffset, seats, d
     const s = three.current;
     if (!s) return;
     s.built?.dispose();
-    s.built = buildRoomScene({ room, layoutResult, tableOffset, seats, screens, cameras, devices, finishes, audioPreference, roomName, defaultScheduler });
+    s.built = buildRoomScene({ room, layoutResult, tableOffset, seats, screens, cameras, devices, finishes, audioPreference, roomName });
     s.sightlines = null;
     s.dirty = true;
     setSceneVersion((v) => v + 1);
-  }, [room, layoutResult, tableOffset, seats, screens, cameras, devices, finishes, audioPreference, roomName, defaultScheduler]);
+  }, [room, layoutResult, tableOffset, seats, screens, cameras, devices, finishes, audioPreference, roomName]);
 
   // Where the overview starts: behind the room from the main screen, looking in.
   const overviewPose = useCallback(() => overviewCameraPose(room, screens, devices.door), [room, screens, devices.door]);

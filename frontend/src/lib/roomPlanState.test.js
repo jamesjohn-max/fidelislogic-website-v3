@@ -153,3 +153,71 @@ describe("customer display", () => {
     expect(update(initialHistory(), { audience: "reseller" }).present.devices.display).toHaveLength(0);
   });
 });
+
+describe("chairs and the screen", () => {
+  const { faceChairsToScreen } = require("./roomConfiguratorEngine");
+  const room = { length: 6, width: 4, height: 2.8 };
+  // Two chairs either side of the middle, facing each other across a table: the first
+  // looks down the plan, the second up it.
+  const chairs = [{ x: 0, y: -1, angle: 180 }, { x: 0, y: 1, angle: 0 }];
+
+  test("a chair with its back to the moved screen is turned to face it, the other left alone", () => {
+    // Screen moved to the top wall: the first chair has its back to it, the second sees it.
+    const offsets = faceChairsToScreen({ chairs, room, chairOffsets: {} }, { x: 3, y: 0.2 });
+    expect(offsets[0].angle).toBe(0);
+    expect(offsets[1]).toBeUndefined();
+    // Moved to the bottom wall instead: now the second chair is the one turned.
+    const other = faceChairsToScreen({ chairs, room, chairOffsets: {} }, { x: 3, y: 3.8 });
+    expect(other[0]).toBeUndefined();
+    expect(other[1].angle).toBe(180);
+    // A chair keeps any place it was nudged to; only its facing changes.
+    const nudged = faceChairsToScreen({ chairs, room, chairOffsets: { 0: { dx: 0.3, dy: 0.2 } } }, { x: 3, y: 0.2 });
+    expect(nudged[0]).toMatchObject({ dx: 0.3, dy: 0.2 });
+  });
+});
+
+describe("audience switch", () => {
+  test("switching to the reseller path takes the automatic display away again", () => {
+    const customer = update(initialHistory(), { audience: "customer" });
+    expect(customer.present.devices.display).toHaveLength(1);
+    expect(update(customer, { audience: "reseller" }).present.devices.display).toHaveLength(0);
+  });
+});
+
+describe("the screen's side of the table", () => {
+  const { freeRectEdge, generateLayout } = require("./roomConfiguratorEngine");
+  // A boardroom with its display on the left-hand wall, as a landscape table starts.
+  const start = () =>
+    update(initialHistory(), (p) => ({
+      audience: "reseller",
+      layout: "rectangular",
+      room: { length: 8, width: 5, height: 2.8 },
+      roomEntered: { length: true, width: true, height: true },
+      table: { ...p.table, length: 3.6, width: 1.4, orientation: 0, screenEndFree: true },
+      chairCount: 8,
+      devices: { ...p.devices, display: [{ id: "d1", x: 0, y: 2.5, angle: 90, mount: "wall", sizeInches: 75 }] },
+    }));
+  // How many chairs sit along the given side, by the way they face: a chair on the
+  // left-hand side of the table looks right across it, and so on.
+  const EDGE_FACING = { top: 180, right: 270, bottom: 0, left: 90 };
+  const onEdge = (plan, edge) => {
+    const { chairs } = generateLayout(plan.layout, plan.room, plan.table, plan.chairCount, {}, plan.seatingDensity);
+    return chairs.filter((c) => c.angle === EDGE_FACING[edge]).length;
+  };
+
+  test("the side the screen is on has no chairs, wherever the screen is moved", () => {
+    const state = start();
+    expect(freeRectEdge(state.present.table)).toBe("left");
+    expect(onEdge(state.present, "left")).toBe(0);
+    expect(onEdge(state.present, "bottom")).toBeGreaterThan(0);
+
+    // Moved to the wall down the side of the room: that long side empties instead, and
+    // every chair it held moves round to the other three.
+    const moved = update(state, (p) => ({ devices: { ...p.devices, display: [{ ...p.devices.display[0], x: 4, y: 5, angle: 0 }] } }));
+    expect(freeRectEdge(moved.present.table)).toBe("bottom");
+    expect(onEdge(moved.present, "bottom")).toBe(0);
+    expect(onEdge(moved.present, "left")).toBeGreaterThan(0);
+    // No seats are lost on the way — the count only drops if that side can't hold them.
+    expect(moved.present.chairCount).toBe(state.present.chairCount);
+  });
+});
