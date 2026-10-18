@@ -1,10 +1,13 @@
-import { CEILING_MIC_RANGE_M, TABLE_MIC_RANGE_M, TABLE_CAM_MIC_RANGE_M, typicalAllInOneMicReach, micMount, defaultSpeakerMount, refCode } from "./roomConfiguratorEngine";
+// From the roomPlannerShared leaf, never from roomConfiguratorEngine: the engine imports
+// this module, so importing it back would be a cycle, and React Refresh kills the whole
+// bundle on one (see the note at the top of roomPlannerShared).
+import { CEILING_MIC_RANGE_M, TABLE_MIC_RANGE_M, TABLE_CAM_MIC_RANGE_M, typicalAllInOneMicReach, micMount, defaultSpeakerMount, refCode } from "./roomPlannerShared";
 
 // --- default pickup / throw ranges, in metres -----------------------------------------
 // Planning figures, NOT measured data: each is a starting point a planner can override
 // per device or room-wide, and is meant to be tuned here, in one place, once checked
 // against real installs. Mic defaults for ceiling arrays, table pods, 360 cameras and
-// all-in-ones come from roomConfiguratorEngine and are re-exported, not redeclared.
+// all-in-ones come from roomPlannerShared and are re-exported, not redeclared.
 export { CEILING_MIC_RANGE_M, TABLE_MIC_RANGE_M, TABLE_CAM_MIC_RANGE_M };
 export const MIN_RANGE_M = 0.25; // floor: no source covers less than this (planning figure)
 export const VIDEO_BAR_MIC_RANGE_M = 4; // beamforming bar mic (planning figure)

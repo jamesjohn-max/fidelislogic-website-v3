@@ -4,10 +4,20 @@
 
 // All audio reach maths lives in roomAudioCoverage — one source of truth, so the advice
 // below, the 2D overlay and the PDF cannot drift apart once ranges are user-editable.
-// That module imports this one back for the mic constants, micMount, refCode and
-// typicalAllInOneMicReach; the cycle is safe because neither side reads the other at
-// module-init time, only inside functions.
+// The dependency is one-way: anything both modules need lives in the roomPlannerShared
+// leaf, which imports from neither. Do NOT import this module from roomAudioCoverage —
+// see the note at the top of roomPlannerShared for what a cycle does to the dev server.
 import { derivedMicRange, micSources, resolveMicRange } from "./roomAudioCoverage";
+import {
+  AUDIO_PREFERENCES, CEILING_MIC_AUDIO, CEILING_MIC_RANGE_M, DEVICE_REF_PREFIX, SOUNDBAR_AUDIO,
+  TABLE_CAM_MIC_RANGE_M, TABLE_MIC_RANGE_M, defaultSpeakerMount, micMount, refCode, typicalAllInOneMicReach,
+} from "./roomPlannerShared";
+
+// Re-exported so every existing consumer keeps importing these from the engine.
+export {
+  AUDIO_PREFERENCES, CEILING_MIC_AUDIO, CEILING_MIC_RANGE_M, DEVICE_REF_PREFIX, SOUNDBAR_AUDIO,
+  TABLE_CAM_MIC_RANGE_M, TABLE_MIC_RANGE_M, defaultSpeakerMount, micMount, refCode, typicalAllInOneMicReach,
+};
 
 export const GRID_STEP = 0.5 / 3;
 export const WALL_SNAP_DISTANCE = 0.55;
@@ -95,13 +105,9 @@ export const LAYOUTS = [
 ];
 
 export const PLATFORMS = ["Microsoft Teams Rooms", "Zoom Rooms", "Google Meet", "Cisco Webex", "BYOD / Bring Your Own Device"];
-export const AUDIO_PREFERENCES = ["Ceiling Microphone Array", "Table Microphone Pods", "Soundbar (Integrated Mic + Speaker)", "Wireless Boundary Microphones"];
+// AUDIO_PREFERENCES, SOUNDBAR_AUDIO and defaultSpeakerMount live in roomPlannerShared.
 // A soundbar is the room's speaker and microphones in one, good for a limited number of
 // people: beyond these, extra speakers / microphones are needed.
-export const SOUNDBAR_AUDIO = AUDIO_PREFERENCES[2];
-// A speaker's mount unless someone sets it: a soundbar setup's speaker sits on the
-// table, everything else (including no setup chosen yet) is up in the ceiling.
-export const defaultSpeakerMount = (audioPreference) => (audioPreference === SOUNDBAR_AUDIO ? "table" : "ceiling");
 export const SOUNDBAR_SPEAKER_CAPACITY = 10;
 export const SOUNDBAR_MIC_CAPACITY = 8;
 // Below this many seats a camera's or video bar's built-in microphones pick everyone up,
@@ -136,7 +142,7 @@ export const ALL_IN_ONE_FOV = 115;
 // Pro) — so it's set per device. Without a datasheet to go by, a typical reach for the
 // size is assumed: 4 m up to 55", 7 m from 65".
 export const ALL_IN_ONE_MIC_REACH_M = [3, 4, 5, 7, 10];
-export const typicalAllInOneMicReach = (sizeInches) => (sizeInches <= 55 ? 4 : 7);
+// typicalAllInOneMicReach lives in roomPlannerShared.
 
 // Camera intelligence behaviors, in the spirit of the framing modes real conferencing
 // cameras ship with today (Poly DirectorAI's speaker tracking / group framing, Jabra
@@ -180,20 +186,7 @@ export const DEVICE_LABELS = {
   bookingPanel: "Booking panel",
 };
 
-// Short reference codes shown as canvas labels and in the text brief (D1, C1, M1, SP1, ...).
-export const DEVICE_REF_PREFIX = {
-  display: "D",
-  allInOne: "AIO",
-  camera: "C",
-  videoBar: "VB",
-  microphone: "M",
-  speaker: "SP",
-  touchPanel: "TP",
-  contentSharing: "CS",
-  door: "DR",
-  bookingPanel: "BP",
-};
-export const refCode = (category, index) => `${DEVICE_REF_PREFIX[category]}${index + 1}`;
+// DEVICE_REF_PREFIX and refCode (D1, C1, M1, SP1, ...) live in roomPlannerShared.
 // Full-name version used for on-canvas labels, e.g. "Booking panel 1".
 export const refLabel = (category, index) => `${DEVICE_LABELS[category]} ${index + 1}`;
 
@@ -1598,7 +1591,7 @@ export function refreshAutoDevices(devices, room, layout, table, tableOffset) {
 // pickup reach is used for planning) but no speaker, and it only works paired with a
 // video bar at the display — which is also where the room's sound comes from.
 export const TABLE_CAM_LABEL = "360° camera";
-export const TABLE_CAM_MIC_RANGE_M = 3;
+// TABLE_CAM_MIC_RANGE_M lives in roomPlannerShared.
 
 // How many seats (room coordinates, from `state.seats`) the built-in microphones of
 // 360° cameras (~3 m around them) and all-in-one displays (each its own reach) pick up.
@@ -1618,15 +1611,7 @@ export function builtInMicCoverage(state) {
 
 // --- dedicated microphone pickup ------------------------------------------------------
 
-// How far dedicated microphones pick up a talker: a ceiling array about 5 m (straight
-// line, from the ceiling down to a seated head), a table microphone about 5 ft.
-export const CEILING_MIC_RANGE_M = 5;
-export const TABLE_MIC_RANGE_M = 1.524; // 5 ft
-export const CEILING_MIC_AUDIO = AUDIO_PREFERENCES[0];
-
-// Whether the room's microphones hang from the ceiling or sit on the table (table
-// pods and wireless boundary mics both do; so does an audio setup not yet chosen).
-export const micMount = (audioPreference) => (audioPreference === CEILING_MIC_AUDIO ? "ceiling" : "table");
+// The mic reaches, CEILING_MIC_AUDIO and micMount live in roomPlannerShared.
 
 // A dedicated microphone's pickup as a radius across the floor plan. A ceiling array's
 // 5 m is measured on the slant down to people's heads, so a higher ceiling reaches a
