@@ -1,9 +1,9 @@
 import {
   resolveMicRange, resolveSpeakerRange, MIN_RANGE_M, micSources, speakerSources, speakerCoverageReport, micCoverageReport,
   VIDEO_BAR_MIC_RANGE_M, TABLE_MIC_RANGE_M, TABLE_CAM_MIC_RANGE_M, WALL_SPEAKER_RANGE_M, SOUNDBAR_RANGE_M,
-  VIDEO_BAR_SPEAKER_RANGE_M, ALL_IN_ONE_SPEAKER_RANGE_M,
+  VIDEO_BAR_SPEAKER_RANGE_M, ALL_IN_ONE_SPEAKER_RANGE_M, CEILING_SPEAKER_RANGE_M,
 } from "./roomAudioCoverage";
-import { buildRecommendations, builtInMicCoverage, builtInPickups, dedicatedMicReach, micCoverage, micsToCover, typicalAllInOneMicReach } from "./roomConfiguratorEngine";
+import { defaultSpeakerMount, placeSpeakerOnWall, addSpreadDevices, WALL_ANGLE, SOUNDBAR_AUDIO, buildRecommendations, builtInMicCoverage, builtInPickups, dedicatedMicReach, micCoverage, micsToCover, typicalAllInOneMicReach } from "./roomConfiguratorEngine";
 
 const room = { length: 8, width: 5, height: 2.8 };
 const base = (audio = {}) => ({ room, audioPreference: "Ceiling Microphone Array", audio: { micRange: null, speakerRange: null, ...audio } });
@@ -251,5 +251,53 @@ describe("engine parity (pre-refactor baseline)", () => {
       devices: { ...emptyDevices(), allInOne: [{ id: "a1", x: 4, y: 0.2, sizeInches: 75, micReach: 1 }] } };
     // 1 m override beats the 7 m typical for a 75", so the seat 2.3 m away is unheard.
     expect(micCoverageReport(state).uncovered).toEqual([0]);
+  });
+});
+
+describe("wall speakers", () => {
+  it("defaults a speaker to table mount under a soundbar setup and ceiling otherwise", () => {
+    expect(defaultSpeakerMount(SOUNDBAR_AUDIO)).toBe("table");
+    expect(defaultSpeakerMount("Ceiling Microphone Array")).toBe("ceiling");
+  });
+
+  // Review Focus 2
+  it("gives a speaker a defined mount and range before an audio setup is chosen", () => {
+    expect(defaultSpeakerMount(null)).toBe("ceiling");
+    const state = { ...base(), audioPreference: null, seats: [], devices: { ...emptyDevices(), speaker: [{ id: "s1", x: 4, y: 2.5, mount: "ceiling" }] } };
+    expect(Number.isFinite(speakerSources(state)[0].range)).toBe(true);
+  });
+
+  it("derives a different range per mount", () => {
+    const at = (mount) => resolveSpeakerRange({ mount }, "speaker", base());
+    expect(at("wall")).toBe(WALL_SPEAKER_RANGE_M);
+    expect(at("table")).toBe(SOUNDBAR_RANGE_M);
+    expect(at("ceiling")).toBeLessThan(CEILING_SPEAKER_RANGE_M); // slant-corrected
+  });
+
+  it("snaps a wall-mounted speaker to the nearest edge", () => {
+    const snapped = placeSpeakerOnWall({ x: 0.3, y: 2.5 }, room);
+    expect(snapped.x).toBe(0);
+    expect(snapped.angle).toBe(WALL_ANGLE.left);
+  });
+
+  it("stamps the setup's default mount on every speaker it adds", () => {
+    const ctx = { layout: "rectangular", room, table: { length: 3, width: 1.2, orientation: 0 }, tableOffset: { x: 0, y: 0 } };
+    const added = (audioPreference) => addSpreadDevices(emptyDevices(), "speaker", 2, { ...ctx, audioPreference }).speaker.map((s) => s.mount);
+    expect(added(SOUNDBAR_AUDIO)).toEqual(["table", "table"]);
+    expect(added(null)).toEqual(["ceiling", "ceiling"]);
+  });
+
+  // Task 2 deferred finding: Source.mount's two non-trivial branches.
+  it("reports an unset speaker mount as ceiling, and a dedicated mic's mount from the audio setup", () => {
+    const state = (audioPreference) => ({ ...base(), audioPreference, seats: [],
+      devices: { ...emptyDevices(), speaker: [{ id: "s1", x: 4, y: 2.5 }], microphone: [{ id: "m1", x: 4, y: 2.5 }] } });
+    expect(speakerSources(state("Ceiling Microphone Array"))[0].mount).toBe("ceiling");
+    expect(micSources(state("Ceiling Microphone Array"))[0].mount).toBe("ceiling");
+    expect(micSources(state("Table Microphone Pods"))[0].mount).toBe("table");
+  });
+
+  it("reads a saved soundbar plan's speaker with no mount as a table speaker, so it does not shift", () => {
+    const state = { ...base(), audioPreference: SOUNDBAR_AUDIO, seats: [], devices: { ...emptyDevices(), speaker: [{ id: "s1", x: 4, y: 2.5 }] } };
+    expect(speakerSources(state)[0].mount).toBe("table");
   });
 });

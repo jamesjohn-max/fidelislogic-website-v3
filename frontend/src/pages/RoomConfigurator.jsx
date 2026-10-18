@@ -76,6 +76,7 @@ import {
   screensOf,
   addSpreadDevices,
   resolvePlacement,
+  placeSpeakerOnWall,
   followMountedCameras,
   refLabel,
 } from "../lib/roomConfiguratorEngine";
@@ -477,13 +478,14 @@ export const RoomConfigurator = ({ with3d = false }) => {
   // (remaining) chairs actually cover.
   const spreadContext = useMemo(
     () => ({
+      audioPreference,
       layout,
       room,
       table,
       tableOffset,
       seats: seatingArea(layoutResult.chairs.filter((_, i) => !removedChairIndices.has(i)), room, tableOffset),
     }),
-    [layout, room, table, tableOffset, layoutResult.chairs, removedChairIndices]
+    [audioPreference, layout, room, table, tableOffset, layoutResult.chairs, removedChairIndices]
   );
 
   // Choosing a layout sets up its furniture fresh: a table at 60% of the room (see
@@ -564,6 +566,8 @@ export const RoomConfigurator = ({ with3d = false }) => {
         next.mount = resolved.mount;
         if (resolved.mount === "wall") next.angle = resolved.angle;
       }
+      // A wall speaker stays on a wall wherever it is dragged, facing into the room.
+      if (category === "speaker" && item.mount === "wall") Object.assign(next, placeSpeakerOnWall({ x: rawX, y: rawY }, room));
       const devices = { ...p.devices, [category]: p.devices[category].map((d) => (d.id === id ? next : d)) };
       // A display carries the cameras mounted on it.
       const moved = { devices: category === "display" ? followMountedCameras(devices, next, p) : devices };

@@ -8,6 +8,7 @@ import {
   SPREAD_CATEGORIES,
   GRID_STEP,
   addSpreadDevices,
+  defaultSpeakerMount,
   createPlacedDevice,
   displayWidthMeters,
   frontWall,
@@ -188,18 +189,18 @@ export const TEMPLATE_IDS = ["small", "medium", "large"];
 // A template's device kit laid out in the room as it is now: its size, table, seats
 // (less any removed or moved), and where the table has been dragged. Rebuilt whenever
 // those change, for as long as nobody has moved or changed a device by hand.
-export function buildTemplateDevices(templateId, { room, layout, table, chairCount, seatingDensity = DEFAULT_SEATING_DENSITY, tableOffset = { x: 0, y: 0 }, podOverrides = {}, removedChairIndices = new Set(), chairOffsets = {} }) {
+export function buildTemplateDevices(templateId, { audioPreference, room, layout, table, chairCount, seatingDensity = DEFAULT_SEATING_DENSITY, tableOffset = { x: 0, y: 0 }, podOverrides = {}, removedChairIndices = new Set(), chairOffsets = {} }) {
   const template = ROOM_TEMPLATES[templateId];
   if (!template) return emptyDevices();
   const { chairs } = generateLayout(layout, room, table, chairCount, podOverrides, seatingDensity);
   const seats = placedSeats(chairs, room, tableOffset, removedChairIndices, chairOffsets);
-  const spreadCtx = { layout, room, table, tableOffset, seats: seatingArea(chairs.filter((_, i) => !removedChairIndices.has(i)), room, tableOffset) };
+  const spreadCtx = { audioPreference, layout, room, table, tableOffset, seats: seatingArea(chairs.filter((_, i) => !removedChairIndices.has(i)), room, tableOffset) };
   const count = seats.length;
   return template.kit.reduce((devices, { category, payload, count: howMany, positions }) => {
     const ctx = { room, layout, table, tableOffset, devices, seats, chairCount: count, area: spreadCtx.seats };
     // Devices at spots the template picks itself (a town hall's stage microphones, say).
     if (positions) {
-      const placed = positions(ctx).map(({ x, y, angle = 0, ...extra }) => ({ id: uid(category), x, y, angle, ...extra }));
+      const placed = positions(ctx).map(({ x, y, angle = 0, ...extra }) => ({ id: uid(category), x, y, angle, ...(category === "speaker" && { mount: defaultSpeakerMount(audioPreference) }), ...extra }));
       return { ...devices, [category]: [...devices[category], ...placed] };
     }
     if (SPREAD_CATEGORIES.includes(category)) return addSpreadDevices(devices, category, howMany(ctx), spreadCtx);
@@ -219,5 +220,5 @@ export function buildTemplatePlan(templateId) {
     seatingDensity: DEFAULT_SEATING_DENSITY,
     tableOffset: { ...(t.tableOffset || { x: 0, y: 0 }) },
   };
-  return { ...furniture, audioPreference: t.audioPreference, devices: buildTemplateDevices(templateId, furniture) };
+  return { ...furniture, audioPreference: t.audioPreference, devices: buildTemplateDevices(templateId, { ...furniture, audioPreference: t.audioPreference }) };
 }

@@ -99,6 +99,9 @@ export const AUDIO_PREFERENCES = ["Ceiling Microphone Array", "Table Microphone 
 // A soundbar is the room's speaker and microphones in one, good for a limited number of
 // people: beyond these, extra speakers / microphones are needed.
 export const SOUNDBAR_AUDIO = AUDIO_PREFERENCES[2];
+// A speaker's mount unless someone sets it: a soundbar setup's speaker sits on the
+// table, everything else (including no setup chosen yet) is up in the ceiling.
+export const defaultSpeakerMount = (audioPreference) => (audioPreference === SOUNDBAR_AUDIO ? "table" : "ceiling");
 export const SOUNDBAR_SPEAKER_CAPACITY = 10;
 export const SOUNDBAR_MIC_CAPACITY = 8;
 // Below this many seats a camera's or video bar's built-in microphones pick everyone up,
@@ -1166,6 +1169,13 @@ export function snapToNearestEdge(x, y, room) {
   return { x: nx, y: ny, angle, edge };
 }
 
+// A wall-mounted speaker hangs on the nearest wall, facing into the room: the same
+// snap a touch panel or display uses.
+export function placeSpeakerOnWall({ x, y }, room) {
+  const { x: sx, y: sy, angle } = snapToNearestEdge(x, y, room);
+  return { x: sx, y: sy, angle };
+}
+
 export function resolvePlacement(category, x, y, room) {
   if (category === "door" || category === "bookingPanel") {
     const e = snapToNearestEdge(x, y, room);
@@ -1188,7 +1198,7 @@ export function cameraFacingToward(camAbs, targetAbs) {
   return faceCenterAngle(camAbs.x - targetAbs.x, camAbs.y - targetAbs.y);
 }
 
-const WALL_ANGLE = { top: 180, bottom: 0, left: 90, right: 270 };
+export const WALL_ANGLE = { top: 180, bottom: 0, left: 90, right: 270 };
 
 export function nearestEdge(x, y, room) {
   const d = { top: y, bottom: room.width - y, left: x, right: room.length - x };
@@ -1554,7 +1564,8 @@ export function addSpreadDevices(devices, category, count, spreadCtx) {
   const pts = spreadDevicePositions(category, autoCount + count, spreadCtx);
   let slot = 0;
   const respread = list.map((item) => (item.autoSpread ? { ...item, ...pts[slot++] } : item));
-  const added = pts.slice(slot).map((p) => ({ id: uid(category), x: p.x, y: p.y, angle: 0, autoSpread: true }));
+  const mount = category === "speaker" ? { mount: defaultSpeakerMount(spreadCtx.audioPreference) } : {};
+  const added = pts.slice(slot).map((p) => ({ id: uid(category), x: p.x, y: p.y, angle: 0, autoSpread: true, ...mount }));
   return { ...devices, [category]: [...respread, ...added] };
 }
 

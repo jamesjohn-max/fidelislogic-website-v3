@@ -1,4 +1,4 @@
-import { CEILING_MIC_RANGE_M, TABLE_MIC_RANGE_M, TABLE_CAM_MIC_RANGE_M, typicalAllInOneMicReach, micMount, refCode } from "./roomConfiguratorEngine";
+import { CEILING_MIC_RANGE_M, TABLE_MIC_RANGE_M, TABLE_CAM_MIC_RANGE_M, typicalAllInOneMicReach, micMount, defaultSpeakerMount, refCode } from "./roomConfiguratorEngine";
 
 // --- default pickup / throw ranges, in metres -----------------------------------------
 // Planning figures, NOT measured data: each is a starting point a planner can override
@@ -30,11 +30,12 @@ export function derivedMicRange(item, category, state) {
   return micMount(state.audioPreference) === "table" ? TABLE_MIC_RANGE_M : slantToFloor(CEILING_MIC_RANGE_M, state.room);
 }
 
-// `category` is optional: dedicated speakers key off item.mount (absent reads as ceiling).
+// `category` is optional: dedicated speakers key off item.mount. A plan saved before speakers
+// had a mount reads as the setup's default, which is how it was drawn.
 export function derivedSpeakerRange(item, state, category = "speaker") {
   if (category === "videoBar") return VIDEO_BAR_SPEAKER_RANGE_M;
   if (category === "allInOne") return ALL_IN_ONE_SPEAKER_RANGE_M;
-  const mount = item?.mount ?? "ceiling";
+  const mount = item?.mount ?? defaultSpeakerMount(state.audioPreference);
   if (mount === "wall") return WALL_SPEAKER_RANGE_M;
   if (mount === "table") return SOUNDBAR_RANGE_M;
   return slantToFloor(CEILING_SPEAKER_RANGE_M, state.room);
@@ -60,7 +61,7 @@ export const resolveSpeakerRange = (item, category, state) =>
 // --- coverage sources and reports --------------------------------------------------------
 // One Source per physical emitter/pickup. `code` indexes the device within its WHOLE
 // category array (so a 360 camera after a front camera is C2, matching the canvas label).
-// `mount` is what the engine would read: a speaker's own, else ceiling; a dedicated mic's
+// `mount` is what the engine would read: a speaker's own, else the setup's default; a dedicated mic's
 // follows the room's audio preference; other devices have none.
 const sourcesOf = (state, kind, categories, include, rangeOf, field) =>
   categories.flatMap((category) =>
@@ -71,7 +72,7 @@ const sourcesOf = (state, kind, categories, include, rangeOf, field) =>
             code: refCode(category, index),
             category,
             kind,
-            mount: category === "speaker" ? item.mount ?? "ceiling" : category === "microphone" ? micMount(state.audioPreference) : null,
+            mount: category === "speaker" ? item.mount ?? defaultSpeakerMount(state.audioPreference) : category === "microphone" ? micMount(state.audioPreference) : null,
             x: item.x,
             y: item.y,
             range: rangeOf(item, category, state),
