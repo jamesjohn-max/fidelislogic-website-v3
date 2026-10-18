@@ -25,7 +25,7 @@ const slantToFloor = (slantM, room) => {
 
 export function derivedMicRange(item, category, state) {
   if (category === "camera") return TABLE_CAM_MIC_RANGE_M;
-  if (category === "allInOne") return item?.micReach ?? typicalAllInOneMicReach(item?.sizeInches);
+  if (category === "allInOne") return typicalAllInOneMicReach(item?.sizeInches);
   if (category === "videoBar") return VIDEO_BAR_MIC_RANGE_M;
   return micMount(state.audioPreference) === "table" ? TABLE_MIC_RANGE_M : slantToFloor(CEILING_MIC_RANGE_M, state.room);
 }
@@ -45,8 +45,14 @@ export function derivedSpeakerRange(item, state, category = "speaker") {
 const firstFinite = (...values) => values.find(Number.isFinite);
 const clamp = (v) => Math.max(MIN_RANGE_M, v);
 
+// `allInOne.micReach` predates this module and is a per-device figure, so it resolves at the
+// item-override level, not below the room-wide one (spec §5.3, §8): a room-wide range must
+// not silently beat a reach already set on the device. Precedence for an all-in-one is
+// micRange -> legacy micReach -> room-wide -> typical for its size.
+const itemMicOverride = (item, category) => (category === "allInOne" ? firstFinite(item?.micRange, item?.micReach) : item?.micRange);
+
 export const resolveMicRange = (item, category, state) =>
-  clamp(firstFinite(item?.micRange, state.audio?.micRange, derivedMicRange(item, category, state)) ?? MIN_RANGE_M);
+  clamp(firstFinite(itemMicOverride(item, category), state.audio?.micRange, derivedMicRange(item, category, state)) ?? MIN_RANGE_M);
 
 export const resolveSpeakerRange = (item, category, state) =>
   clamp(firstFinite(item?.speakerRange, state.audio?.speakerRange, derivedSpeakerRange(item, state, category)) ?? MIN_RANGE_M);

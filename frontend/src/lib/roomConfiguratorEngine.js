@@ -1594,7 +1594,7 @@ export const TABLE_CAM_MIC_RANGE_M = 3;
 export function builtInMicCoverage(state) {
   const cams = state.devices.camera.filter((c) => c.isTableCam);
   const allInOnes = state.devices.allInOne || [];
-  const pickups = builtInPickups(state.devices);
+  const pickups = asPickups(builtInSources(micSources(state)));
   const seats = state.seats || [];
   return {
     cams: cams.length,
@@ -1630,8 +1630,11 @@ const asPickups = (sources) => sources.map((s) => ({ x: s.x, y: s.y, reach: s.ra
 // The built-in mic pickups in the room: 360° cameras and all-in-one displays. A video
 // bar is a mic source too, but not a "built-in" one for the advice below, which contrasts
 // a table camera's or all-in-one's own pickup against adding dedicated microphones.
-export const builtInPickups = (devices) =>
-  asPickups(micSources({ devices }).filter((s) => s.category === "camera" || s.category === "allInOne"));
+const builtInSources = (sources) => sources.filter((s) => s.category === "camera" || s.category === "allInOne");
+
+// Kept for the external callers (the viewer and the PDF) that hold only a device bag; it
+// cannot see a room-wide range, so in-engine callers use builtInSources(micSources(state)).
+export const builtInPickups = (devices) => asPickups(builtInSources(micSources({ devices })));
 
 // Every microphone pickup in the room, each at its resolved range.
 const micPickups = (state) => asPickups(micSources(state));
@@ -1642,7 +1645,7 @@ export function micCoverage(state) {
   const seats = state.seats || [];
   const pickups = micPickups(state);
   const unheard = seats.filter((s) => !heardBy(s, pickups));
-  return { seats: seats.length, dedicated: state.devices.microphone.length, heard: seats.length - unheard.length, unheard, reach: dedicatedMicReach(state.audioPreference, state.room) };
+  return { seats: seats.length, dedicated: state.devices.microphone.length, heard: seats.length - unheard.length, unheard, reach: resolveMicRange(null, "microphone", state) };
 }
 
 // The fewest dedicated microphones, laid out the way a set is spread (see
@@ -2010,7 +2013,7 @@ export function buildRecommendations(state) {
   if (devices.microphone.length === 0) {
     const outOfReach = coverage.seats - coverage.micCovered;
     if (coverage.sources) {
-      const reaches = devices.allInOne.map((d) => d.micReach ?? typicalAllInOneMicReach(d.sizeInches));
+      const reaches = micSources(state).filter((s) => s.category === "allInOne").map((s) => s.range);
       const pickup =
         coverage.cams && coverage.allInOnes
           ? "the built-in mics' pickup"

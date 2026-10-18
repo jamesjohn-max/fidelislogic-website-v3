@@ -3,7 +3,7 @@ import {
   VIDEO_BAR_MIC_RANGE_M, TABLE_MIC_RANGE_M, TABLE_CAM_MIC_RANGE_M, WALL_SPEAKER_RANGE_M, SOUNDBAR_RANGE_M,
   VIDEO_BAR_SPEAKER_RANGE_M, ALL_IN_ONE_SPEAKER_RANGE_M,
 } from "./roomAudioCoverage";
-import { builtInMicCoverage, builtInPickups, dedicatedMicReach, micCoverage, micsToCover, typicalAllInOneMicReach } from "./roomConfiguratorEngine";
+import { buildRecommendations, builtInMicCoverage, builtInPickups, dedicatedMicReach, micCoverage, micsToCover, typicalAllInOneMicReach } from "./roomConfiguratorEngine";
 
 const room = { length: 8, width: 5, height: 2.8 };
 const base = (audio = {}) => ({ room, audioPreference: "Ceiling Microphone Array", audio: { micRange: null, speakerRange: null, ...audio } });
@@ -145,6 +145,17 @@ describe("derived ranges reached through the sources", () => {
     expect(speakerSources(state)[0].isCustom).toBe(false);
   });
 
+  // Spec §5.3/§8: the legacy field is the device's override, so a room-wide range loses to it.
+  it("keeps a legacy allInOne micReach above a room-wide range", () => {
+    const wide = { audio: { micRange: 6, speakerRange: null } };
+    expect(mic({ allInOne: [{ id: "a1", x: 1, y: 1, sizeInches: 75, micReach: 2 }] }, wide)).toEqual([2]);
+    // an explicit micRange still outranks the legacy field
+    expect(mic({ allInOne: [{ id: "a1", x: 1, y: 1, sizeInches: 75, micReach: 2, micRange: 3 }] }, wide)).toEqual([3]);
+    // with neither, the room-wide range applies, and without that the typical for its size
+    expect(mic({ allInOne: [{ id: "a1", x: 1, y: 1, sizeInches: 75 }] }, wide)).toEqual([6]);
+    expect(mic({ allInOne: [{ id: "a1", x: 1, y: 1, sizeInches: 75 }] })).toEqual([typicalAllInOneMicReach(75)]);
+  });
+
   it("codes a source by its index in the whole category, not the filtered list", () => {
     const state = withDevices({ camera: [{ id: "c1", x: 1, y: 1 }, { id: "c2", x: 2, y: 1, isTableCam: true }] });
     expect(micSources(state)[0].code).toBe("C2");
@@ -205,6 +216,33 @@ describe("engine parity (pre-refactor baseline)", () => {
     expect(VIDEO_BAR_MIC_RANGE_M).toBe(4); // seat is 2.3 m from the bar, inside it
     expect(micCoverage(state)).toMatchObject({ seats: 1, heard: 1, unheard: [] });
     expect(micCoverageReport(state).uncovered).toEqual([]);
+  });
+
+  // Items 2 and 3 of the Task 3 review: every number the engine reports must see a
+  // room-wide range, or the advice and the overlay contradict each other on one page.
+  it("lets a room-wide micRange reach builtInMicCoverage and micCoverage's sibling reach", () => {
+    const legacy = { room, audioPreference: "Ceiling Microphone Array", seats: [{ x: 7.5, y: 2.5 }],
+      devices: { ...emptyDevices(), camera: [{ id: "c1", x: 4, y: 2.5, isTableCam: true }], microphone: [{ id: "m1", x: 2, y: 2.5 }] } };
+    expect(builtInMicCoverage(legacy).micCovered).toBe(0); // 360 cam reaches 3 m, the seat is 3.5 m away
+    expect(micCoverage(legacy).reach).toBeCloseTo(Math.sqrt(25 - 1.6 ** 2), 10);
+    expect(micCoverage(legacy).unheard).toHaveLength(1);
+
+    const wide = { ...legacy, audio: { micRange: 6, speakerRange: null } };
+    expect(builtInMicCoverage(wide).micCovered).toBe(1); // the room-wide 6 m now reaches it
+    expect(micCoverage(wide).reach).toBe(6); // the reach agrees with the unheard it sits beside
+    expect(micCoverage(wide).unheard).toEqual([]);
+  });
+
+  // Item 1: the sentence quotes a reach that explains a seat count computed elsewhere, so it
+  // has to come from the same resolved range.
+  it("quotes the all-in-one's resolved reach in the built-in pickup advice", () => {
+    const planWith = (audio) => ({ ...base(), ...(audio ? { audio } : {}), layout: "rectangular", chairCount: 2,
+      table: { length: 3, width: 1.2, orientation: 0 }, tableOffset: { x: 0, y: 0 },
+      seats: [{ x: 4, y: 0.5 }, { x: 7.5, y: 4.5 }],
+      devices: { ...emptyDevices(), allInOne: [{ id: "a1", x: 4, y: 0.2, sizeInches: 55 }] } });
+    const advice = (plan) => buildRecommendations(plan).find((r) => r.id === "builtin-mic-range")?.text;
+    expect(advice(planWith())).toMatch(/~4m mic pickup/); // typical for a 55"
+    expect(advice(planWith({ micRange: 2, speakerRange: null }))).toMatch(/~2m mic pickup/);
   });
 
   // Review Focus 5
