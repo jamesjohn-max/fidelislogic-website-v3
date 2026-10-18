@@ -1,4 +1,4 @@
-import { CEILING_MIC_RANGE_M, TABLE_MIC_RANGE_M, TABLE_CAM_MIC_RANGE_M, typicalAllInOneMicReach, micMount } from "./roomConfiguratorEngine";
+import { CEILING_MIC_RANGE_M, TABLE_MIC_RANGE_M, TABLE_CAM_MIC_RANGE_M, typicalAllInOneMicReach, micMount, refCode } from "./roomConfiguratorEngine";
 
 // --- default pickup / throw ranges, in metres -----------------------------------------
 // Planning figures, NOT measured data: each is a starting point a planner can override
@@ -50,3 +50,44 @@ export const resolveMicRange = (item, category, state) =>
 
 export const resolveSpeakerRange = (item, category, state) =>
   clamp(firstFinite(item?.speakerRange, state.audio?.speakerRange, derivedSpeakerRange(item, state, category)) ?? MIN_RANGE_M);
+
+// --- coverage sources and reports --------------------------------------------------------
+// One Source per physical emitter/pickup. `code` indexes the device within its WHOLE
+// category array (so a 360 camera after a front camera is C2, matching the canvas label).
+// `mount` is what the engine would read: a speaker's own, else ceiling; a dedicated mic's
+// follows the room's audio preference; other devices have none.
+const sourcesOf = (state, kind, categories, include, rangeOf, field) =>
+  categories.flatMap((category) =>
+    (state.devices?.[category] ?? []).flatMap((item, index) =>
+      include(category, item)
+        ? [{
+            id: item.id,
+            code: refCode(category, index),
+            category,
+            kind,
+            mount: category === "speaker" ? item.mount ?? "ceiling" : category === "microphone" ? micMount(state.audioPreference) : null,
+            x: item.x,
+            y: item.y,
+            range: rangeOf(item, category, state),
+            isCustom: Number.isFinite(item[field]),
+          }]
+        : []
+    )
+  );
+
+export const micSources = (state) =>
+  sourcesOf(state, "mic", ["microphone", "videoBar", "allInOne", "camera"], (category, item) => category !== "camera" || item.isTableCam, resolveMicRange, "micRange");
+
+export const speakerSources = (state) =>
+  sourcesOf(state, "speaker", ["speaker", "videoBar", "allInOne"], () => true, resolveSpeakerRange, "speakerRange");
+
+// Seats are inside the room by construction, so clipping a source's disc to the walls
+// changes what is drawn, never what is counted. 1e-6 matches `heardBy` in the engine.
+const report = (state, sources) => {
+  const seats = state.seats ?? [];
+  const uncovered = seats.flatMap((seat, i) => (sources.some((s) => Math.hypot(seat.x - s.x, seat.y - s.y) <= s.range + 1e-6) ? [] : [i]));
+  return { sources, seats: seats.length, covered: seats.length - uncovered.length, uncovered };
+};
+
+export const micCoverageReport = (state) => report(state, micSources(state));
+export const speakerCoverageReport = (state) => report(state, speakerSources(state));
