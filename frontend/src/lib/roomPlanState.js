@@ -62,6 +62,8 @@ export const initialPlan = () => ({
   devices: { ...emptyDevices(), door: [createDefaultDoor(PLACEHOLDER_ROOM)] },
   platform: null,
   audioPreference: null,
+  // Room-wide mic / speaker range in metres; null means not set, derive per device.
+  audio: { micRange: null, speakerRange: null },
   wallMaterials: [],
   floorType: null,
   ceilingType: null,
