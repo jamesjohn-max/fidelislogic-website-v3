@@ -7,7 +7,7 @@
 // That module imports this one back for the mic constants, micMount, refCode and
 // typicalAllInOneMicReach; the cycle is safe because neither side reads the other at
 // module-init time, only inside functions.
-import { derivedMicRange, micSources } from "./roomAudioCoverage";
+import { derivedMicRange, micSources, resolveMicRange } from "./roomAudioCoverage";
 
 export const GRID_STEP = 0.5 / 3;
 export const WALL_SNAP_DISTANCE = 0.55;
@@ -1648,8 +1648,13 @@ export function micCoverage(state) {
 // The fewest dedicated microphones, laid out the way a set is spread (see
 // spreadDevicePositions), that pick up every seat the built-in mics (`builtIn`
 // pickups) don't. 0 when those already cover everyone.
-export function micsToCover({ layout, room, table, tableOffset, seats, seatArea, audioPreference, builtIn = [], max = 24 }) {
-  const reach = dedicatedMicReach(audioPreference, room);
+//
+// `micRange` is the room-wide override (state.audio.micRange): when finite it is the reach,
+// otherwise the reach derives from the mount as before. It resolves through the same
+// resolveMicRange the overlay uses, so the count asked for here and the discs drawn on the
+// plan always come from one number.
+export function micsToCover({ layout, room, table, tableOffset, seats, seatArea, audioPreference, micRange, builtIn = [], max = 24 }) {
+  const reach = resolveMicRange(null, "microphone", { audioPreference, room, audio: { micRange } });
   const need = (seats || []).filter((s) => !heardBy(s, builtIn));
   if (!need.length) return 0;
   for (let n = 1; n <= max; n++) {

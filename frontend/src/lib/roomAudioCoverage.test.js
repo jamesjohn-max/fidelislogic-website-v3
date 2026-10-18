@@ -185,6 +185,17 @@ describe("engine parity (pre-refactor baseline)", () => {
     expect(micsToCover({ ...cover, audioPreference: "Ceiling Microphone Array", builtIn: [{ x: 2, y: 2.5, reach: 6 }] })).toBe(0);
   });
 
+  // A room-wide micRange must reach the recommendation too, or the planner gets an overlay
+  // drawn from the custom range and an "add N microphones" count from the derived default.
+  it("takes a room-wide micRange as the reach, and derives today's value without one", () => {
+    const seats = [{ x: 2, y: 2.5 }, { x: 7.5, y: 2.5 }];
+    const cover = { layout: "rectangular", room, table: { length: 3, width: 1.2, orientation: 0 }, tableOffset: { x: 0, y: 0 }, seats, seatArea: { x: 1, y: 1.5, length: 6, width: 2 }, audioPreference: "Ceiling Microphone Array" };
+    expect(micsToCover(cover)).toBe(1); // derived 4.737 m, exactly today's answer
+    expect(micsToCover({ ...cover, micRange: undefined })).toBe(1); // an absent key reads the same
+    expect(micsToCover({ ...cover, micRange: NaN })).toBe(1); // so does a non-finite one
+    expect(micsToCover({ ...cover, micRange: 3 })).toBe(2); // a tighter override asks for a second mic
+  });
+
   // The one deliberate behaviour change of the consolidation: spec §5.3 makes a video
   // bar a mic source, so the engine's advice now agrees with the overlay about it. Before
   // the refactor the engine ignored video bars and reported this seat unheard.
