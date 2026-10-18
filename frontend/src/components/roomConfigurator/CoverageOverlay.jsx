@@ -5,13 +5,19 @@ import { usePalette } from "./PaletteContext";
 // without relying on colour. A wall-mounted source (an all-in-one, a video bar, a wall
 // speaker) is drawn as an outline over whatever it already shows, as an all-in-one's
 // view cone, and labelled where it meets the top or bottom wall.
-export function MicRange({ source, room, labelScale }) {
+export function MicRange({ source, room, labelScale, stagger = 0 }) {
   const c = usePalette();
   const { x, y, range: reach } = source;
   const isSpeaker = source.kind === "speaker";
   const outline = source.mount === "wall" || source.category === "allInOne" || source.category === "videoBar";
   const clipId = `rc-range-${source.kind}-${source.id}`;
   const fontSize = 0.11 * labelScale;
+  // A ring wider than the room has its whole stroke clipped away, so an outline source
+  // would draw nothing at all — indistinguishable from covering nothing, the opposite of
+  // the truth. Then it gets the floor tint instead, and the label says so in words (the
+  // tint alone is never the message).
+  const corners = [[0, 0], [room.length, 0], [0, room.width], [room.length, room.width]];
+  const coversRoom = corners.every(([cx, cy]) => Math.hypot(cx - x, cy - y) <= reach);
   // Just inside the ring's top edge, else its bottom, left or right — the first spot
   // that's inside the room (a ring can be wider than the room in both directions). A
   // wall-mounted source's ring is labelled where it meets the top or bottom wall
@@ -34,8 +40,13 @@ export function MicRange({ source, room, labelScale }) {
     ];
     // A centered label needs half its width clear of the side walls.
     const clearance = (p) => (p.anchor === "middle" ? fontSize * 4 : inset);
-    const spot = spots.find((p) => p.y > fontSize && p.y < room.width - inset && p.x > clearance(p) && p.x < room.length - clearance(p));
-    if (!spot) return null;
+    const spot =
+      spots.find((p) => p.y > fontSize && p.y < room.width - inset && p.x > clearance(p) && p.x < room.length - clearance(p)) ??
+      // Nothing on the ring is inside the room: label it on the bottom wall under the
+      // source, which always is.
+      // Several rings can all fall back to the same wall, so they take turns on three
+      // lines rather than printing over each other.
+      { x: Math.min(Math.max(x, fontSize * 4), room.length - fontSize * 4), y: room.width - inset - (stagger % 3) * fontSize * 1.35, anchor: "middle" };
     return (
       <text x={spot.x} y={spot.y} textAnchor={spot.anchor} fontSize={fontSize} fontWeight={600} fill={c.fovLabel} fillOpacity={0.85} stroke={c.halo} strokeWidth={0.03 * labelScale} paintOrder="stroke">
         {text}
@@ -54,7 +65,7 @@ export function MicRange({ source, room, labelScale }) {
           cx={x}
           cy={y}
           r={reach}
-          fill={outline ? "none" : c.fov}
+          fill={outline && !coversRoom ? "none" : c.fov}
           fillOpacity={0.08}
           stroke={c.fov}
           strokeOpacity={0.55}
@@ -63,7 +74,7 @@ export function MicRange({ source, room, labelScale }) {
           vectorEffect="non-scaling-stroke"
         />
       </g>
-      {label(reach, `${isSpeaker ? "Speaker" : "Mic pickup"} ~${+reach.toFixed(1)}m`)}
+      {label(reach, `${isSpeaker ? "Speaker" : "Mic pickup"} ~${+reach.toFixed(1)}m${coversRoom ? " · whole room" : ""}`)}
     </g>
   );
 }
@@ -73,5 +84,5 @@ export function MicRange({ source, room, labelScale }) {
 export function CoverageOverlay({ sources, room, labelScale, mode = "selected", selection = null }) {
   if (mode === "off") return null;
   const shown = mode === "all" ? sources : sources.filter((s) => selection && s.category === selection.category && s.id === selection.id);
-  return shown.map((s) => <MicRange key={`${s.kind}:${s.id}`} source={s} room={room} labelScale={labelScale} />);
+  return shown.map((s, i) => <MicRange key={`${s.kind}:${s.id}`} source={s} room={room} labelScale={labelScale} stagger={i} />);
 }

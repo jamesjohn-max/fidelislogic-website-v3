@@ -16,6 +16,8 @@ import {
   TableTopField,
   PlatformField,
   AudioPreferenceField,
+  AudioRangeFields,
+  SpeakerMountSwitch,
   DeviceList,
   CameraFeaturePicker,
   NotesField,
@@ -35,7 +37,7 @@ import { analytics } from "../lib/analytics";
 import { toast } from "../components/ui/sonner";
 import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
 import { api } from "../lib/api";
-import { micSources, speakerSources } from "../lib/roomAudioCoverage";
+import { micSources, speakerSources, derivedMicRange, derivedSpeakerRange } from "../lib/roomAudioCoverage";
 import { initialHistory, planReducer } from "../lib/roomPlanState";
 import { ROOM_TEMPLATES, emptyDevices } from "../lib/roomTemplates";
 import { loadDraft, saveDraft, clearDraft, loadPhotos, savePhotos, hasPlanLink, readPlanLink, planLink } from "../lib/roomPlannerDraft";
@@ -60,7 +62,7 @@ import {
   defaultTableSize,
   ULTRAWIDE,
   builtInMicCoverage,
-  builtInPickups,
+  builtInPickupsIn,
   micCoverage,
   recommendedAllInOneSize,
   recommendedDisplaySize,
@@ -76,6 +78,7 @@ import {
   addSpreadDevices,
   resolvePlacement,
   placeSpeakerOnWall,
+  defaultSpeakerMount,
   followMountedCameras,
   refLabel,
 } from "../lib/roomConfiguratorEngine";
@@ -264,6 +267,8 @@ export const RoomConfigurator = ({ with3d = false }) => {
     layout,
     platform,
     audioPreference,
+    // Room-wide mic / speaker range. A draft saved before these existed has no `audio`.
+    audio = {},
     wallMaterials,
     floorType,
     ceilingType,
@@ -583,6 +588,47 @@ export const RoomConfigurator = ({ with3d = false }) => {
     });
   };
 
+  // The selected device's own range, in metres: `null` DELETES the field, so the device
+  // follows the room-wide value (or the derived default) again — writing the current
+  // default in instead would silently freeze it there. A slider drag coalesces into one
+  // undo step. An all-in-one's legacy `micReach` is an item-level override too, so a
+  // reset has to clear it as well or the device would keep refusing to follow.
+  const handleSetSourceRange = (category, id, kind, metres) => {
+    const field = kind === "speaker" ? "speakerRange" : "micRange";
+    update(
+      (p) => ({
+        devices: {
+          ...p.devices,
+          [category]: p.devices[category].map((item) => {
+            if (item.id !== id) return item;
+            const next = { ...item };
+            if (metres == null) {
+              delete next[field];
+              if (field === "micRange") delete next.micReach;
+            } else {
+              next[field] = metres;
+            }
+            return next;
+          }),
+        },
+      }),
+      { coalesce: "audio-range" }
+    );
+  };
+
+  // A speaker's mount: it sets how far the speaker reaches and, on a wall, snaps it onto
+  // the nearest one. Clearing autoSpread keeps it there — otherwise the next change to the
+  // room would re-spread it back off its wall.
+  const handleSetSpeakerMount = (id, mount) =>
+    update((p) => ({
+      devices: {
+        ...p.devices,
+        speaker: p.devices.speaker.map((item) =>
+          item.id === id ? { ...item, mount, autoSpread: false, ...(mount === "wall" ? placeSpeakerOnWall(item, p.room) : {}) } : item
+        ),
+      },
+    }));
+
   const handleTableDragCommit = (rawOffset) => update({ tableOffset: rawOffset });
 
   const handleRotateSelected = (delta) => {
@@ -687,6 +733,7 @@ export const RoomConfigurator = ({ with3d = false }) => {
     layout,
     platform,
     audioPreference,
+    audio,
     devices,
     tableOffset,
     wallMaterials,
@@ -869,10 +916,16 @@ export const RoomConfigurator = ({ with3d = false }) => {
   // They're about the AV plan, so only the reseller path has them.
   const recommendations = audience === "reseller" ? buildRecommendations(state) : [];
   const camCoverage = builtInMicCoverage(state);
+  // The built-in pickups as they are actually resolved (a room-wide or per-device range
+  // moves them too), so the notes below quote the number the plan draws.
+  const resolvedMicReaches = (category) => micSources(state).filter((s) => s.category === category).map((s) => s.range);
+  const camReaches = resolvedMicReaches("camera");
   // What the inline options suggest: the screen size for this room's viewing distance,
   // and how many more microphones/speakers it needs (the 360° camera's mics included).
   // Microphones are counted by pickup range over the seats as they are.
-  const micCover = { seats, seatArea: spreadContext.seats, table, tableOffset, builtIn: builtInPickups(devices) };
+  // `micRange` and the built-in pickups both resolve through the room-wide range, so the
+  // "add N microphones" count and the discs drawn on the plan come from one number.
+  const micCover = { seats, seatArea: spreadContext.seats, table, tableOffset, micRange: audio.micRange, builtIn: builtInPickupsIn(state) };
   const suggestedMore = (category) =>
     clamp(recommendedDeviceCount(category, layout, room, effectiveChairCount, camCoverage, audioPreference, category === "microphone" ? micCover : null) - devices[category].length, 1, 24);
   const deviceListProps = {
@@ -1211,9 +1264,22 @@ export const RoomConfigurator = ({ with3d = false }) => {
               {...group("audio")}
             >
               <AudioPreferenceField value={audioPreference} onChange={(v) => update({ audioPreference: v })} />
-              <BuiltInMicNote coverage={camCoverage} reaches={devices.allInOne.map((d) => d.micReach)} />
-              <MicCoverageNote coverage={micCoverage(state)} audioPreference={audioPreference} />
+              <AudioRangeFields
+                audio={audio}
+                micDefault={derivedMicRange(null, "microphone", state)}
+                speakerDefault={derivedSpeakerRange(null, state)}
+                onChange={(field, metres) => update((p) => ({ audio: { ...p.audio, [field]: metres } }), { coalesce: "audio-range" })}
+              />
+              {/* The resolved reaches, not the raw field: an all-in-one may follow the
+                  room-wide range, or have had its legacy micReach reset away. */}
+              <BuiltInMicNote
+                coverage={camCoverage}
+                camReach={camReaches.length ? Math.max(...camReaches) : undefined}
+                reaches={resolvedMicReaches("allInOne")}
+              />
+              <MicCoverageNote coverage={micCoverage(state)} audioPreference={audioPreference} audio={audio} />
               <DeviceList categories={["microphone", "speaker"]} {...deviceListProps} />
+              <SpeakerMountSwitch speakers={devices.speaker} defaultMount={defaultSpeakerMount(audioPreference)} onChange={handleSetSpeakerMount} />
               <RecommendationList recommendations={audioRecs} onAddDevice={handleAddDevice} />
             </StepGroup>
             <StepGroup
@@ -1322,6 +1388,7 @@ export const RoomConfigurator = ({ with3d = false }) => {
     removedChairIndices,
     chairOffsets,
     coverageSources: [...micSources(coverageState), ...speakerSources(coverageState)],
+    onSetSourceRange: handleSetSourceRange,
   };
 
   return (

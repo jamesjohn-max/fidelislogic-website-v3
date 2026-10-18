@@ -156,6 +156,19 @@ describe("derived ranges reached through the sources", () => {
     expect(mic({ allInOne: [{ id: "a1", x: 1, y: 1, sizeInches: 75 }] })).toEqual([typicalAllInOneMicReach(75)]);
   });
 
+  // Task 6: isCustom means "does not follow the room-wide default", so the legacy field
+  // has to read as custom — otherwise one device silently ignores a room-wide range and
+  // nothing on screen says why.
+  it("marks a legacy allInOne micReach as custom, and the room-wide range as not", () => {
+    const wide = { audio: { micRange: 6, speakerRange: null } };
+    const custom = (devices, extra) => micSources(withDevices(devices, extra)).map((s) => s.isCustom);
+    expect(custom({ allInOne: [{ id: "a1", x: 1, y: 1, sizeInches: 75, micReach: 2 }] }, wide)).toEqual([true]);
+    expect(custom({ allInOne: [{ id: "a1", x: 1, y: 1, sizeInches: 75, micRange: 3 }] }, wide)).toEqual([true]);
+    expect(custom({ allInOne: [{ id: "a1", x: 1, y: 1, sizeInches: 75 }] }, wide)).toEqual([false]);
+    // micReach is an all-in-one's own field; it is not an override anywhere else.
+    expect(custom({ microphone: [{ id: "m1", x: 1, y: 1, micReach: 2 }] }, wide)).toEqual([false]);
+  });
+
   it("codes a source by its index in the whole category, not the filtered list", () => {
     const state = withDevices({ camera: [{ id: "c1", x: 1, y: 1 }, { id: "c2", x: 2, y: 1, isTableCam: true }] });
     expect(micSources(state)[0].code).toBe("C2");

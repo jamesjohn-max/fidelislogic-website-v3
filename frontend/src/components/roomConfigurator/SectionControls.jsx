@@ -44,6 +44,7 @@ import {
   typicalAllInOneMicReach,
   micMount,
   micRangeLabel,
+  refLabel,
 } from "../../lib/roomConfiguratorEngine";
 import {
   TrackActiveSpeakerIllustration,
@@ -52,6 +53,7 @@ import {
   IndividualTilesIllustration,
 } from "./cameraFeatureIllustrations";
 import { VideoBarGlyph } from "./VideoBarGlyph";
+import { RangeControl } from "./RangeControl";
 import { revealInPanel } from "./revealInPanel";
 
 const CAMERA_FEATURE_ILLUSTRATIONS = {
@@ -218,6 +220,74 @@ export function PlatformField({ value, onChange }) {
 
 export function AudioPreferenceField({ value, onChange }) {
   return <SelectField id="rc-audio" label="Preferred audio setup" value={value} onChange={onChange} options={AUDIO_PREFERENCES} />;
+}
+
+// The room-wide mic and speaker ranges: what every mic and speaker reaches unless it
+// carries a range of its own. Each starts at the figure derived for this room's setup
+// (shown as "Default"), and Reset deletes it so the room goes back to following that.
+export function AudioRangeFields({ audio, micDefault, speakerDefault, onChange }) {
+  return (
+    <div className="mt-3 flex flex-col gap-1.5">
+      <RangeControl
+        id="rc-audio-mic-range"
+        label="Mic pickup"
+        value={audio?.micRange}
+        fallback={micDefault}
+        onChange={(metres) => onChange("micRange", metres)}
+        onReset={() => onChange("micRange", null)}
+      />
+      <RangeControl
+        id="rc-audio-speaker-range"
+        label="Speaker range"
+        value={audio?.speakerRange}
+        fallback={speakerDefault}
+        onChange={(metres) => onChange("speakerRange", metres)}
+        onReset={() => onChange("speakerRange", null)}
+      />
+      <p className="text-xs text-white/45">
+        Applies to every microphone and speaker without a range of its own. Select one on the plan to give it a different reach.
+      </p>
+    </div>
+  );
+}
+
+// Where each speaker hangs: it sets how far the speaker is drawn to reach, and a wall
+// speaker also snaps onto the nearest wall. A speaker keeps the mount it was added with,
+// so changing the audio setup above leaves the ones already on the plan alone — this is
+// where they are moved over.
+const SPEAKER_MOUNTS = ["ceiling", "wall", "table"];
+export function SpeakerMountSwitch({ speakers, defaultMount, onChange }) {
+  if (!speakers.length) return null;
+  return (
+    <div className="mt-3 flex flex-col gap-2">
+      <p className="text-xs text-white/45">Speakers already on the plan keep their mount when the setup above changes — switch them here.</p>
+      {speakers.map((item, i) => {
+        const label = refLabel("speaker", i);
+        const current = item.mount ?? defaultMount;
+        return (
+          <div key={item.id} className="flex items-center justify-between gap-3 text-xs font-medium text-white/70">
+            <span>{label}</span>
+            <div role="radiogroup" aria-label={`${label} mount`} className="flex shrink-0 rounded-lg border border-white/[0.08] bg-white/[0.03] p-0.5">
+              {SPEAKER_MOUNTS.map((mount) => (
+                <button
+                  key={mount}
+                  type="button"
+                  role="radio"
+                  aria-checked={current === mount}
+                  onClick={() => onChange(item.id, mount)}
+                  className={`min-h-[28px] rounded-md px-3 text-xs font-semibold capitalize transition-[background-color,color] duration-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 ${
+                    current === mount ? "bg-blue-600 text-white" : "text-white/60 hover:bg-white/10 hover:text-white"
+                  }`}
+                >
+                  {mount}
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 // Devices that need a choice before they're added — a screen size, a lens, or how many —
@@ -546,11 +616,14 @@ export function NotesField({ value, onChange }) {
 // the microphones added here only need to fill the gaps. (It has no speaker — sound
 // comes from the video bar it's paired with.) Hidden when there's no 360° camera.
 // How many seats the built-in mics of 360° cameras and all-in-one displays reach.
-export function BuiltInMicNote({ coverage, reaches }) {
+// `camReach` and `reaches` are resolved ranges, not the raw defaults: a room-wide range
+// or a per-device one moves these pickups too, and the note has to say the same number
+// the plan draws.
+export function BuiltInMicNote({ coverage, camReach = TABLE_CAM_MIC_RANGE_M, reaches }) {
   if (!coverage.sources) return null;
   const from = [
-    coverage.cams && `the 360° camera (~${TABLE_CAM_MIC_RANGE_M}m)`,
-    coverage.allInOnes && `the all-in-one display (~${Math.max(...reaches)}m)`,
+    coverage.cams && `the 360° camera (~${+camReach.toFixed(2)}m)`,
+    coverage.allInOnes && reaches.length > 0 && `the all-in-one display (~${+Math.max(...reaches).toFixed(2)}m)`,
   ].filter(Boolean);
   return (
     <div className="flex items-start gap-2 rounded-xl bg-blue-500/10 px-2.5 py-2 text-xs leading-snug text-white/70">
@@ -568,7 +641,7 @@ export function BuiltInMicNote({ coverage, reaches }) {
 
 // Audio step, once microphones are in: how many seats are within a microphone's
 // pickup (a ceiling array's ~5 m, a table mic's ~5 ft, or a built-in mic's reach).
-export function MicCoverageNote({ coverage, audioPreference }) {
+export function MicCoverageNote({ coverage, audioPreference, audio }) {
   if (!coverage.dedicated || !coverage.seats) return null;
   const all = coverage.heard === coverage.seats;
   return (
@@ -579,7 +652,9 @@ export function MicCoverageNote({ coverage, audioPreference }) {
         <span className="font-semibold text-white">
           {coverage.heard} of {coverage.seats}
         </span>{" "}
-        seats · {micMount(audioPreference) === "ceiling" ? "ceiling arrays reach" : "table mics reach"} {micRangeLabel(audioPreference)}.
+        seats · {micMount(audioPreference) === "ceiling" ? "ceiling arrays reach" : "table mics reach"}{" "}
+        {/* The room-wide range, when there is one, beats the figure the mount would give. */}
+        {Number.isFinite(audio?.micRange) ? `~${+coverage.reach.toFixed(2)} m` : micRangeLabel(audioPreference)}.
       </p>
     </div>
   );

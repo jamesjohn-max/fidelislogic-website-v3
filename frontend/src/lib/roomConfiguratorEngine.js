@@ -1631,6 +1631,10 @@ const builtInSources = (sources) => sources.filter((s) => s.category === "camera
 // cannot see a room-wide range, so in-engine callers use builtInSources(micSources(state)).
 export const builtInPickups = (devices) => asPickups(builtInSources(micSources({ devices })));
 
+// The same for a caller that holds the whole plan, so a room-wide range reaches the
+// built-in pickups too (the page asks micsToCover how many mics the built-ins leave).
+export const builtInPickupsIn = (state) => asPickups(builtInSources(micSources(state)));
+
 // Every microphone pickup in the room, each at its resolved range.
 const micPickups = (state) => asPickups(micSources(state));
 const heardBy = (seat, pickups) => pickups.some((p) => Math.hypot(seat.x - p.x, seat.y - p.y) <= p.reach + 1e-6);

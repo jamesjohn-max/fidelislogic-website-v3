@@ -66,7 +66,10 @@ export const resolveSpeakerRange = (item, category, state) =>
 // category array (so a 360 camera after a front camera is C2, matching the canvas label).
 // `mount` is what the engine would read: a speaker's own, else the setup's default; a dedicated mic's
 // follows the room's audio preference; other devices have none.
-const sourcesOf = (state, kind, categories, include, rangeOf, field) =>
+// `isCustom` means "this device does not follow the room-wide default", so `overrideOf`
+// is the same item-level resolver the range uses — a legacy allInOne `micReach` reads as
+// custom, because a room-wide range does not move it and the badge has to say why.
+const sourcesOf = (state, kind, categories, include, rangeOf, overrideOf) =>
   categories.flatMap((category) =>
     (state.devices?.[category] ?? []).flatMap((item, index) =>
       include(category, item)
@@ -79,17 +82,17 @@ const sourcesOf = (state, kind, categories, include, rangeOf, field) =>
             x: item.x,
             y: item.y,
             range: rangeOf(item, category, state),
-            isCustom: Number.isFinite(item[field]),
+            isCustom: Number.isFinite(overrideOf(item, category)),
           }]
         : []
     )
   );
 
 export const micSources = (state) =>
-  sourcesOf(state, "mic", ["microphone", "videoBar", "allInOne", "camera"], (category, item) => category !== "camera" || item.isTableCam, resolveMicRange, "micRange");
+  sourcesOf(state, "mic", ["microphone", "videoBar", "allInOne", "camera"], (category, item) => category !== "camera" || item.isTableCam, resolveMicRange, itemMicOverride);
 
 export const speakerSources = (state) =>
-  sourcesOf(state, "speaker", ["speaker", "videoBar", "allInOne"], () => true, resolveSpeakerRange, "speakerRange");
+  sourcesOf(state, "speaker", ["speaker", "videoBar", "allInOne"], () => true, resolveSpeakerRange, (item) => item?.speakerRange);
 
 // Seats are inside the room by construction, so clipping a source's disc to the walls
 // changes what is drawn, never what is counted. 1e-6 matches `heardBy` in the engine.

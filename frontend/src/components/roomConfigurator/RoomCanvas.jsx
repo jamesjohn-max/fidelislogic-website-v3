@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { X, Trash2 } from "lucide-react";
+import { X, Trash2, Radar } from "lucide-react";
 import {
   GRID_STEP,
   ROOM_MARGIN,
@@ -19,6 +19,7 @@ import {
 } from "../../lib/roomConfiguratorEngine";
 import { PaletteContext, usePalette } from "./PaletteContext";
 import { CoverageOverlay } from "./CoverageOverlay";
+import { RangeControl } from "./RangeControl";
 import "./roomConfigurator.css";
 
 // Two colour sets for the plan: dark to sit in the page, and light for the PDF, which is
@@ -536,6 +537,9 @@ export function RoomCanvas({
   // are drawn: "selected" (the selected device's), "all" or "off".
   coverageSources = [],
   coverageMode = "selected",
+  // Sets the selected device's own range: (category, id, kind, metres) — metres null
+  // deletes the override, so the device follows the room-wide value again.
+  onSetSourceRange,
   // Guidance under the plan for the current step; falls back to how to move the seating.
   hint,
   // Shown above the plan, at the plan's width.
@@ -554,6 +558,9 @@ export function RoomCanvas({
   const [liveTableOffset, setLiveTableOffset] = useState(null);
   const [liveDevicePos, setLiveDevicePos] = useState(null);
   const [liveAngle, setLiveAngle] = useState(null);
+  // Show every source's range at once (spec decision 5). A view setting, not part of the
+  // plan, so it is not undone or saved with it.
+  const [showAllCoverage, setShowAllCoverage] = useState(false);
 
   const effectiveOffset = liveTableOffset || tableOffset;
   // Memoized because the pointer-up callback depends on it; as a fresh object
@@ -953,6 +960,10 @@ export function RoomCanvas({
     ? `Chair ${selection.index + 1}`
     : DEVICE_LABELS[selection.category];
   const selectionDeletable = selection && selection.category !== "table" && selection.category !== "tablePod";
+  // The selected device's own pickup/throw, at most one of each kind (an all-in-one or a
+  // video bar has both). `range` is already resolved, so it reads as the override when the
+  // device has one and as the default it follows when it has not.
+  const selectedSources = selection ? coverageSources.filter((src) => src.category === selection.category && src.id === selection.id) : [];
 
   // x, y in meters from the room's top-left corner — the same origin the ruler is
   // drawn from, so this always reads consistently with the marks on the diagram.
@@ -1043,7 +1054,7 @@ export function RoomCanvas({
                   sources={coverageSources.map((s) => ({ ...s, ...renderDevicePos(s.category, s) }))}
                   room={room}
                   labelScale={labelScale}
-                  mode={coverageMode}
+                  mode={coverageMode !== "off" && showAllCoverage ? "all" : coverageMode}
                   selection={selection}
                 />
 
@@ -1197,46 +1208,84 @@ export function RoomCanvas({
             item's actions once something is. On desktop it keeps a fixed minimum height
             (part of --rc-plan-chrome) so selecting something never resizes the plan. */}
           {interactive && (
-            <div className="shrink-0 lg:min-h-[60px]">
-              {!selection && (
-                <p className="mt-2 text-xs leading-relaxed text-white/45">
-                  {hint ||
-                    (isPods
-                      ? "Drag a table to move it with its chairs, or use its handle to turn it. Double-click (or double-tap on a phone or tablet) a chair to move just that one."
-                      : "Drag the table to move the whole layout. Double-click (or double-tap on a phone or tablet) a chair to move just that one.")}
-                </p>
-              )}
+            <div className="shrink-0 lg:min-h-[84px]">
+              <div className="mt-2 flex items-start gap-2">
+                <div className="min-w-0 flex-1">
+                  {!selection && (
+                    <p className="text-xs leading-relaxed text-white/45">
+                      {hint ||
+                        (isPods
+                          ? "Drag a table to move it with its chairs, or use its handle to turn it. Double-click (or double-tap on a phone or tablet) a chair to move just that one."
+                          : "Drag the table to move the whole layout. Double-click (or double-tap on a phone or tablet) a chair to move just that one.")}
+                    </p>
+                  )}
 
-              {selection && (
-                <div className="rc-banner-in mt-2 flex items-center justify-between gap-3 rounded-lg border border-blue-400/30 bg-blue-500/10 px-3 py-2 text-sm">
-                  <span className="font-medium text-cyan-100">
-                    {selectionLabel} selected
-                    {selection.category === "table" ? ": drag or use the arrow keys to move it" : ""}
-                    {selection.category === "tablePod" ? `: drag to move, ${turnHint}, resize under Seating` : ""}
-                    {selectedPosition && (
-                      <span className="font-normal text-cyan-300"> at {selectedPosition.x.toFixed(2)}m, {selectedPosition.y.toFixed(2)}m</span>
-                    )}
-                  </span>
-                  <div className="flex items-center gap-1">
-                    {selectionDeletable && (
-                      <button
-                        onClick={handleDeleteSelected}
-                        className="flex min-h-[36px] items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold text-red-400 transition-transform duration-100 hover:bg-red-500/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-500 active:scale-[0.96]"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                        Delete
-                      </button>
-                    )}
-                    <button
-                      aria-label="Deselect"
-                      onClick={() => onSelect(null)}
-                      className="flex h-9 w-9 items-center justify-center rounded-md text-cyan-300 hover:bg-blue-500/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
+                  {selection && (
+                    <div className="rc-banner-in flex flex-col gap-1.5 rounded-lg border border-blue-400/30 bg-blue-500/10 px-3 py-2 text-sm">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="font-medium text-cyan-100">
+                          {selectionLabel} selected
+                          {selection.category === "table" ? ": drag or use the arrow keys to move it" : ""}
+                          {selection.category === "tablePod" ? `: drag to move, ${turnHint}, resize under Seating` : ""}
+                          {selectedPosition && (
+                            <span className="font-normal text-cyan-300"> at {selectedPosition.x.toFixed(2)}m, {selectedPosition.y.toFixed(2)}m</span>
+                          )}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          {selectionDeletable && (
+                            <button
+                              onClick={handleDeleteSelected}
+                              className="flex min-h-[36px] items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold text-red-400 transition-transform duration-100 hover:bg-red-500/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-500 active:scale-[0.96]"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              Delete
+                            </button>
+                          )}
+                          <button
+                            aria-label="Deselect"
+                            onClick={() => onSelect(null)}
+                            className="flex h-9 w-9 items-center justify-center rounded-md text-cyan-300 hover:bg-blue-500/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                      {/* How far this device reaches, in metres, over the room-wide default
+                          it otherwise follows. Both kinds sit on one line where there is room. */}
+                      {onSetSourceRange && selectedSources.length > 0 && (
+                        <div className={`grid gap-x-4 gap-y-1 border-t border-blue-400/20 pt-1.5 ${selectedSources.length > 1 ? "sm:grid-cols-2" : ""}`}>
+                          {selectedSources.map((src) => (
+                            <RangeControl
+                              key={src.kind}
+                              id={`rc-device-range-${src.kind}`}
+                              label={src.kind === "speaker" ? "Speaker range" : "Mic pickup"}
+                              value={src.isCustom ? src.range : null}
+                              fallback={src.range}
+                              isCustom={src.isCustom}
+                              onChange={(metres) => onSetSourceRange(selection.category, selection.id, src.kind, metres)}
+                              onReset={() => onSetSourceRange(selection.category, selection.id, src.kind, null)}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-              )}
+                {coverageSources.length > 0 && coverageMode !== "off" && (
+                  <button
+                    type="button"
+                    aria-pressed={showAllCoverage}
+                    onClick={() => setShowAllCoverage((on) => !on)}
+                    title="Draw every microphone and speaker's range on the plan at once"
+                    className={`flex min-h-[36px] shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 ${
+                      showAllCoverage ? "border-blue-500 bg-blue-500/15 text-cyan-100" : "border-white/[0.08] bg-white/[0.03] text-white/60 hover:text-white"
+                    }`}
+                  >
+                    <Radar aria-hidden="true" className="h-3.5 w-3.5" />
+                    {showAllCoverage ? "All coverage shown" : "Show all coverage"}
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </div>
