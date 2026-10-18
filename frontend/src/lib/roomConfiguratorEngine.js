@@ -2,6 +2,13 @@
 // Coordinate system: meters, origin top-left of room, x → right, y → down.
 // Rotation angle convention: 0° = facing "up" (toward y=0), clockwise, matching compass bearing.
 
+// All audio reach maths lives in roomAudioCoverage — one source of truth, so the advice
+// below, the 2D overlay and the PDF cannot drift apart once ranges are user-editable.
+// That module imports this one back for the mic constants, micMount, refCode and
+// typicalAllInOneMicReach; the cycle is safe because neither side reads the other at
+// module-init time, only inside functions.
+import { derivedMicRange, micSources } from "./roomAudioCoverage";
+
 export const GRID_STEP = 0.5 / 3;
 export const WALL_SNAP_DISTANCE = 0.55;
 export const ROTATE_STEP = 15;
@@ -1587,10 +1594,7 @@ export const TABLE_CAM_MIC_RANGE_M = 3;
 export function builtInMicCoverage(state) {
   const cams = state.devices.camera.filter((c) => c.isTableCam);
   const allInOnes = state.devices.allInOne || [];
-  const pickups = [
-    ...cams.map((c) => ({ x: c.x, y: c.y, reach: TABLE_CAM_MIC_RANGE_M })),
-    ...allInOnes.map((d) => ({ x: d.x, y: d.y, reach: d.micReach ?? typicalAllInOneMicReach(d.sizeInches) })),
-  ];
+  const pickups = builtInPickups(state.devices);
   const seats = state.seats || [];
   return {
     cams: cams.length,
@@ -1608,7 +1612,6 @@ export function builtInMicCoverage(state) {
 export const CEILING_MIC_RANGE_M = 5;
 export const TABLE_MIC_RANGE_M = 1.524; // 5 ft
 export const CEILING_MIC_AUDIO = AUDIO_PREFERENCES[0];
-const SEATED_HEAD_M = 1.2;
 
 // Whether the room's microphones hang from the ceiling or sit on the table (table
 // pods and wireless boundary mics both do; so does an audio setup not yet chosen).
@@ -1617,27 +1620,21 @@ export const micMount = (audioPreference) => (audioPreference === CEILING_MIC_AU
 // A dedicated microphone's pickup as a radius across the floor plan. A ceiling array's
 // 5 m is measured on the slant down to people's heads, so a higher ceiling reaches a
 // little less far across the room.
-export function dedicatedMicReach(audioPreference, room) {
-  if (micMount(audioPreference) === "table") return TABLE_MIC_RANGE_M;
-  const drop = Math.max(0, (room?.height ?? 2.8) - SEATED_HEAD_M);
-  return Math.sqrt(Math.max(0, CEILING_MIC_RANGE_M ** 2 - drop ** 2));
-}
+export const dedicatedMicReach = (audioPreference, room) => derivedMicRange(null, "microphone", { audioPreference, room });
 
 // How the pickup is described: "~5 m" for ceiling arrays, "~1.5 m (5 ft)" for table mics.
 export const micRangeLabel = (audioPreference) => (micMount(audioPreference) === "ceiling" ? `~${CEILING_MIC_RANGE_M} m` : "~1.5 m (5 ft)");
 
-// The built-in mic pickups in the room: 360° cameras and all-in-one displays.
-export const builtInPickups = (devices) => [
-  ...devices.camera.filter((c) => c.isTableCam).map((c) => ({ x: c.x, y: c.y, reach: TABLE_CAM_MIC_RANGE_M })),
-  ...(devices.allInOne || []).map((d) => ({ x: d.x, y: d.y, reach: d.micReach ?? typicalAllInOneMicReach(d.sizeInches) })),
-];
+const asPickups = (sources) => sources.map((s) => ({ x: s.x, y: s.y, reach: s.range }));
 
-// Every microphone pickup in the room: the built-in ones, and each dedicated
-// microphone at its mount's reach.
-function micPickups(state) {
-  const reach = dedicatedMicReach(state.audioPreference, state.room);
-  return [...builtInPickups(state.devices), ...state.devices.microphone.map((m) => ({ x: m.x, y: m.y, reach }))];
-}
+// The built-in mic pickups in the room: 360° cameras and all-in-one displays. A video
+// bar is a mic source too, but not a "built-in" one for the advice below, which contrasts
+// a table camera's or all-in-one's own pickup against adding dedicated microphones.
+export const builtInPickups = (devices) =>
+  asPickups(micSources({ devices }).filter((s) => s.category === "camera" || s.category === "allInOne"));
+
+// Every microphone pickup in the room, each at its resolved range.
+const micPickups = (state) => asPickups(micSources(state));
 const heardBy = (seat, pickups) => pickups.some((p) => Math.hypot(seat.x - p.x, seat.y - p.y) <= p.reach + 1e-6);
 
 // Seats no microphone picks up — dedicated or built in.

@@ -3,7 +3,7 @@ import {
   VIDEO_BAR_MIC_RANGE_M, TABLE_MIC_RANGE_M, TABLE_CAM_MIC_RANGE_M, WALL_SPEAKER_RANGE_M, SOUNDBAR_RANGE_M,
   VIDEO_BAR_SPEAKER_RANGE_M, ALL_IN_ONE_SPEAKER_RANGE_M,
 } from "./roomAudioCoverage";
-import { typicalAllInOneMicReach } from "./roomConfiguratorEngine";
+import { builtInMicCoverage, builtInPickups, dedicatedMicReach, micCoverage, micsToCover, typicalAllInOneMicReach } from "./roomConfiguratorEngine";
 
 const room = { length: 8, width: 5, height: 2.8 };
 const base = (audio = {}) => ({ room, audioPreference: "Ceiling Microphone Array", audio: { micRange: null, speakerRange: null, ...audio } });
@@ -148,5 +148,59 @@ describe("derived ranges reached through the sources", () => {
   it("codes a source by its index in the whole category, not the filtered list", () => {
     const state = withDevices({ camera: [{ id: "c1", x: 1, y: 1 }, { id: "c2", x: 2, y: 1, isTableCam: true }] });
     expect(micSources(state)[0].code).toBe("C2");
+  });
+});
+
+// Task 3 guards the consolidation of the engine's mic reach onto this module: these
+// assertions were recorded against the engine BEFORE the refactor, so they fail if a
+// saved plan or a shared link would resolve to a different number afterwards.
+describe("engine parity (pre-refactor baseline)", () => {
+  it("reproduces today's mic coverage for a plan with no audio key", () => {
+    // Seat 2 sits 5.5 m from the mic, beyond the 4.737 m a ceiling array reaches in a
+    // 2.8 m room — so exactly one seat is unheard. Do not move it closer than 4.74 m.
+    const legacy = { room, audioPreference: "Ceiling Microphone Array", seats: [{ x: 2, y: 2.5 }, { x: 7.5, y: 2.5 }],
+      devices: { ...emptyDevices(), microphone: [{ id: "m1", x: 2, y: 2.5 }] } };
+    expect(micCoverage(legacy)).toMatchObject({ seats: 2, dedicated: 1, heard: 1 });
+    expect(micCoverage(legacy).unheard).toHaveLength(1);
+    expect(micCoverage(legacy).unheard[0]).toEqual({ x: 7.5, y: 2.5 });
+    expect(micCoverage(legacy).reach).toBeCloseTo(Math.sqrt(25 - 1.6 ** 2), 10);
+  });
+
+  it("reproduces today's built-in pickups and reach for a plan with no audio key", () => {
+    const devices = { ...emptyDevices(), camera: [{ id: "c1", x: 4, y: 2.5, isTableCam: true }], allInOne: [{ id: "a1", x: 4, y: 0.2, sizeInches: 55 }] };
+    expect(builtInPickups(devices)).toEqual(
+      expect.arrayContaining([{ x: 4, y: 2.5, reach: TABLE_CAM_MIC_RANGE_M }, { x: 4, y: 0.2, reach: typicalAllInOneMicReach(55) }])
+    );
+    expect(builtInPickups(devices)).toHaveLength(2);
+    expect(builtInMicCoverage({ room, devices, seats: [{ x: 4, y: 2.5 }, { x: 0.5, y: 4.8 }] }))
+      .toEqual({ cams: 1, allInOnes: 1, sources: 2, seats: 2, micCovered: 1 });
+    expect(dedicatedMicReach("Ceiling Microphone Array", room)).toBeCloseTo(Math.sqrt(25 - 1.6 ** 2), 10);
+    expect(dedicatedMicReach("Table Microphone Pods", room)).toBe(TABLE_MIC_RANGE_M);
+  });
+
+  it("reproduces today's micsToCover for a plan with no audio key", () => {
+    const seats = [{ x: 2, y: 2.5 }, { x: 7.5, y: 2.5 }];
+    const cover = { layout: "rectangular", room, table: { length: 3, width: 1.2, orientation: 0 }, tableOffset: { x: 0, y: 0 }, seats, seatArea: { x: 1, y: 1.5, length: 6, width: 2 } };
+    expect(micsToCover({ ...cover, audioPreference: "Ceiling Microphone Array" })).toBe(1);
+    expect(micsToCover({ ...cover, audioPreference: "Ceiling Microphone Array", builtIn: [{ x: 2, y: 2.5, reach: 6 }] })).toBe(0);
+  });
+
+  // The one deliberate behaviour change of the consolidation: spec §5.3 makes a video
+  // bar a mic source, so the engine's advice now agrees with the overlay about it. Before
+  // the refactor the engine ignored video bars and reported this seat unheard.
+  it("counts a video bar as a mic source, like the coverage report does", () => {
+    const state = { room, audioPreference: "Ceiling Microphone Array", seats: [{ x: 7.5, y: 2.5 }],
+      devices: { ...emptyDevices(), microphone: [{ id: "m1", x: 2, y: 2.5 }], videoBar: [{ id: "v1", x: 7.5, y: 0.2 }] } };
+    expect(VIDEO_BAR_MIC_RANGE_M).toBe(4); // seat is 2.3 m from the bar, inside it
+    expect(micCoverage(state)).toMatchObject({ seats: 1, heard: 1, unheard: [] });
+    expect(micCoverageReport(state).uncovered).toEqual([]);
+  });
+
+  // Review Focus 5
+  it("reads a legacy allInOne.micReach as that device's override", () => {
+    const state = { ...base(), seats: [{ x: 4, y: 2.5 }],
+      devices: { ...emptyDevices(), allInOne: [{ id: "a1", x: 4, y: 0.2, sizeInches: 75, micReach: 1 }] } };
+    // 1 m override beats the 7 m typical for a 75", so the seat 2.3 m away is unheard.
+    expect(micCoverageReport(state).uncovered).toEqual([0]);
   });
 });
