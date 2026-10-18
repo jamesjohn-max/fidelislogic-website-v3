@@ -1557,8 +1557,7 @@ export function addSpreadDevices(devices, category, count, spreadCtx) {
   const pts = spreadDevicePositions(category, autoCount + count, spreadCtx);
   let slot = 0;
   const respread = list.map((item) => (item.autoSpread ? { ...item, ...pts[slot++] } : item));
-  const mount = category === "speaker" ? { mount: defaultSpeakerMount(spreadCtx.audioPreference) } : {};
-  const added = pts.slice(slot).map((p) => ({ id: uid(category), x: p.x, y: p.y, angle: 0, autoSpread: true, ...mount }));
+  const added = pts.slice(slot).map((p) => ({ id: uid(category), x: p.x, y: p.y, angle: 0, autoSpread: true }));
   return { ...devices, [category]: [...respread, ...added] };
 }
 

@@ -280,11 +280,15 @@ describe("wall speakers", () => {
     expect(snapped.angle).toBe(WALL_ANGLE.left);
   });
 
-  it("stamps the setup's default mount on every speaker it adds", () => {
+  // `mount` is an override, like micRange: absent follows the room's audio setup, so
+  // switching setup redraws every speaker that nobody has set by hand.
+  it("leaves a new speaker's mount unset so it follows the audio setup", () => {
     const ctx = { layout: "rectangular", room, table: { length: 3, width: 1.2, orientation: 0 }, tableOffset: { x: 0, y: 0 } };
-    const added = (audioPreference) => addSpreadDevices(emptyDevices(), "speaker", 2, { ...ctx, audioPreference }).speaker.map((s) => s.mount);
-    expect(added(SOUNDBAR_AUDIO)).toEqual(["table", "table"]);
-    expect(added(null)).toEqual(["ceiling", "ceiling"]);
+    const { speaker } = addSpreadDevices(emptyDevices(), "speaker", 2, ctx);
+    expect(speaker.map((s) => s.mount)).toEqual([undefined, undefined]);
+    const followed = (audioPreference) => speakerSources({ ...base(), audioPreference, seats: [], devices: { ...emptyDevices(), speaker } }).map((s) => s.mount);
+    expect(followed(SOUNDBAR_AUDIO)).toEqual(["table", "table"]);
+    expect(followed("Ceiling Microphone Array")).toEqual(["ceiling", "ceiling"]);
   });
 
   // Task 2 deferred finding: Source.mount's two non-trivial branches.
@@ -299,5 +303,7 @@ describe("wall speakers", () => {
   it("reads a saved soundbar plan's speaker with no mount as a table speaker, so it does not shift", () => {
     const state = { ...base(), audioPreference: SOUNDBAR_AUDIO, seats: [], devices: { ...emptyDevices(), speaker: [{ id: "s1", x: 4, y: 2.5 }] } };
     expect(speakerSources(state)[0].mount).toBe("table");
+    // ...and ranges like one, which is how it was always drawn (not the slant-corrected ceiling radius).
+    expect(resolveSpeakerRange({}, "speaker", { ...base(), audioPreference: SOUNDBAR_AUDIO })).toBe(SOUNDBAR_RANGE_M);
   });
 });

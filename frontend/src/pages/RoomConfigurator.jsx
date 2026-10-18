@@ -478,14 +478,13 @@ export const RoomConfigurator = ({ with3d = false }) => {
   // (remaining) chairs actually cover.
   const spreadContext = useMemo(
     () => ({
-      audioPreference,
       layout,
       room,
       table,
       tableOffset,
       seats: seatingArea(layoutResult.chairs.filter((_, i) => !removedChairIndices.has(i)), room, tableOffset),
     }),
-    [audioPreference, layout, room, table, tableOffset, layoutResult.chairs, removedChairIndices]
+    [layout, room, table, tableOffset, layoutResult.chairs, removedChairIndices]
   );
 
   // Choosing a layout sets up its furniture fresh: a table at 60% of the room (see
