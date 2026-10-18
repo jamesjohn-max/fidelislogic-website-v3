@@ -16,10 +16,9 @@ import {
   nearestGridPoint,
   rotateBy,
   clampTableOffset,
-  TABLE_CAM_MIC_RANGE_M,
 } from "../../lib/roomConfiguratorEngine";
 import { PaletteContext, usePalette } from "./PaletteContext";
-import { MicRange } from "./CoverageOverlay";
+import { CoverageOverlay } from "./CoverageOverlay";
 import "./roomConfigurator.css";
 
 // Two colour sets for the plan: dark to sit in the page, and light for the PDF, which is
@@ -250,14 +249,9 @@ const BookingPanelIcon = ({ selected }) => {
 };
 
 // Shared by cameras, video bars and all-in-one displays — anything with a field of view.
-function FovRay({ cam, room, labelScale }) {
-  if (cam.isTableCam) return <MicRange cam={cam} reach={TABLE_CAM_MIC_RANGE_M} room={room} labelScale={labelScale} />;
-  return (
-    <>
-      <ViewCone cam={cam} room={room} />
-      {cam.micReach && <MicRange cam={cam} reach={cam.micReach} room={room} labelScale={labelScale} outline />}
-    </>
-  );
+// A 360° camera sees the whole room, so it has no cone; its pickup is drawn by CoverageOverlay.
+function FovRay({ cam, room }) {
+  return cam.isTableCam ? null : <ViewCone cam={cam} room={room} />;
 }
 
 // Front-of-room cameras and video bars: the fan of what the lens sees, out to the walls.
@@ -538,9 +532,10 @@ export function RoomCanvas({
   onPodDragCommit,
   onSetPodAngle,
   diagramRef,
-  // A dedicated microphone's pickup across the plan ({ reach, label }), drawn round
-  // the selected microphone.
-  micPickup = null,
+  // Every mic and speaker's reach (micSources + speakerSources). coverageMode picks which
+  // are drawn: "selected" (the selected device's), "all" or "off".
+  coverageSources = [],
+  coverageMode = "selected",
   // Guidance under the plan for the current step; falls back to how to move the seating.
   hint,
   // Shown above the plan, at the plan's width.
@@ -1037,30 +1032,20 @@ export function RoomCanvas({
                 <RulerTicks marks={marksY} orientation="vertical" wallAt={0} sign={-1} />
                 <RulerTicks marks={marksY} orientation="vertical" wallAt={room.length} sign={1} />
 
-                {micPickup &&
-                  selection?.category === "microphone" &&
-                  devices.microphone
-                    .filter((m) => m.id === selection.id)
-                    .map((m) => {
-                      const pos = renderDevicePos("microphone", m);
-                      return (
-                        <MicRange
-                          key={`pickup-${m.id}`}
-                          cam={{ ...m, x: pos.x, y: pos.y }}
-                          reach={micPickup.reach}
-                          room={room}
-                          labelScale={labelScale}
-                          text={`Mic pickup ${micPickup.label}`}
-                        />
-                      );
-                    })}
                 {FOV_CATEGORIES.map((category) =>
                   devices[category].map((cam) => {
                     const pos = renderDevicePos(category, cam);
                     const angle = renderDeviceAngle(category, cam);
-                    return <FovRay key={cam.id} cam={{ ...cam, x: pos.x, y: pos.y, angle }} room={room} labelScale={labelScale} />;
+                    return <FovRay key={cam.id} cam={{ ...cam, x: pos.x, y: pos.y, angle }} room={room} />;
                   })
                 )}
+                <CoverageOverlay
+                  sources={coverageSources.map((s) => ({ ...s, ...renderDevicePos(s.category, s) }))}
+                  room={room}
+                  labelScale={labelScale}
+                  mode={coverageMode}
+                  selection={selection}
+                />
 
                 <g
                   {...(layout && !isPods ? focusable("Table and chairs", { category: "table", id: "table" }) : {})}

@@ -35,6 +35,7 @@ import { analytics } from "../lib/analytics";
 import { toast } from "../components/ui/sonner";
 import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
 import { api } from "../lib/api";
+import { micSources, speakerSources } from "../lib/roomAudioCoverage";
 import { initialHistory, planReducer } from "../lib/roomPlanState";
 import { ROOM_TEMPLATES, emptyDevices } from "../lib/roomTemplates";
 import { loadDraft, saveDraft, clearDraft, loadPhotos, savePhotos, hasPlanLink, readPlanLink, planLink } from "../lib/roomPlannerDraft";
@@ -61,8 +62,6 @@ import {
   builtInMicCoverage,
   builtInPickups,
   micCoverage,
-  dedicatedMicReach,
-  micRangeLabel,
   recommendedAllInOneSize,
   recommendedDisplaySize,
   recommendedDeviceCount,
@@ -1310,6 +1309,8 @@ export const RoomConfigurator = ({ with3d = false }) => {
     onRedo: redo,
   };
 
+  const canvasDevices = isCustomer ? customerDevices(devices) : devices;
+  const coverageState = { ...state, devices: canvasDevices };
   const canvasProps = {
     room,
     table,
@@ -1317,10 +1318,10 @@ export const RoomConfigurator = ({ with3d = false }) => {
     layout,
     layoutResult,
     tableOffset,
-    devices: isCustomer ? customerDevices(devices) : devices,
+    devices: canvasDevices,
     removedChairIndices,
     chairOffsets,
-    micPickup: { reach: dedicatedMicReach(audioPreference, room), label: micRangeLabel(audioPreference) },
+    coverageSources: [...micSources(coverageState), ...speakerSources(coverageState)],
   };
 
   return (
