@@ -1042,16 +1042,31 @@ const AUDIO_PLAN_H = 86;
 // on-screen overlay, where a mic is tinted and a speaker dotted.
 const MIC_AREA = [219, 238, 248];
 const AUDIO_CAVEAT = "These are geometric planning ranges, not measured SPL coverage.";
+
+// The caveat goes wherever coverage rings are drawn, whatever the report is for. The
+// customer report has no device table and no gap lists, but its Room Layout Diagram is
+// rasterized from the same plan, and a customer room with an all-in-one carries that
+// device's mic and speaker rings — so the hedge has to reach page 1 too, or the picture
+// implies an acoustic survey nobody performed (spec §10).
+function drawCoverageCaveat(doc, y) {
+  doc.setFont("helvetica", "italic");
+  doc.setFontSize(7.5);
+  setText(doc, SLATE_500);
+  doc.text(AUDIO_CAVEAT, MARGIN, y);
+  return y + 3;
+}
 const MOUNT_LABEL = { ceiling: "Ceiling", wall: "Wall", table: "Table" };
 // Per-device names: DEVICE_LABELS has the plural category names ("Microphones").
 const AUDIO_DEVICE_LABEL = { microphone: "Microphone", speaker: "Speaker", camera: "360° camera" };
+// Cells are drawn, never wrapped or clipped, so each column is sized to the widest value
+// it can hold at 7.6pt — Range has to take "15 m · whole room", not just "1.52 m".
 const AUDIO_TABLE_COLS = [
   { label: "Ref", w: 15 },
-  { label: "Device", w: 40 },
+  { label: "Device", w: 32 },
   { label: "Covers", w: 22 },
-  { label: "Mount", w: 20 },
-  { label: "Range", w: 20 },
-  { label: "Range from", w: CONTENT_W - 15 - 40 - 22 - 20 - 20 },
+  { label: "Mount", w: 18 },
+  { label: "Range", w: 30 },
+  { label: "Range from", w: CONTENT_W - 15 - 32 - 22 - 18 - 30 },
 ];
 
 // Every source's disc at once, each clipped to the room rect — the jsPDF equivalent of
@@ -1062,6 +1077,10 @@ const AUDIO_TABLE_COLS = [
 // at all and read as covering nothing — the opposite of the truth — so a speaker that
 // reaches every corner is drawn on the room's own edge instead (the same case the
 // on-screen overlay calls out). A mic that wide still shows, because it is filled.
+const coversRoom = (s, room) =>
+  [[0, 0], [room.length, 0], [0, room.width], [room.length, room.width]]
+    .every(([cx, cy]) => Math.hypot(cx - s.x, cy - s.y) <= s.range);
+
 function drawCoverageDiscs(doc, { toPage, scale, roomRect }, room, mics, speakers) {
   const [rx, ry, rw, rh] = roomRect;
   const clipped = (draw) => {
@@ -1076,9 +1095,6 @@ function drawCoverageDiscs(doc, { toPage, scale, roomRect }, room, mics, speaker
     const [px, py] = toPage(s.x, s.y);
     doc.circle(px, py, s.range * scale, style);
   };
-  const coversRoom = (s) =>
-    [[0, 0], [room.length, 0], [0, room.width], [room.length, room.width]]
-      .every(([cx, cy]) => Math.hypot(cx - s.x, cy - s.y) <= s.range);
 
   // Every fill first, then every outline: otherwise the next mic's fill paints over the
   // last one's ring, and a mic inside another's reach loses its own edge entirely.
@@ -1092,7 +1108,7 @@ function drawCoverageDiscs(doc, { toPage, scale, roomRect }, room, mics, speaker
   doc.setLineWidth(0.5);
   doc.setLineDashPattern([1.2, 1.2], 0);
   speakers.forEach((s) => {
-    if (coversRoom(s)) doc.rect(rx + 0.7, ry + 0.7, rw - 1.4, rh - 1.4, "S");
+    if (coversRoom(s, room)) doc.rect(rx + 0.7, ry + 0.7, rw - 1.4, rh - 1.4, "S");
     else clipped(() => disc(s, "S"));
   });
   doc.setLineDashPattern([], 0);
@@ -1129,20 +1145,23 @@ function drawCoverageLegend(doc, x, y, mics, speakers) {
 
 // Which of the three levels the drawn range came from (see resolveMicRange): what the
 // planner set on this device, else the room-wide range, else what the device derives.
-const rangeOrigin = (source, state) =>
+export const rangeOrigin = (source, state) =>
   source.isCustom
     ? "Custom (this device)"
     : Number.isFinite(state.audio?.[source.kind === "mic" ? "micRange" : "speakerRange"])
       ? "Room default"
       : "Device default";
 
+// A source that reaches every corner is drawn as the room's own edge, and two of them
+// draw that one shape twice — so the row says so in words, as the on-screen label does.
+// Without it the plan shows one outline where the table lists two devices.
 const audioTableRows = (state, sources) =>
   sources.map((s) => [
     s.code,
     AUDIO_DEVICE_LABEL[s.category] || DEVICE_LABELS[s.category] || s.category,
     s.kind === "mic" ? "Microphone" : "Speaker",
     MOUNT_LABEL[s.mount] || "—",
-    `${+s.range.toFixed(2)} m`,
+    `${+s.range.toFixed(2)} m${coversRoom(s, state.room) ? " · whole room" : ""}`,
     rangeOrigin(s, state),
   ]);
 
@@ -1150,7 +1169,7 @@ const audioTableRows = (state, sources) =>
 // different problems with different fixes, so merging them would cost the integrator
 // reading this the one thing the list is for. Seats carry their room coordinates, since
 // the plan's rulers are what locates them.
-const coverageGapText = (report, seats, kindWord) => {
+export const coverageGapText = (report, seats, kindWord) => {
   if (!report.sources.length) return `no ${kindWord} in this plan.`;
   if (!report.seats) return "no seats in this plan.";
   if (!report.uncovered.length) return `none — all ${report.seats} seats are in range.`;
@@ -1215,11 +1234,7 @@ function drawAudioCoverage(doc, y, state, layoutResult, removedChairIndices, cha
 
   cursorY = drawCoverageGaps(doc, cursorY + 2, gaps);
 
-  doc.setFont("helvetica", "italic");
-  doc.setFontSize(7.5);
-  setText(doc, SLATE_500);
-  doc.text(AUDIO_CAVEAT, MARGIN, cursorY + 2);
-  return cursorY + 5;
+  return drawCoverageCaveat(doc, cursorY + 2);
 }
 
 // --- recommended notes ---------------------------------------------------------------------
@@ -1398,7 +1413,12 @@ export async function exportRoomConfigPdf({ state, layoutResult, removedChairInd
     drawDiagram(doc, y, diagramH, diagramBoxW, state, layoutResult, removedChairIndices, chairOffsets);
   }
   y += diagramH + 4;
-  y = drawDiagramLegendRow(doc, MARGIN, y, customer ? customerLegend(state.layout) : undefined) + 5;
+  y = drawDiagramLegendRow(doc, MARGIN, y, customer ? customerLegend(state.layout) : undefined) + 2;
+  // Only the rasterized live plan carries the coverage rings (the vector fallback draws
+  // none), so the caveat follows that picture exactly — on every report, not just the
+  // reseller's, since a customer plan keeps its all-in-one and its rings with it.
+  if (diagramCanvas && hasAudioSources(state)) y = drawCoverageCaveat(doc, y + 1.5);
+  y += 3;
 
   const summary = layoutSummaryGrid(doc, state, audience, unconfirmed);
   const marked = summary.columns.some(([, rows]) => rows.some(([, v]) => String(v).endsWith(DEFAULT_MARK)));

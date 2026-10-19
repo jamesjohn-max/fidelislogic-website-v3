@@ -600,11 +600,25 @@ describe("dedicated microphone pickup range", () => {
     });
   });
 
+  const micCoverageRec = (state) => buildRecommendations(state).find((r) => r.id === "mic-coverage");
+
   test("flags seats beyond the microphones' pickup", () => {
     const state = { ...makeState({ devices: { display: [], microphone: [{ id: "m1", x: 2, y: 3 }] }, seats, room }), audioPreference: AUDIO_PREFERENCES[1] };
-    const rec = buildRecommendations(state).find((r) => r.id === "mic-coverage");
+    const rec = micCoverageRec(state);
     expect(rec).toMatchObject({ level: "suggestion", addCategories: ["microphone"] });
-    expect(rec.text).toMatch(/5 ft/);
+    // The range in force, as resolveMicRange returns it — a table pod's 1.524 m. The
+    // advice used to quote the catalogue label ("~1.5 m (5 ft)"), which the plan's discs
+    // and the PDF's coverage table could both contradict.
+    expect(rec.text).toMatch(/~1\.52 m pickup/);
+  });
+
+  test("the pickup it quotes follows a room-wide range, not the catalogue figure", () => {
+    const state = {
+      ...makeState({ devices: { display: [], microphone: [{ id: "m1", x: 2, y: 3 }] }, seats, room }),
+      audioPreference: AUDIO_PREFERENCES[1],
+      audio: { micRange: 1 },
+    };
+    expect(micCoverageRec(state).text).toMatch(/~1 m pickup/);
   });
 });
 

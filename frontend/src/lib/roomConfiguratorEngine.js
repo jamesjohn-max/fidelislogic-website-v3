@@ -1619,8 +1619,12 @@ export function builtInMicCoverage(state) {
 // little less far across the room.
 export const dedicatedMicReach = (audioPreference, room) => derivedMicRange(null, "microphone", { audioPreference, room });
 
-// How the pickup is described: "~5 m" for ceiling arrays, "~1.5 m (5 ft)" for table mics.
-export const micRangeLabel = (audioPreference) => (micMount(audioPreference) === "ceiling" ? `~${CEILING_MIC_RANGE_M} m` : "~1.5 m (5 ft)");
+// How a pickup is described in advice text, from the range actually in force — the one
+// resolveMicRange returns, which is what the plan's discs and the PDF's coverage table
+// both use. Never the catalogue figure: a ceiling array's 5 m is measured on the slant,
+// so it is already wrong by the ceiling height before any room-wide or per-device range
+// moves it, and advice that contradicts the table beside it is worse than no advice.
+export const micRangeLabel = (reachM) => `~${+reachM.toFixed(2)} m`;
 
 const asPickups = (sources) => sources.map((s) => ({ x: s.x, y: s.y, reach: s.range }));
 
@@ -2014,13 +2018,15 @@ export function buildRecommendations(state) {
   if (devices.microphone.length === 0) {
     const outOfReach = coverage.seats - coverage.micCovered;
     if (coverage.sources) {
-      const reaches = micSources(state).filter((s) => s.category === "allInOne").map((s) => s.range);
+      // Both figures come from micSources, so they are the ranges actually drawn and
+      // tabled — a 360° camera's catalogue 3 m is as movable as an all-in-one's reach.
+      const farthest = (category) => +Math.max(...micSources(state).filter((s) => s.category === category).map((s) => s.range)).toFixed(2);
       const pickup =
         coverage.cams && coverage.allInOnes
           ? "the built-in mics' pickup"
           : coverage.cams
-          ? `the 360° camera's ~${TABLE_CAM_MIC_RANGE_M}m mic pickup`
-          : `the all-in-one display's ~${Math.max(...reaches)}m mic pickup`;
+          ? `the 360° camera's ~${farthest("camera")}m mic pickup`
+          : `the all-in-one display's ~${farthest("allInOne")}m mic pickup`;
       if (outOfReach > 0)
         add("builtin-mic-range", "suggestion", `${seatsWord(outOfReach)} beyond ${pickup} — add table or ceiling microphones to cover them.`, ["microphone"]);
     } else if (soundbar) {
@@ -2048,7 +2054,7 @@ export function buildRecommendations(state) {
       add(
         "mic-coverage",
         "suggestion",
-        `${seatsWord(mics.unheard.length)} beyond the ${kind} ${micRangeLabel(state.audioPreference)} pickup — add microphones or move them closer to those seats.`,
+        `${seatsWord(mics.unheard.length)} beyond the ${kind} ${micRangeLabel(mics.reach)} pickup — add microphones or move them closer to those seats.`,
         ["microphone"]
       );
     }
