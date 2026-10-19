@@ -20,6 +20,18 @@
      use. Cyan survives where it belongs: on the dark stage, see --rc-stage-accent. */
   --rc-accent: #2563eb;
   --rc-line: rgb(15 23 42 / 0.10);
+  /* A line that has to be felt rather than just seen: the hover state of a bordered
+     control, where the resting line is deliberately faint. */
+  --rc-line-strong: rgb(15 23 42 / 0.2);
+
+  /* Status, by role. Amber/emerald/red carry meaning here, so they get tokens like the
+     ink does rather than a literal Tailwind shade: on the light panel only the 700-800
+     steps clear WCAG AA against white or a 10-15% wash of their own hue (the 100-300
+     steps that used to sit here measured 1.1-1.9:1), while on a dark stage the 300s are
+     the right ones. .rc-stage flips them, so one class name reads correctly on either. */
+  --rc-warn: #92400e;   /* amber-800: 6.6:1 on amber-400/10, 7.1:1 on white */
+  --rc-ok: #065f46;     /* emerald-800: 7.3:1 on emerald-400/10 */
+  --rc-danger: #b91c1c; /* red-700: 6.5:1 on white, 5.3:1 on red-500/15 */
 
   /* The plan and the 3D view keep a dark stage: the 3D scene is lit for a dark room,
      and a floor plan reads better on one. brand-dark, as tailwind.config.js has it. */
@@ -69,7 +81,11 @@
   --rc-ink-soft: rgb(255 255 255 / 0.72);
   --rc-ink-muted: rgb(255 255 255 / 0.5);
   --rc-line: var(--rc-stage-line);
+  --rc-line-strong: rgb(255 255 255 / 0.2);
   --rc-accent: var(--rc-stage-accent);
+  --rc-warn: #fcd34d;   /* amber-300 */
+  --rc-ok: #6ee7b7;     /* emerald-300 */
+  --rc-danger: #fca5a5; /* red-300 */
   /* The panel vars too, so chrome floating over a stage — the 3D viewer's view
      switcher and seat report — stays dark. Those controls still use white ink, which
      is correct over a dark stage and wrong anywhere else. */
@@ -86,12 +102,21 @@
 .group:hover .rc-ink-group-hover { color: var(--rc-ink); }
 .rc-ink-soft { color: var(--rc-ink-soft); }
 .rc-ink-muted { color: var(--rc-ink-muted); }
+.rc-warn { color: var(--rc-warn); }
+.rc-ok { color: var(--rc-ok); }
+.rc-danger { color: var(--rc-danger); }
 .rc-border { border-color: var(--rc-line); }
+.rc-border-hover:hover { border-color: var(--rc-line-strong); }
+.group:hover .rc-border-group-hover { border-color: var(--rc-line-strong); }
+.group:hover .rc-ink-soft-group-hover { color: var(--rc-ink-soft); }
+.rc-placeholder-muted::placeholder { color: var(--rc-ink-muted); }
 .rc-divide > * + * { border-color: var(--rc-line); }
 .rc-fill { background-color: rgb(15 23 42 / 0.04); }
 .rc-fill-strong { background-color: rgb(15 23 42 / 0.07); }
+.rc-fill-active:active { background-color: rgb(15 23 42 / 0.07); }
 .rc-stage .rc-fill { background-color: rgb(255 255 255 / 0.05); }
 .rc-stage .rc-fill-strong { background-color: rgb(255 255 255 / 0.1); }
+.rc-stage .rc-fill-active:active { background-color: rgb(255 255 255 / 0.1); }
 /* Hover fills. These carry the ink change too: the old pairing was
    `text-white/60 hover:bg-white/10 hover:text-white`, which hardcodes a dark surface
    twice over. One class now covers both halves, on either surface. */
@@ -217,8 +242,14 @@
 @media (min-width: 1024px) {
   .rc-plan-stage {
     /* The status bar above the plan plus the slot below it (hint, or the selected
-       item's actions and its audio range). */
-    --rc-plan-chrome: 8rem;
+       item's actions and its audio range). Measured in the browser, not estimated:
+       status bar 36 + its mb-3 8 + slot 111 = 155px, where the slot is mt-2 8 plus a
+       selection banner of 103 (border 1 + py-2 8 + a 36px action row + gap-1.5 6 +
+       the range grid's border 1 + pt-1.5 6 + the slider's h-9 36) + 8. At 8rem the
+       column grew taller than the stage — align-items is flex-start — and pushed the
+       range control, this feature's primary UI, out of the one-screen lock.
+       If the slot or the status bar gains a row, re-measure and raise this. */
+    --rc-plan-chrome: 10rem;
     flex: 1 1 0;
     min-height: 0;
     container-type: size;

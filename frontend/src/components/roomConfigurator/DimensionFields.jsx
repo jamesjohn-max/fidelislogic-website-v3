@@ -21,7 +21,7 @@ const formatNum = (v, decimals) => {
 };
 
 const STEPPER_BUTTON =
-  "flex h-full w-8 shrink-0 items-center justify-center rc-ink-muted transition-[background-color,transform] duration-100 rc-fill-hover/85 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:active:scale-100 active:scale-90 active:rc-fill-strong";
+  "flex h-full w-8 shrink-0 items-center justify-center rc-ink-muted transition-[background-color,transform] duration-100 rc-fill-hover rc-fill-active focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:active:scale-100 active:scale-90";
 
 function FieldLabel({ htmlFor, id, children }) {
   return (
@@ -100,7 +100,7 @@ function NumberField({ id, label, value, min, max, step, helper, onChange, decim
         </button>
       </div>
       {error && (
-        <span id={`${id}-error`} className="text-xs font-medium text-red-400">
+        <span id={`${id}-error`} className="text-xs font-medium rc-danger">
           {error}
         </span>
       )}
@@ -120,7 +120,7 @@ export function Segmented({ label, options, value, onChange, helper, disabledIds
       <div role="radiogroup" aria-labelledby={labelId} className="relative flex h-10 rounded-lg rc-fill p-1">
         <span
           aria-hidden="true"
-          className="absolute bottom-1 left-1 top-1 rounded-md rc-fill shadow-[0_1px_3px_rgba(15,23,42,0.12),0_0_0_0.5px_rgba(15,23,42,0.06)] transition-transform duration-300 ease-out-strong motion-reduce:transition-none"
+          className="absolute bottom-1 left-1 top-1 rounded-md bg-[color:var(--rc-panel)] shadow-[0_1px_3px_rgba(15,23,42,0.12),0_0_0_0.5px_rgba(15,23,42,0.06)] transition-transform duration-300 ease-out-strong motion-reduce:transition-none"
           style={{ width: `calc((100% - 0.5rem) / ${options.length})`, transform: `translateX(${index * 100}%)` }}
         />
         {options.map((o) => {
@@ -138,7 +138,7 @@ export function Segmented({ label, options, value, onChange, helper, disabledIds
               disabled={disabled}
               onClick={() => onChange(o.id)}
               className={`relative z-[1] flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 text-[13px] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:opacity-40 ${
-                active ? "text-white" : "rc-ink-muted hover:rc-ink"
+                active ? "rc-ink" : "rc-ink-muted rc-ink-hover"
               }`}
             >
               {Icon && <Icon className="h-4 w-4" />}

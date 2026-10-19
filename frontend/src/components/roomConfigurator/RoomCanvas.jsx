@@ -1019,7 +1019,7 @@ export function RoomCanvas({
           <div className="rc-plan-frame relative">
             <div
               ref={diagramRef}
-              className="h-full w-full overflow-hidden rounded-3xl border rc-border shadow-sm"
+              className={`h-full w-full overflow-hidden rounded-3xl border rc-border shadow-sm${theme === "screen" ? " rc-stage" : ""}`}
               style={{ backgroundColor: palette.margin }}
             >
               <svg
@@ -1235,7 +1235,7 @@ export function RoomCanvas({
                           {selectionDeletable && (
                             <button
                               onClick={handleDeleteSelected}
-                              className="flex min-h-[36px] items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold text-red-400 transition-transform duration-100 hover:bg-red-500/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-500 active:scale-[0.96]"
+                              className="flex min-h-[36px] items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold rc-danger transition-transform duration-100 hover:bg-red-500/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-500 active:scale-[0.96]"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                               Delete

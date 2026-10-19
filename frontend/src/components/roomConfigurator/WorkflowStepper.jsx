@@ -43,10 +43,10 @@ export function WorkflowStepper({ steps, current, visited, attention, pending = 
                       : isDone
                       ? "bg-blue-500/10 text-blue-600 group-hover:bg-blue-500/15"
                       : isPartial
-                      ? "border-2 border-dashed border-amber-400/60 rc-fill text-amber-200 group-hover:bg-amber-400/10"
+                      ? "border-2 border-dashed border-amber-400/60 rc-fill rc-warn group-hover:bg-amber-400/10"
                       : isReached
                       ? "border border-blue-400/40 rc-fill text-blue-600 group-hover:bg-blue-500/10"
-                      : "border rc-border rc-fill rc-ink-muted group-hover:rc-border group-hover:rc-ink-soft"
+                      : "border rc-border rc-border-group-hover rc-fill rc-ink-muted rc-ink-soft-group-hover"
                   }`}
                 >
                   {isDone ? <Check className="h-4 w-4" strokeWidth={2.5} /> : i + 1}

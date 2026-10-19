@@ -241,7 +241,7 @@ const ConsultationHandoff = ({ audience }) => (
   >
     <span>
       Want a second opinion on this room?{" "}
-      <span className="font-semibold text-blue-300">Book a consultation</span> — we'll
+      <span className="font-semibold text-blue-700">Book a consultation</span> — we'll
       review the plan with you. Nothing is sent until you choose to share it.
     </span>
   </Link>
@@ -1438,7 +1438,7 @@ export const RoomConfigurator = ({ with3d = false }) => {
                 <button
                   type="button"
                   aria-label="About Room Planner"
-                  className={`h-8 w-8 items-center justify-center rounded-full rc-ink-muted transition-colors rc-fill-hover/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 ${
+                  className={`h-8 w-8 items-center justify-center rounded-full rc-ink-muted transition-colors rc-fill-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 ${
                     steps ? "flex" : "hidden"
                   }`}
                 >
@@ -1581,7 +1581,7 @@ export const RoomConfigurator = ({ with3d = false }) => {
                         setPlanView("3d");
                         if (!window.matchMedia("(min-width: 1024px)").matches) planRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
                       }}
-                      className="flex min-h-[44px] items-center gap-2 whitespace-nowrap rounded-lg border border-blue-500/50 bg-blue-500/10 px-3.5 text-sm font-semibold text-blue-200 transition-[background-color,border-color,transform] duration-100 hover:border-blue-400 hover:bg-blue-500/20 rc-ink-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 active:scale-[0.97]"
+                      className="flex min-h-[44px] items-center gap-2 whitespace-nowrap rounded-lg border border-blue-500/50 bg-blue-500/10 px-3.5 text-sm font-semibold text-blue-700 transition-[background-color,border-color,transform] duration-100 hover:border-blue-400 hover:bg-blue-500/20 hover:text-blue-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 active:scale-[0.97]"
                     >
                       <Box aria-hidden="true" className="h-4 w-4" />
                       3D view

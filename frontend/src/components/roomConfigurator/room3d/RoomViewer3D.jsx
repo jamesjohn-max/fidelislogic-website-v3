@@ -474,7 +474,7 @@ export default function RoomViewer3D({ room, layoutResult, tableOffset, seats, d
 
   if (error) {
     return (
-      <div className="flex h-full min-h-[320px] items-center justify-center rounded-3xl border border-white/[0.08] bg-[color:var(--rc-panel)] p-6 text-center text-sm text-white/60">
+      <div className="flex h-full min-h-[320px] items-center justify-center rounded-3xl border rc-border bg-[color:var(--rc-panel)] p-6 text-center text-sm rc-ink-muted">
         {error}
       </div>
     );

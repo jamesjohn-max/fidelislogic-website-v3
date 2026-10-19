@@ -35,7 +35,7 @@ export function TemplatePicker({ template, audience, onChoose }) {
               className={`flex min-h-[56px] items-center gap-2.5 rounded-xl border px-2.5 py-2 text-left transition-[background-color,border-color,color,transform] duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 active:scale-[0.97] ${
                 active
                   ? "border-blue-500 bg-blue-500/10 shadow-[0_0_0_1px_rgba(59,130,246,1)]"
-                  : "rc-border rc-fill hover:rc-border rc-fill-hover"
+                  : "rc-border rc-border-hover rc-fill rc-fill-hover"
               }`}
             >
               <Icon aria-hidden="true" className={`h-4 w-4 shrink-0 ${active ? "text-[color:var(--rc-accent)]" : "rc-ink-muted"}`} />

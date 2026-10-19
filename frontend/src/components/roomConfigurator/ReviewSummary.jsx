@@ -143,8 +143,8 @@ export function ReviewSummary({ state, audience, details, photoCount, onEditStep
 export function UncheckedSections({ items, onCheck }) {
   return (
     <div className="rounded-xl border border-amber-400/25 bg-amber-400/10 px-3 py-2.5">
-      <p className="flex items-start gap-1.5 text-xs font-semibold leading-snug text-amber-200">
-        <CircleDashed aria-hidden="true" className="mt-px h-3.5 w-3.5 shrink-0 text-amber-300" />
+      <p className="flex items-start gap-1.5 text-xs font-semibold leading-snug rc-warn">
+        <CircleDashed aria-hidden="true" className="mt-px h-3.5 w-3.5 shrink-0 rc-warn" />
         {plural(items.length, "section")} not checked yet. Anything left empty shows as "Not specified" in the PDF, and a layout's starting table and seats as "(default)".
       </p>
       <ul className="mt-1 divide-y divide-amber-400/15">

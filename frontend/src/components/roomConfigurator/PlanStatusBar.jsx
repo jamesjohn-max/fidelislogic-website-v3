@@ -23,7 +23,7 @@ function Stat({ icon: Icon, label, children }) {
 }
 
 const ICON_BUTTON =
-  "flex h-9 w-9 items-center justify-center rounded-lg rc-ink-muted transition-[background-color,color,transform] duration-100 rc-fill-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 active:scale-[0.94] disabled:pointer-events-none disabled:rc-ink-muted";
+  "flex h-9 w-9 items-center justify-center rounded-lg rc-ink-muted transition-[background-color,color,transform] duration-100 rc-fill-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 active:scale-[0.94] disabled:pointer-events-none disabled:opacity-40";
 
 // Live read-out above the plan (room type, capacity, size), so each change made in a
 // step is confirmed at a glance, with undo and redo beside it. Starting over throws away
@@ -75,7 +75,7 @@ export function PlanStatusBar({
           <AlertDialogTrigger asChild>
             <button
               type="button"
-              className="ml-1 flex min-h-[36px] items-center gap-1.5 rounded-lg px-2.5 text-[13px] font-medium text-orange-400 transition-[background-color,color,transform] duration-100 hover:bg-orange-500/10 hover:text-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 active:scale-[0.97]"
+              className="ml-1 flex min-h-[36px] items-center gap-1.5 rounded-lg px-2.5 text-[13px] font-medium text-orange-700 transition-[background-color,color,transform] duration-100 hover:bg-orange-500/10 hover:text-orange-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 active:scale-[0.97]"
             >
               <RotateCcw className="h-3.5 w-3.5" />
               Start Over

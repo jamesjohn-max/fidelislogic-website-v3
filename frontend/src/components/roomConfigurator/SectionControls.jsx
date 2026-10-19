@@ -122,7 +122,7 @@ const DEVICE_DESCRIPTIONS = {
 const CHOICE_BASE =
   "transition-[background-color,border-color,color,transform] duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500";
 const CHOICE_ON = "border-blue-500 bg-blue-500/10 text-blue-700 shadow-[0_0_0_1px_rgba(59,130,246,1)]";
-const CHOICE_OFF = "rc-border rc-fill rc-ink-soft hover:rc-border rc-fill-hover";
+const CHOICE_OFF = "rc-border rc-border-hover rc-fill rc-ink-soft rc-fill-hover";
 
 // Starts on "Choose one" when nothing has been picked (value null), so an untouched
 // field never passes for an answer.
@@ -497,7 +497,7 @@ function DeviceRow({ category, count, onAdd, onRemove, choosing, onChoose, onClo
             aria-label={`Remove ${label}`}
             onClick={() => onRemove(category)}
             disabled={count === 0}
-            className="flex h-8 w-8 items-center justify-center rounded-full border rc-border rc-ink-muted transition-[background-color,transform] duration-100 rc-fill-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:opacity-30 disabled:active:scale-100 active:scale-90 active:rc-fill-strong"
+            className="flex h-8 w-8 items-center justify-center rounded-full border rc-border rc-ink-muted transition-[background-color,transform] duration-100 rc-fill-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:opacity-30 disabled:active:scale-100 active:scale-90 rc-fill-active"
           >
             <Minus className="h-3.5 w-3.5" />
           </button>
@@ -604,7 +604,7 @@ export function NotesField({ value, onChange }) {
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="Cable routes, power points, furniture staying in the room, access times…"
-        className="w-full resize-y rounded-lg border rc-border rc-fill px-3 py-2.5 text-sm leading-relaxed rc-ink shadow-sm outline-none transition-[border-color,box-shadow] placeholder:rc-ink-muted focus:border-blue-400/60 focus:ring-2 focus:ring-blue-500/20"
+        className="w-full resize-y rounded-lg border rc-border rc-fill px-3 py-2.5 text-sm leading-relaxed rc-ink shadow-sm outline-none transition-[border-color,box-shadow] rc-placeholder-muted focus:border-blue-400/60 focus:ring-2 focus:ring-blue-500/20"
       />
       <span className="text-xs rc-ink-muted">Included in the PDF report.</span>
     </div>
@@ -645,7 +645,7 @@ export function MicCoverageNote({ coverage, audioPreference }) {
   const all = coverage.heard === coverage.seats;
   return (
     <div className={`flex items-start gap-2 rounded-xl px-2.5 py-2 text-xs leading-snug rc-ink-soft ${all ? "bg-emerald-500/10" : "bg-amber-400/10"}`}>
-      <Radar aria-hidden="true" className={`mt-px h-3.5 w-3.5 shrink-0 ${all ? "text-emerald-300" : "text-amber-300"}`} />
+      <Radar aria-hidden="true" className={`mt-px h-3.5 w-3.5 shrink-0 ${all ? "rc-ok" : "rc-warn"}`} />
       <p>
         Microphones pick up{" "}
         <span className="font-semibold rc-ink">

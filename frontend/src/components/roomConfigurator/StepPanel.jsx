@@ -38,7 +38,7 @@ export const StepPanel = forwardRef(function StepPanel(
               {step.title}
             </h2>
             {progress && progress.total > 1 && (
-              <span className={`shrink-0 text-xs font-medium tabular-nums ${progress.done === progress.total ? "text-emerald-300" : "rc-ink-muted"}`}>
+              <span className={`shrink-0 text-xs font-medium tabular-nums ${progress.done === progress.total ? "rc-ok" : "rc-ink-muted"}`}>
                 {progress.done} of {progress.total} done
               </span>
             )}
@@ -54,7 +54,7 @@ export const StepPanel = forwardRef(function StepPanel(
           <button
             type="button"
             onClick={onBack}
-            className="-ml-3 flex min-h-[44px] items-center gap-1.5 rounded-lg px-3 text-sm font-medium rc-ink-muted transition-[background-color,transform] duration-100 rc-fill-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 active:scale-[0.97] active:rc-fill-strong"
+            className="-ml-3 flex min-h-[44px] items-center gap-1.5 rounded-lg px-3 text-sm font-medium rc-ink-muted transition-[background-color,transform] duration-100 rc-fill-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 active:scale-[0.97] rc-fill-active"
           >
             <ArrowLeft className="h-4 w-4" />
             Back
@@ -81,10 +81,10 @@ export const StepPanel = forwardRef(function StepPanel(
 // once it's been opened, "Not checked" while it still shows only the starting values,
 // "Optional" for the ones that can be left, and a warning while an essential is open.
 function SectionStatus({ status }) {
-  if (status === "attention") return <AlertCircle aria-hidden="true" className="h-[18px] w-[18px] shrink-0 text-amber-300" />;
-  if (status === "checked") return <CircleCheck aria-hidden="true" className="h-[18px] w-[18px] shrink-0 text-emerald-300" />;
+  if (status === "attention") return <AlertCircle aria-hidden="true" className="h-[18px] w-[18px] shrink-0 rc-warn" />;
+  if (status === "checked") return <CircleCheck aria-hidden="true" className="h-[18px] w-[18px] shrink-0 rc-ok" />;
   if (status === "optional") return <Circle aria-hidden="true" className="h-[18px] w-[18px] shrink-0 rc-ink-soft" />;
-  return <CircleDashed aria-hidden="true" className="h-[18px] w-[18px] shrink-0 text-amber-300" />;
+  return <CircleDashed aria-hidden="true" className="h-[18px] w-[18px] shrink-0 rc-warn" />;
 }
 
 const STATUS_WORDS = { checked: "checked", unchecked: "not checked", optional: "optional", attention: "needs attention" };
@@ -131,7 +131,7 @@ export function StepGroup({ title, description, summary, alerts = 0, error = nul
               {(status === "unchecked" || status === "optional") && (
                 <span
                   className={`rounded-md px-1.5 py-px text-xs font-semibold ${
-                    status === "unchecked" ? "bg-amber-400/15 text-amber-200" : "rc-fill rc-ink-muted"
+                    status === "unchecked" ? "bg-amber-400/15 rc-warn" : "rc-fill rc-ink-muted"
                   }`}
                 >
                   {status === "unchecked" ? "Not checked" : "Optional"}
@@ -142,13 +142,13 @@ export function StepGroup({ title, description, summary, alerts = 0, error = nul
             <span className="line-clamp-2 block text-xs leading-snug rc-ink-muted">{open ? description || shownSummary : shownSummary}</span>
           </span>
           {alerts > 0 && (
-            <span className="shrink-0 rounded-full bg-amber-400/15 px-2 py-0.5 text-xs font-semibold text-amber-200">
+            <span className="shrink-0 rounded-full bg-amber-400/15 px-2 py-0.5 text-xs font-semibold rc-warn">
               {alerts} to fix
             </span>
           )}
           <ChevronDown
             aria-hidden="true"
-            className={`h-4 w-4 shrink-0 rc-ink-muted transition-transform duration-300 ease-out-strong group-hover:rc-ink-muted motion-reduce:transition-none ${open ? "rotate-180" : ""}`}
+            className={`h-4 w-4 shrink-0 rc-ink-muted transition-transform duration-300 ease-out-strong rc-ink-group-hover motion-reduce:transition-none ${open ? "rotate-180" : ""}`}
           />
         </button>
       </h3>
@@ -157,8 +157,8 @@ export function StepGroup({ title, description, summary, alerts = 0, error = nul
         <div className="-mx-1 min-h-0 overflow-hidden px-1">
           <div inert={!open} className="flex flex-col gap-3 pb-3.5 pt-1">
             {error && (
-              <p role="alert" className="rc-banner-in flex items-start gap-1.5 rounded-lg border border-amber-400/25 bg-amber-400/10 px-2.5 py-2 text-xs font-medium leading-snug text-amber-100">
-                <AlertCircle aria-hidden="true" className="mt-px h-3.5 w-3.5 shrink-0 text-amber-300" />
+              <p role="alert" className="rc-banner-in flex items-start gap-1.5 rounded-lg border border-amber-400/25 bg-amber-400/10 px-2.5 py-2 text-xs font-medium leading-snug rc-warn">
+                <AlertCircle aria-hidden="true" className="mt-px h-3.5 w-3.5 shrink-0 rc-warn" />
                 {error}
               </p>
             )}
