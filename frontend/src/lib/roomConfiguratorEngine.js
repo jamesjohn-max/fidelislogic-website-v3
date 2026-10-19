@@ -226,8 +226,10 @@ export function displayImageHeight(sizeInches, aspect = "16:9") {
 
 // How a screen is described in lists and the report: `75"`, or `105" 21:9 ultra-wide`.
 export const displaySpec = (d) => `${d.sizeInches}"${d.aspect === ULTRAWIDE ? " 21:9 ultra-wide" : ""}`;
-// ...and an all-in-one display: `65" · mics ~7m`.
-export const allInOneSpec = (d) => `${d.sizeInches}" · mics ~${d.micReach}m`;
+// ...and an all-in-one display: `65" · mics ~7m`. The reach is the resolved one, so the
+// spec line and the disc drawn on the plan can never quote different numbers; `state` is
+// optional for a caller that holds only the devices.
+export const allInOneSpec = (d, state = {}) => `${d.sizeInches}" · mics ~${+resolveMicRange(d, "allInOne", state).toFixed(2)}m`;
 // Everything on the walls people watch: displays and all-in-one displays.
 export const screensOf = (devices) => [...devices.display, ...devices.allInOne];
 

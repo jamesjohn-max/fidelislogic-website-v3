@@ -112,7 +112,7 @@ export function ReviewSummary({ state, audience, details, photoCount, onEditStep
         facts={[
           state.platform || "Platform not chosen",
           devices.allInOne.length
-            ? [devices.display.length && codes(devices, "display", "", displaySpec), codes(devices, "allInOne", "", (d) => `${allInOneSpec(d)} all-in-one`)].filter(Boolean).join(", ")
+            ? [devices.display.length && codes(devices, "display", "", displaySpec), codes(devices, "allInOne", "", (d) => `${allInOneSpec(d, state)} all-in-one`)].filter(Boolean).join(", ")
             : codes(devices, "display", "No display", displaySpec),
           devices.camera.length || devices.videoBar.length || devices.allInOne.length
             ? [

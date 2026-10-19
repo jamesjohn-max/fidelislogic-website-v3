@@ -591,8 +591,8 @@ export const RoomConfigurator = ({ with3d = false }) => {
   // The selected device's own range, in metres: `null` DELETES the field, so the device
   // follows the room-wide value (or the derived default) again — writing the current
   // default in instead would silently freeze it there. A slider drag coalesces into one
-  // undo step. An all-in-one's legacy `micReach` is an item-level override too, so a
-  // reset has to clear it as well or the device would keep refusing to follow.
+  // undo step. Only `micRange` / `speakerRange` are ever touched: an all-in-one's
+  // `micReach` is its own spec, which the report prints and nothing here may remove.
   const handleSetSourceRange = (category, id, kind, metres) => {
     const field = kind === "speaker" ? "speakerRange" : "micRange";
     update(
@@ -604,7 +604,6 @@ export const RoomConfigurator = ({ with3d = false }) => {
             const next = { ...item };
             if (metres == null) {
               delete next[field];
-              if (field === "micRange") delete next.micReach;
             } else {
               next[field] = metres;
             }
@@ -1277,7 +1276,7 @@ export const RoomConfigurator = ({ with3d = false }) => {
                 camReach={camReaches.length ? Math.max(...camReaches) : undefined}
                 reaches={resolvedMicReaches("allInOne")}
               />
-              <MicCoverageNote coverage={micCoverage(state)} audioPreference={audioPreference} audio={audio} />
+              <MicCoverageNote coverage={micCoverage(state)} audioPreference={audioPreference} />
               <DeviceList categories={["microphone", "speaker"]} {...deviceListProps} />
               <SpeakerMountSwitch speakers={devices.speaker} defaultMount={defaultSpeakerMount(audioPreference)} onChange={handleSetSpeakerMount} />
               <RecommendationList recommendations={audioRecs} onAddDevice={handleAddDevice} />

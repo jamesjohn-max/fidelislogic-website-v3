@@ -43,7 +43,6 @@ import {
   ALL_IN_ONE_MIC_REACH_M,
   typicalAllInOneMicReach,
   micMount,
-  micRangeLabel,
   refLabel,
 } from "../../lib/roomConfiguratorEngine";
 import {
@@ -641,7 +640,7 @@ export function BuiltInMicNote({ coverage, camReach = TABLE_CAM_MIC_RANGE_M, rea
 
 // Audio step, once microphones are in: how many seats are within a microphone's
 // pickup (a ceiling array's ~5 m, a table mic's ~5 ft, or a built-in mic's reach).
-export function MicCoverageNote({ coverage, audioPreference, audio }) {
+export function MicCoverageNote({ coverage, audioPreference }) {
   if (!coverage.dedicated || !coverage.seats) return null;
   const all = coverage.heard === coverage.seats;
   return (
@@ -652,9 +651,9 @@ export function MicCoverageNote({ coverage, audioPreference, audio }) {
         <span className="font-semibold text-white">
           {coverage.heard} of {coverage.seats}
         </span>{" "}
-        seats · {micMount(audioPreference) === "ceiling" ? "ceiling arrays reach" : "table mics reach"}{" "}
-        {/* The room-wide range, when there is one, beats the figure the mount would give. */}
-        {Number.isFinite(audio?.micRange) ? `~${+coverage.reach.toFixed(2)} m` : micRangeLabel(audioPreference)}.
+        {/* `reach` is the figure the plan draws: the room-wide range if there is one, else
+            the mount's own, slant-corrected for this room's height. */}
+        seats · {micMount(audioPreference) === "ceiling" ? "ceiling arrays reach" : "table mics reach"} ~{+coverage.reach.toFixed(2)} m.
       </p>
     </div>
   );

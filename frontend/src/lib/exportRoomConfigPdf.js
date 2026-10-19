@@ -11,11 +11,11 @@ import {
   TABLE_KIND_LABELS,
   seatingDensityLabel,
   seatingSpacingSummary,
-  TABLE_CAM_MIC_RANGE_M,
   allInOneSpec,
   CLASSROOM_DESK_DEPTH,
   displaySpec,
 } from "./roomConfiguratorEngine";
+import { resolveMicRange } from "./roomAudioCoverage";
 
 // This report is built from the configurator's data model with jsPDF's own drawing
 // primitives (text/rect/ellipse/lines); only the room diagram comes from the live
@@ -835,7 +835,7 @@ function layoutSummaryGrid(doc, state, audience, unconfirmed = new Set()) {
       ];
   const deviceRows = [
     ["Display", devices.display.length ? devices.display.map((d, i) => `${refCode("display", i)}: ${displaySpec(d)}`).join(", ") : "0"],
-    ...(devices.allInOne.length ? [["All-in-one display", devices.allInOne.map((d, i) => `${refCode("allInOne", i)}: ${allInOneSpec(d)}`).join(", ")]] : []),
+    ...(devices.allInOne.length ? [["All-in-one display", devices.allInOne.map((d, i) => `${refCode("allInOne", i)}: ${allInOneSpec(d, state)}`).join(", ")]] : []),
     ["Camera", devices.camera.length ? devices.camera.map((c, i) => `${refCode("camera", i)}: ${c.isTableCam ? "360°" : `${c.fov}°`}`).join(", ") : "0"],
     ["Video bar", devices.videoBar.length ? devices.videoBar.map((v, i) => `${refCode("videoBar", i)}: ${v.fov}°`).join(", ") : "0"],
     ["Camera features", cameraFeatures?.length ? cameraFeatures.map((id) => CAMERA_FEATURES.find((f) => f.id === id)?.label || id).join(", ") : "None selected"],
@@ -926,13 +926,14 @@ const DEFAULT_NOTE = "(default) — a starting value nobody changed or confirmed
 
 const onDisplayText = (item) => (item.mountedOn && item.mountSide ? `, ${item.mountSide} the display` : "");
 
-function deviceSpecText(category, item) {
+function deviceSpecText(category, item, state) {
   switch (category) {
     case "display": return `${displaySpec(item)} display`;
-    case "allInOne": return `${item.sizeInches}" all-in-one — built-in ${item.fov}° camera, mics (~${item.micReach}m) and speakers`;
+    // The resolved mic reach, as everywhere else: a room-wide or per-device range moves it.
+    case "allInOne": return `${item.sizeInches}" all-in-one — built-in ${item.fov}° camera, mics (~${+resolveMicRange(item, "allInOne", state).toFixed(2)}m) and speakers`;
     case "camera":
       return item.isTableCam
-        ? `360° camera — built-in mics (~${TABLE_CAM_MIC_RANGE_M}m), no speaker; paired with a video bar or all-in-one display`
+        ? `360° camera — built-in mics (~${+resolveMicRange(item, "camera", state).toFixed(2)}m), no speaker; paired with a video bar or all-in-one display`
         : `${item.fov}° FOV camera${onDisplayText(item)}`;
     case "videoBar": return `${item.fov}° FOV video bar${onDisplayText(item)}`;
     case "microphone": return "Microphone";
@@ -957,11 +958,11 @@ const DEVICE_TABLE_COLS = [
 const DEVICE_TABLE_HEADER_H = 6.2;
 const DEVICE_TABLE_ROW_H = 4.6;
 
-function deviceTableRows(devices) {
+function deviceTableRows(state) {
   const rows = [];
   DEVICE_ORDER.forEach((category) => {
-    devices[category].forEach((item, idx) => {
-      rows.push([refCode(category, idx), DEVICE_LABELS[category], deviceSpecText(category, item), `${item.x.toFixed(2)}, ${item.y.toFixed(2)} m`]);
+    state.devices[category].forEach((item, idx) => {
+      rows.push([refCode(category, idx), DEVICE_LABELS[category], deviceSpecText(category, item, state), `${item.x.toFixed(2)}, ${item.y.toFixed(2)} m`]);
     });
   });
   return rows;
@@ -1218,7 +1219,7 @@ export async function exportRoomConfigPdf({ state, layoutResult, removedChairInd
     y += 6;
   }
 
-  const deviceRows = customer ? [] : deviceTableRows(state.devices);
+  const deviceRows = customer ? [] : deviceTableRows(state);
   if (deviceRows.length) {
     // Keep the section title with at least its header and first couple of rows.
     ensureSpace(SECTION_TITLE_H + DEVICE_TABLE_HEADER_H + DEVICE_TABLE_ROW_H * Math.min(deviceRows.length, 2));

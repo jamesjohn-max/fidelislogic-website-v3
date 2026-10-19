@@ -134,7 +134,7 @@ into a device, so no room-wide edit can clobber an override.
 | `microphone` | yes | — |
 | `speaker` | — | yes |
 | `videoBar` | **new** | **new** |
-| `allInOne` | existing `micReach`, read as the override | **new** |
+| `allInOne` | `micReach` as its **derived default**, not an override — see correction below | **new** |
 | `camera` where `isTableCam` | yes (replaces the fixed 3 m) | — (has no speaker) |
 | `camera` (front) | — | — |
 
@@ -279,7 +279,19 @@ numbers. Therefore:
 - No `DRAFT_VERSION` bump.
 - Existing localStorage drafts load unchanged.
 - Existing shareable links resolve unchanged.
-- `allInOne.micReach` keeps working — it is read as the per-device override.
+- `allInOne.micReach` keeps working — it supplies that device's derived default.
+
+> **Correction (made during Task 6's review).** §5.3 and this line originally called
+> `micReach` "the per-device override", on the assumption it was legacy data carried by
+> old plans. That assumption was wrong, and it was never checked when written: `micReach`
+> is written at creation for **every** all-in-one (`SectionControls.jsx:353` when the
+> planner picks a size, `roomTemplates.js:66` for templates). It is the device's
+> size-derived capability, not a planner's choice. Treating it as an override made every
+> all-in-one born "Custom", silently excluded it from the room-wide range, and — because
+> reset deletes an override — put `~undefinedm` into the review screen and the client
+> PDF. Precedence is therefore `micRange` → room-wide → derived (which consults
+> `micReach`), and `isCustom` tracks only `micRange`, because "Custom" must mean the
+> planner changed it.
 
 This is proved by a regression test (§9), not by inspection.
 

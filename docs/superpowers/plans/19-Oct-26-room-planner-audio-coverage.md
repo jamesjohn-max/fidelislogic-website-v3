@@ -22,6 +22,7 @@
 - **The PDF section must state** that these are geometric planning ranges, not measured SPL coverage.
 - **Existing suites pass unchanged.** If `roomConfiguratorEngine.test.js` needs edits, the consolidation changed behaviour — investigate, do not accommodate.
 - **The repo has no component-test setup** (only `lib/*.test.js`). Do not add one. Push logic into the module where it can be tested; verify UI by hand.
+- **A green test suite is not evidence the app runs.** Added during Task 4, after a circular import left the entire site rendering a blank `<body>` while Jest and `craco build` both passed — neither runs React Refresh, which enumerates a module's exports at evaluation time. Every task from here verifies with a **cold dev-server load**: stop any running server, start a fresh one, load `/tools/room-configurator`, confirm real content renders and the console has no `before initialization` errors.
 
 ## Review Focus
 
@@ -260,7 +261,9 @@ The regression-critical task. Spec §6.1: reach currently lives in `roomConfigur
 ```js
 it("reproduces today's mic coverage for a plan with no audio key", () => {
   // Fixture written against the PRE-change micCoverage output; see Step 2.
-  const legacy = { room, audioPreference: "Ceiling Microphone Array", seats: [{ x: 2, y: 2.5 }, { x: 6, y: 2.5 }],
+  // Seat 2 sits 5.5 m from the mic, beyond the 4.737 m a ceiling array reaches in a
+  // 2.8 m room — so exactly one seat is unheard. Do not move it closer than 4.74 m.
+  const legacy = { room, audioPreference: "Ceiling Microphone Array", seats: [{ x: 2, y: 2.5 }, { x: 7.5, y: 2.5 }],
     devices: { ...emptyDevices(), microphone: [{ id: "m1", x: 2, y: 2.5 }] } };
   expect(micCoverage(legacy)).toMatchObject({ seats: 2, dedicated: 1, heard: 1 });
   expect(micCoverage(legacy).unheard).toHaveLength(1);
@@ -284,7 +287,9 @@ Expected: PASS before any engine edit.
 
 - [ ] **Step 3: Rewrite `micPickups`, `micCoverage` and `micsToCover` to call `micSources`**
 
-Delete the duplicated reach maths. `dedicatedMicReach` and `builtInPickups` stay exported (the viewer and PDF import them) but become thin wrappers over the module. `micsToCover` keeps using `spreadDevicePositions` for candidate placement and only takes its reach from the module.
+Delete the duplicated reach maths. `dedicatedMicReach` and `builtInPickups` stay exported but become thin wrappers over the module.
+
+> **Correction (made during Task 3's review):** this step originally said the 3D viewer and the PDF import these two helpers. They do not. `buildRoomScene.js:3` imports only `AUDIO_PREFERENCES`, `SOUNDBAR_AUDIO` and `nearestEdge`; `exportRoomConfigPdf.js` imports `TABLE_CAM_MIC_RANGE_M` and display/seating helpers. The sole consumer of both is `RoomConfigurator.jsx` — `dedicatedMicReach` at line 1320 and `builtInPickups` at line 873. Keeping them exported is still right, but the blast radius is one file, not three. `micsToCover` keeps using `spreadDevicePositions` for candidate placement and only takes its reach from the module.
 
 - [ ] **Step 4: Run the whole suite**
 
@@ -347,7 +352,9 @@ Expected: FAIL, `defaultSpeakerMount is not a function`
 
 - [ ] **Step 3: Implement `defaultSpeakerMount(audioPreference)` and wall placement**
 
-`defaultSpeakerMount` returns `"table"` for `SOUNDBAR_AUDIO` and `"ceiling"` for everything else including `null`. Wall snapping reuses the existing path at `roomConfiguratorEngine.js:1240` — the one touch panels use — rather than a new one. Set `mount` when a speaker is constructed, defaulting from `audioPreference` so no existing plan shifts (spec §5.5).
+`defaultSpeakerMount` returns `"table"` for `SOUNDBAR_AUDIO` and `"ceiling"` for everything else including `null`. Wall snapping reuses the existing path at `roomConfiguratorEngine.js:1240` — the one touch panels use — rather than a new one.
+
+> **Correction (made during Task 4's review):** this step originally said to set `mount` when a speaker is constructed. That was wrong, and it was the step's own instruction that caused the only Important finding in the task. Stamping eagerly *changes* behaviour instead of preserving it — before this task the 3D keyed on `ctx.audioPreference`, so changing the room's audio setup redrew every speaker; a stamped speaker instead keeps `mount: "table"` and goes on drawing as a table soundbar under a ceiling-mic setup, with no rebuild to correct it. **`mount` is absence-based**, like every other override here: absent means "follow the room's audio setup", an explicit value means the planner chose it. Read-time fallbacks (`item.mount ?? defaultSpeakerMount(...)`) supply the default wherever it is needed.
 
 - [ ] **Step 4: Render wall speakers in 3D**
 
@@ -435,6 +442,13 @@ A device with an override shows a **custom** marker and a reset control. Reset d
 - [ ] **Step 2: Add the room-wide controls and the mount switch**
 
 Two inputs on the Audio step beside the `Preferred audio setup` dropdown, writing `state.audio.micRange` and `state.audio.speakerRange`, each showing whether it is at default and each resettable to `null`. Add a ceiling / wall / table mount switch to a selected speaker, writing `speaker.mount` from Task 4.
+
+**Forward dependency added during Task 3:** `micsToCover` gained an optional `micRange` key in its options bag. Wherever this page calls it, pass `state.audio.micRange`. Without that, a custom room-wide range drives the overlay but not the "add N microphones" recommendation — the engine-vs-overlay contradiction spec §6.1 exists to remove. (`state.audio` already exists — Task 1 added it to `initialPlan` — so wire it immediately.)
+
+**Forward dependencies added during Task 4:**
+- **The mount switch must also clear the speaker's `autoSpread` flag.** Otherwise `respreadAutoDevices` will move a wall speaker off its wall the next time the room changes.
+- `mount` is fixed when a speaker is created, so changing the room's audio setup later leaves existing speakers on their old mount. That is deliberate — no existing plan may shift — and this switch is the manual remedy. Say so in the UI if it is cheap to.
+- ~~`isCustom` should treat a legacy `micReach` as custom.~~ **Withdrawn during Task 6's review.** This rested on `micReach` being legacy data, which it is not — it is written at creation for every all-in-one (`SectionControls.jsx:353`, `roomTemplates.js:66`), so it is the device's size-derived capability, not a planner's choice. Treating it as an override badged every all-in-one "Custom" on arrival, excluded it from the room-wide range, and let reset delete it — putting `~undefinedm` into the review screen and the client PDF. **`isCustom` tracks only `micRange`**, because "Custom" must mean the planner changed it, and precedence is `micRange` → room-wide → derived (which consults `micReach`).
 
 - [ ] **Step 3: Add the show-all toggle**
 

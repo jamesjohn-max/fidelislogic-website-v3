@@ -145,27 +145,28 @@ describe("derived ranges reached through the sources", () => {
     expect(speakerSources(state)[0].isCustom).toBe(false);
   });
 
-  // Spec §5.3/§8: the legacy field is the device's override, so a room-wide range loses to it.
-  it("keeps a legacy allInOne micReach above a room-wide range", () => {
+  // Spec §5.3/§8: `micReach` is written from the all-in-one's size when it is created, so
+  // it is a derived figure, not the planner's choice — a room-wide range beats it.
+  it("lets a room-wide range beat an allInOne micReach", () => {
     const wide = { audio: { micRange: 6, speakerRange: null } };
-    expect(mic({ allInOne: [{ id: "a1", x: 1, y: 1, sizeInches: 75, micReach: 2 }] }, wide)).toEqual([2]);
-    // an explicit micRange still outranks the legacy field
+    expect(mic({ allInOne: [{ id: "a1", x: 1, y: 1, sizeInches: 75, micReach: 2 }] }, wide)).toEqual([6]);
+    // the planner's own micRange outranks both
     expect(mic({ allInOne: [{ id: "a1", x: 1, y: 1, sizeInches: 75, micReach: 2, micRange: 3 }] }, wide)).toEqual([3]);
-    // with neither, the room-wide range applies, and without that the typical for its size
+    // with no room-wide range, micReach is the derived figure, and without that the
+    // typical reach for its size
+    expect(mic({ allInOne: [{ id: "a1", x: 1, y: 1, sizeInches: 75, micReach: 2 }] })).toEqual([2]);
     expect(mic({ allInOne: [{ id: "a1", x: 1, y: 1, sizeInches: 75 }] }, wide)).toEqual([6]);
     expect(mic({ allInOne: [{ id: "a1", x: 1, y: 1, sizeInches: 75 }] })).toEqual([typicalAllInOneMicReach(75)]);
   });
 
-  // Task 6: isCustom means "does not follow the room-wide default", so the legacy field
-  // has to read as custom — otherwise one device silently ignores a room-wide range and
-  // nothing on screen says why.
-  it("marks a legacy allInOne micReach as custom, and the room-wide range as not", () => {
+  // "Custom" has to mean the planner changed it, or every all-in-one is born badged.
+  it("marks only a hand-set micRange as custom", () => {
     const wide = { audio: { micRange: 6, speakerRange: null } };
     const custom = (devices, extra) => micSources(withDevices(devices, extra)).map((s) => s.isCustom);
-    expect(custom({ allInOne: [{ id: "a1", x: 1, y: 1, sizeInches: 75, micReach: 2 }] }, wide)).toEqual([true]);
+    expect(custom({ allInOne: [{ id: "a1", x: 1, y: 1, sizeInches: 75, micReach: 2 }] }, wide)).toEqual([false]);
     expect(custom({ allInOne: [{ id: "a1", x: 1, y: 1, sizeInches: 75, micRange: 3 }] }, wide)).toEqual([true]);
     expect(custom({ allInOne: [{ id: "a1", x: 1, y: 1, sizeInches: 75 }] }, wide)).toEqual([false]);
-    // micReach is an all-in-one's own field; it is not an override anywhere else.
+    // micReach is an all-in-one's own field; it is not read anywhere else.
     expect(custom({ microphone: [{ id: "m1", x: 1, y: 1, micReach: 2 }] }, wide)).toEqual([false]);
   });
 

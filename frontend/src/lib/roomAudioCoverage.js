@@ -28,7 +28,10 @@ const slantToFloor = (slantM, room) => {
 
 export function derivedMicRange(item, category, state) {
   if (category === "camera") return TABLE_CAM_MIC_RANGE_M;
-  if (category === "allInOne") return typicalAllInOneMicReach(item?.sizeInches);
+  // `micReach` is an all-in-one's own capability, written from its size when the device is
+  // created (never by hand), so it belongs here among the derived figures — under a
+  // room-wide range, not above it. Without one, a typical reach for its size.
+  if (category === "allInOne") return Number.isFinite(item?.micReach) ? item.micReach : typicalAllInOneMicReach(item?.sizeInches);
   if (category === "videoBar") return VIDEO_BAR_MIC_RANGE_M;
   return micMount(state.audioPreference) === "table" ? TABLE_MIC_RANGE_M : slantToFloor(CEILING_MIC_RANGE_M, state.room);
 }
@@ -49,14 +52,11 @@ export function derivedSpeakerRange(item, state, category = "speaker") {
 const firstFinite = (...values) => values.find(Number.isFinite);
 const clamp = (v) => Math.max(MIN_RANGE_M, v);
 
-// `allInOne.micReach` predates this module and is a per-device figure, so it resolves at the
-// item-override level, not below the room-wide one (spec §5.3, §8): a room-wide range must
-// not silently beat a reach already set on the device. Precedence for an all-in-one is
-// micRange -> legacy micReach -> room-wide -> typical for its size.
-const itemMicOverride = (item, category) => (category === "allInOne" ? firstFinite(item?.micRange, item?.micReach) : item?.micRange);
-
+// One precedence for every source, with no exceptions: what the planner set on the device
+// (`micRange`), then the room-wide range, then what the device derives (spec §5.3, §8 —
+// an all-in-one's `micReach` is part of that last step, see derivedMicRange).
 export const resolveMicRange = (item, category, state) =>
-  clamp(firstFinite(itemMicOverride(item, category), state.audio?.micRange, derivedMicRange(item, category, state)) ?? MIN_RANGE_M);
+  clamp(firstFinite(item?.micRange, state.audio?.micRange, derivedMicRange(item, category, state)) ?? MIN_RANGE_M);
 
 export const resolveSpeakerRange = (item, category, state) =>
   clamp(firstFinite(item?.speakerRange, state.audio?.speakerRange, derivedSpeakerRange(item, state, category)) ?? MIN_RANGE_M);
@@ -66,9 +66,8 @@ export const resolveSpeakerRange = (item, category, state) =>
 // category array (so a 360 camera after a front camera is C2, matching the canvas label).
 // `mount` is what the engine would read: a speaker's own, else the setup's default; a dedicated mic's
 // follows the room's audio preference; other devices have none.
-// `isCustom` means "this device does not follow the room-wide default", so `overrideOf`
-// is the same item-level resolver the range uses — a legacy allInOne `micReach` reads as
-// custom, because a room-wide range does not move it and the badge has to say why.
+// `isCustom` means "the planner set this device's range by hand", which is exactly the
+// item-level override the range resolves first — nothing a device is born with.
 const sourcesOf = (state, kind, categories, include, rangeOf, overrideOf) =>
   categories.flatMap((category) =>
     (state.devices?.[category] ?? []).flatMap((item, index) =>
@@ -89,7 +88,7 @@ const sourcesOf = (state, kind, categories, include, rangeOf, overrideOf) =>
   );
 
 export const micSources = (state) =>
-  sourcesOf(state, "mic", ["microphone", "videoBar", "allInOne", "camera"], (category, item) => category !== "camera" || item.isTableCam, resolveMicRange, itemMicOverride);
+  sourcesOf(state, "mic", ["microphone", "videoBar", "allInOne", "camera"], (category, item) => category !== "camera" || item.isTableCam, resolveMicRange, (item) => item?.micRange);
 
 export const speakerSources = (state) =>
   sourcesOf(state, "speaker", ["speaker", "videoBar", "allInOne"], () => true, resolveSpeakerRange, (item) => item?.speakerRange);
