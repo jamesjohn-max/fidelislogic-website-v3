@@ -76,15 +76,23 @@ export function PlannerIntroHero({ audience, onChoose, intro, privacyNote, image
         </figure>
       </div>
 
-      {/* Right: the rail. Get Started sits here so it is the nearest thing to the
-          visitor's cursor, which is what the layout exists for. */}
-      <div className="flex min-h-0 flex-col justify-center gap-4">
-        <AudiencePicker audience={audience} onChoose={onChoose} stacked />
-
-        <p className="rc-support rc-step-enter flex items-start gap-2 rc-ink-muted">
-          <ShieldCheck aria-hidden="true" className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-700" />
-          {privacyNote}
-        </p>
+      {/* Right: the choice. It sits here so it is the nearest thing to the visitor's
+          cursor, which is what the layout exists for, and it is a panel in its own right
+          — same height, radius and border as the stage opposite, so the two read as one
+          composition rather than a panel beside a floating card. The privacy line goes
+          inside it as a footer for the same reason. */}
+      <div className="flex min-h-0 flex-col">
+        <AudiencePicker
+          audience={audience}
+          onChoose={onChoose}
+          stacked
+          footer={
+            <p className="rc-support flex items-start gap-2 rc-ink-muted">
+              <ShieldCheck aria-hidden="true" className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-700" />
+              {privacyNote}
+            </p>
+          }
+        />
       </div>
     </section>
   );

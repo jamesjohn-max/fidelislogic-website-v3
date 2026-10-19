@@ -8,11 +8,17 @@ const ICONS = { customer: Building2, reseller: Briefcase };
 // by side where there's room.
 // `stacked` keeps the two paths one above the other: the intro hero puts this in a
 // narrow right-hand rail, where the side-by-side grid would squeeze both cards.
-export function AudiencePicker({ audience, onChoose, stacked = false }) {
+//
+// `footer` renders inside this panel rather than below it. In the hero this panel is
+// the right half of a two-panel composition and has to match the stage opposite it, so
+// anything that belongs to it lives within its border — a second floating element below
+// would break that symmetry, and wrapping this in an outer panel would nest one card in
+// another.
+export function AudiencePicker({ audience, onChoose, stacked = false, footer = null }) {
   return (
     <section
       aria-labelledby="rc-start-title"
-      className="rc-step-enter flex flex-col rounded-3xl border rc-border rc-fill shadow-sm lg:max-h-full lg:min-h-0 lg:self-start lg:overflow-y-auto"
+      className="rc-step-enter flex flex-col rounded-3xl border rc-border rc-fill shadow-sm lg:h-full lg:min-h-0"
     >
       <header className="px-5 pt-5">
         <p className="rc-label text-[color:var(--rc-accent-ink)]">Get started</p>
@@ -25,10 +31,14 @@ export function AudiencePicker({ audience, onChoose, stacked = false }) {
           Free, no sign-up. Pick the path that fits you — you can switch at any time.
         </p>
       </header>
+      {/* The options take the panel's slack and centre in it, so a taller panel grows
+          the breathing room around the choice instead of leaving a gap beneath it. */}
       <div
         role="radiogroup"
         aria-labelledby="rc-start-title"
-        className={`flex flex-col gap-2.5 px-5 pb-5 pt-4 ${stacked ? "" : "md:grid md:grid-cols-2"}`}
+        className={`flex flex-col gap-2.5 px-5 pb-5 pt-4 lg:min-h-0 lg:flex-1 lg:justify-center lg:overflow-y-auto ${
+          stacked ? "" : "md:grid md:grid-cols-2"
+        }`}
       >
         {Object.entries(AUDIENCES).map(([id, a]) => {
           const Icon = ICONS[id];
@@ -62,6 +72,7 @@ export function AudiencePicker({ audience, onChoose, stacked = false }) {
           );
         })}
       </div>
+      {footer && <div className="border-t rc-border px-5 py-4">{footer}</div>}
     </section>
   );
 }
