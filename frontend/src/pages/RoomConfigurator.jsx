@@ -120,14 +120,11 @@ const INTRO_POINTS = [
   "Private by design: nothing you enter is sent anywhere. Your draft stays in this browser until you start over, and the PDF is built right here",
 ];
 
-// The landing hero shows three of the points above plus the privacy one, not all five:
-// the page has to fit one screen, and five bullets beside the Get Started cards pushes
-// the fold. These are references into INTRO_POINTS rather than copies, so the two cannot
-// drift. The only point the hero leaves out is INTRO_POINTS[1] ("Close the gap between
-// what the customer needs and what gets installed"), which restates the INTRO paragraph
-// the hero already prints above the visual — so nothing is actually lost. Add a point
-// here and the fit has to be re-measured.
-const HERO_HIGHLIGHTS = [INTRO_POINTS[0], INTRO_POINTS[3], INTRO_POINTS[2]];
+// The landing hero carries the INTRO paragraph and the privacy line only. The bulleted
+// points are deliberately not shown there: the headline and paragraph make the argument,
+// and the rail is left to the one decision a visitor has to make. INTRO_POINTS is still
+// the single source for that copy — the full list renders in the "About Room Planner"
+// popover once a path is chosen.
 const HERO_PRIVACY_NOTE = INTRO_POINTS[4];
 
 function IntroText({ className = "" }) {
@@ -1555,7 +1552,6 @@ export const RoomConfigurator = ({ with3d = false }) => {
               audience={audience}
               onChoose={chooseAudience}
               intro={INTRO}
-              highlights={HERO_HIGHLIGHTS}
               privacyNote={HERO_PRIVACY_NOTE}
               image={siteImages.roomPlanner3d}
             />

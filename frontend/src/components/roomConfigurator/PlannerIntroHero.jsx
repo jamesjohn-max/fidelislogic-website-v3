@@ -1,4 +1,4 @@
-import { Check, Play, ShieldCheck } from "lucide-react";
+import { Play, ShieldCheck } from "lucide-react";
 import { AudiencePicker } from "./AudiencePicker";
 import { ResponsiveImage } from "../ResponsiveImage";
 
@@ -23,7 +23,7 @@ import { ResponsiveImage } from "../ResponsiveImage";
 // `window.matchMedia("(prefers-reduced-motion: reduce)")` and fall back to the poster,
 // which is what the rest of the planner does. And keep the frame's aspect ratio, or the
 // single-viewport fit above has to be re-measured.
-export function PlannerIntroHero({ audience, onChoose, intro, highlights, privacyNote, image }) {
+export function PlannerIntroHero({ audience, onChoose, intro, privacyNote, image }) {
   return (
     <section className="grid gap-5 lg:h-full lg:min-h-0 lg:grid-cols-[minmax(0,1.08fr)_minmax(340px,418px)] lg:gap-7">
       {/* Left: the stage. `rc-stage` flips the ink, line and panel tokens to their
@@ -52,25 +52,6 @@ export function PlannerIntroHero({ audience, onChoose, intro, highlights, privac
             quote it.
           </h1>
           <p className="rc-body mt-4 max-w-[58ch] rc-ink-soft">{intro}</p>
-
-          {/* The three points sit with the headline, not in the right rail. They are
-              the argument for the headline's claim, so they belong beside it — and it
-              leaves the rail doing one job: the choice. The tick colour resolves through
-              `--rc-accent-ink`, which `.rc-stage` already flips to the dark-surface
-              value, so nothing here is hardcoded for this background. */}
-          <ul className="mt-5 flex max-w-[54ch] flex-col gap-2.5">
-            {highlights.map((point) => (
-              <li key={point} className="rc-body flex gap-2.5 rc-ink-soft">
-                <span
-                  aria-hidden="true"
-                  className="mt-[0.42em] flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[color:var(--rc-accent)]/12 text-[color:var(--rc-accent-ink)]"
-                >
-                  <Check className="h-2.5 w-2.5" strokeWidth={3} />
-                </span>
-                {point}
-              </li>
-            ))}
-          </ul>
         </div>
 
         <figure className="relative mt-5 flex min-h-0 flex-1 overflow-hidden rounded-2xl border rc-border shadow-[0_24px_60px_-20px_rgba(0,0,0,0.7)]">
