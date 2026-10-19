@@ -1650,7 +1650,15 @@ export function micCoverage(state) {
   const seats = state.seats || [];
   const pickups = micPickups(state);
   const unheard = seats.filter((s) => !heardBy(s, pickups));
-  return { seats: seats.length, dedicated: state.devices.microphone.length, heard: seats.length - unheard.length, unheard, reach: resolveMicRange(null, "microphone", state) };
+  // `reach` explains `unheard`, so it has to come from the same sources: the farthest of
+  // the dedicated microphones actually in the room, each resolved through its own range.
+  // Resolving a null item instead gave the room-level figure, so a mic with a hand-set
+  // range put a number in the advice and on screen that the PDF's coverage table — drawn
+  // from these same sources — then contradicted. With no dedicated mic, `dedicated` is 0
+  // and nothing quotes this, so the mount's own resolved range stands in.
+  const dedicated = micSources(state).filter((s) => s.category === "microphone");
+  const reach = dedicated.length ? Math.max(...dedicated.map((s) => s.range)) : resolveMicRange(null, "microphone", state);
+  return { seats: seats.length, dedicated: state.devices.microphone.length, heard: seats.length - unheard.length, unheard, reach };
 }
 
 // The fewest dedicated microphones, laid out the way a set is spread (see

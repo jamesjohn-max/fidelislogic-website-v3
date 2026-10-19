@@ -17,11 +17,31 @@ const listFiles = (dir) =>
     return e.isDirectory() ? listFiles(full) : /\.jsx?$/.test(e.name) ? [full] : [];
   });
 
-const resolveImport = (from, spec) => {
-  if (!spec.startsWith(".")) return null; // a package; cannot cycle back into src
-  const base = path.resolve(path.dirname(from), spec);
+const resolveFrom = (dir, spec) => {
+  const base = path.resolve(dir, spec);
   return EXTENSIONS.map((ext) => base + ext).find((f) => fs.existsSync(f) && fs.statSync(f).isFile()) ?? null;
 };
+
+const resolveImport = (from, spec) => {
+  // `@/x` is the src-root alias (jsconfig.json). It resolves inside src just like a
+  // relative path does, so it can cycle; skipping it left ~48 files contributing no
+  // edges at all, and this test is the only automated guard against the cycle that
+  // blanks the whole site while jest and `craco build` both stay green.
+  if (spec.startsWith("@/")) return resolveFrom(SRC, spec.slice(2));
+  if (!spec.startsWith(".")) return null; // a package; cannot cycle back into src
+  return resolveFrom(path.dirname(from), spec);
+};
+
+// Every `@/` specifier in src, resolved. The guard below asserts the alias is in use and
+// that each use lands on a real file, so the branch in resolveImport cannot go back to
+// silently returning null and taking ~48 files out of the graph with it.
+const aliasEdges = () =>
+  listFiles(SRC).flatMap((file) =>
+    [...fs.readFileSync(file, "utf8").matchAll(STATIC_IMPORT)]
+      .map((m) => m[1])
+      .filter((spec) => spec.startsWith("@/"))
+      .map((spec) => resolveImport(file, spec))
+  );
 
 const buildGraph = () => {
   const graph = new Map();
@@ -66,6 +86,9 @@ describe("import cycles", () => {
     const graph = buildGraph();
     // Guard against the scan silently finding no imports (a broken regex would pass vacuously).
     expect([...graph.values()].flat().length).toBeGreaterThan(50);
+    const alias = aliasEdges();
+    expect(alias.length).toBeGreaterThan(10); // the alias is in use
+    expect(alias.filter((f) => f === null)).toEqual([]); // and every use of it resolves
     const cycles = findCycles(graph);
     expect(cycles.map(names)).toEqual([]);
   });

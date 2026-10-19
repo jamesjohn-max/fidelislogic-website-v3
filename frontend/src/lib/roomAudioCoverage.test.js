@@ -259,6 +259,25 @@ describe("engine parity (pre-refactor baseline)", () => {
     expect(advice(planWith({ micRange: 2, speakerRange: null }))).toMatch(/~2m mic pickup/);
   });
 
+  // Final review, Important 3: `reach` is the figure the advice and MicCoverageNote quote
+  // to explain `unheard`, and the PDF's coverage table prints the same mics' own ranges on
+  // the same page. Resolving a null item gave the ROOM-level range, so a hand-set mic made
+  // the sentence contradict the table beside it.
+  it("takes the reach from the dedicated mics in the room, not the room-wide default", () => {
+    const state = { room, audioPreference: "Ceiling Microphone Array", audio: { micRange: 2.5, speakerRange: null },
+      seats: [{ x: 2, y: 2.5 }, { x: 7.5, y: 2.5 }],
+      devices: { ...emptyDevices(), microphone: [{ id: "m1", x: 2, y: 2.5, micRange: 1 }] } };
+    // The one mic is hand-set to 1 m, under the room's 2.5 m: the table prints 1.00 m, so
+    // the sentence has to say 1 m too.
+    expect(micSources(state).map((s) => s.range)).toEqual([1]);
+    expect(micCoverage(state).reach).toBe(1);
+    expect(buildRecommendations(state).find((r) => r.id === "mic-coverage").text).toMatch(/~1 m pickup/);
+    // Two mics: the farthest is what explains the seats still left out.
+    const two = { ...state, devices: { ...state.devices, microphone: [{ id: "m1", x: 2, y: 2.5, micRange: 1 }, { id: "m2", x: 7.5, y: 2.5, micRange: 4 }] } };
+    expect(micCoverage(two).reach).toBe(4);
+    expect(micCoverage(two).unheard).toEqual([]);
+  });
+
   // Review Focus 5
   it("reads a legacy allInOne.micReach as that device's override", () => {
     const state = { ...base(), seats: [{ x: 4, y: 2.5 }],
