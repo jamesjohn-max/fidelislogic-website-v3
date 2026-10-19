@@ -18,8 +18,8 @@ export function TemplatePicker({ template, audience, onChoose }) {
   // A customer's plan holds the room, its furniture and door, so only a reseller's lists the kit.
   const includes = current && [`Table and ${templateSeats(template)} ${templateSeats(template) === 1 ? "chair" : "chairs"}`, ...(audience === "reseller" ? current.includes : []), "Door"];
   return (
-    <div className="flex flex-col gap-2 border-b border-white/[0.06] pb-3.5 pt-1">
-      <span id="rc-template-label" className="text-xs font-medium text-white/60">
+    <div className="flex flex-col gap-2 border-b rc-border pb-3.5 pt-1">
+      <span id="rc-template-label" className="text-xs font-medium rc-ink-muted">
         Start from
       </span>
       <div role="radiogroup" aria-labelledby="rc-template-label" className="grid grid-cols-2 gap-1.5">
@@ -35,19 +35,19 @@ export function TemplatePicker({ template, audience, onChoose }) {
               className={`flex min-h-[56px] items-center gap-2.5 rounded-xl border px-2.5 py-2 text-left transition-[background-color,border-color,color,transform] duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 active:scale-[0.97] ${
                 active
                   ? "border-blue-500 bg-blue-500/10 shadow-[0_0_0_1px_rgba(59,130,246,1)]"
-                  : "border-white/[0.08] bg-white/[0.03] hover:border-white/15 hover:bg-white/[0.05]"
+                  : "rc-border rc-border-hover rc-fill rc-fill-hover"
               }`}
             >
-              <Icon aria-hidden="true" className={`h-4 w-4 shrink-0 ${active ? "text-[color:var(--rc-accent)]" : "text-white/35"}`} />
+              <Icon aria-hidden="true" className={`h-4 w-4 shrink-0 ${active ? "text-[color:var(--rc-accent)]" : "rc-ink-muted"}`} />
               <span className="min-w-0">
-                <span className={`block text-[13px] font-semibold leading-tight ${active ? "text-cyan-100" : "text-white/85"}`}>{label}</span>
-                <span className="mt-0.5 block text-xs leading-tight text-white/45">{sub}</span>
+                <span className={`block text-[13px] font-semibold leading-tight ${active ? "text-blue-700" : "rc-ink"}`}>{label}</span>
+                <span className="mt-0.5 block text-xs leading-tight rc-ink-muted">{sub}</span>
               </span>
             </button>
           );
         })}
       </div>
-      <p className="text-xs leading-snug text-white/45" aria-live="polite">
+      <p className="text-xs leading-snug rc-ink-muted" aria-live="polite">
         {current
           ? `Includes: ${includes.join(", ")}. Enter the real measurements below and the plan adjusts to fit.`
           : template === "custom"

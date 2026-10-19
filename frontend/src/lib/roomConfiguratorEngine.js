@@ -2,6 +2,23 @@
 // Coordinate system: meters, origin top-left of room, x → right, y → down.
 // Rotation angle convention: 0° = facing "up" (toward y=0), clockwise, matching compass bearing.
 
+// All audio reach maths lives in roomAudioCoverage — one source of truth, so the advice
+// below, the 2D overlay and the PDF cannot drift apart once ranges are user-editable.
+// The dependency is one-way: anything both modules need lives in the roomPlannerShared
+// leaf, which imports from neither. Do NOT import this module from roomAudioCoverage —
+// see the note at the top of roomPlannerShared for what a cycle does to the dev server.
+import { derivedMicRange, micSources, resolveMicRange } from "./roomAudioCoverage";
+import {
+  AUDIO_PREFERENCES, CEILING_MIC_AUDIO, CEILING_MIC_RANGE_M, DEVICE_REF_PREFIX, SOUNDBAR_AUDIO,
+  TABLE_CAM_MIC_RANGE_M, TABLE_MIC_RANGE_M, defaultSpeakerMount, micMount, refCode, typicalAllInOneMicReach,
+} from "./roomPlannerShared";
+
+// Re-exported so every existing consumer keeps importing these from the engine.
+export {
+  AUDIO_PREFERENCES, CEILING_MIC_AUDIO, CEILING_MIC_RANGE_M, DEVICE_REF_PREFIX, SOUNDBAR_AUDIO,
+  TABLE_CAM_MIC_RANGE_M, TABLE_MIC_RANGE_M, defaultSpeakerMount, micMount, refCode, typicalAllInOneMicReach,
+};
+
 export const GRID_STEP = 0.5 / 3;
 export const WALL_SNAP_DISTANCE = 0.55;
 export const ROTATE_STEP = 15;
@@ -88,10 +105,9 @@ export const LAYOUTS = [
 ];
 
 export const PLATFORMS = ["Microsoft Teams Rooms", "Zoom Rooms", "Google Meet", "Cisco Webex", "BYOD / Bring Your Own Device"];
-export const AUDIO_PREFERENCES = ["Ceiling Microphone Array", "Table Microphone Pods", "Soundbar (Integrated Mic + Speaker)", "Wireless Boundary Microphones"];
+// AUDIO_PREFERENCES, SOUNDBAR_AUDIO and defaultSpeakerMount live in roomPlannerShared.
 // A soundbar is the room's speaker and microphones in one, good for a limited number of
 // people: beyond these, extra speakers / microphones are needed.
-export const SOUNDBAR_AUDIO = AUDIO_PREFERENCES[2];
 export const SOUNDBAR_SPEAKER_CAPACITY = 10;
 export const SOUNDBAR_MIC_CAPACITY = 8;
 // Below this many seats a camera's or video bar's built-in microphones pick everyone up,
@@ -126,7 +142,7 @@ export const ALL_IN_ONE_FOV = 115;
 // Pro) — so it's set per device. Without a datasheet to go by, a typical reach for the
 // size is assumed: 4 m up to 55", 7 m from 65".
 export const ALL_IN_ONE_MIC_REACH_M = [3, 4, 5, 7, 10];
-export const typicalAllInOneMicReach = (sizeInches) => (sizeInches <= 55 ? 4 : 7);
+// typicalAllInOneMicReach lives in roomPlannerShared.
 
 // Camera intelligence behaviors, in the spirit of the framing modes real conferencing
 // cameras ship with today (Poly DirectorAI's speaker tracking / group framing, Jabra
@@ -170,20 +186,7 @@ export const DEVICE_LABELS = {
   bookingPanel: "Booking panel",
 };
 
-// Short reference codes shown as canvas labels and in the text brief (D1, C1, M1, SP1, ...).
-export const DEVICE_REF_PREFIX = {
-  display: "D",
-  allInOne: "AIO",
-  camera: "C",
-  videoBar: "VB",
-  microphone: "M",
-  speaker: "SP",
-  touchPanel: "TP",
-  contentSharing: "CS",
-  door: "DR",
-  bookingPanel: "BP",
-};
-export const refCode = (category, index) => `${DEVICE_REF_PREFIX[category]}${index + 1}`;
+// DEVICE_REF_PREFIX and refCode (D1, C1, M1, SP1, ...) live in roomPlannerShared.
 // Full-name version used for on-canvas labels, e.g. "Booking panel 1".
 export const refLabel = (category, index) => `${DEVICE_LABELS[category]} ${index + 1}`;
 
@@ -223,8 +226,10 @@ export function displayImageHeight(sizeInches, aspect = "16:9") {
 
 // How a screen is described in lists and the report: `75"`, or `105" 21:9 ultra-wide`.
 export const displaySpec = (d) => `${d.sizeInches}"${d.aspect === ULTRAWIDE ? " 21:9 ultra-wide" : ""}`;
-// ...and an all-in-one display: `65" · mics ~7m`.
-export const allInOneSpec = (d) => `${d.sizeInches}" · mics ~${d.micReach}m`;
+// ...and an all-in-one display: `65" · mics ~7m`. The reach is the resolved one, so the
+// spec line and the disc drawn on the plan can never quote different numbers; `state` is
+// optional for a caller that holds only the devices.
+export const allInOneSpec = (d, state = {}) => `${d.sizeInches}" · mics ~${+resolveMicRange(d, "allInOne", state).toFixed(2)}m`;
 // Everything on the walls people watch: displays and all-in-one displays.
 export const screensOf = (devices) => [...devices.display, ...devices.allInOne];
 
@@ -1159,6 +1164,13 @@ export function snapToNearestEdge(x, y, room) {
   return { x: nx, y: ny, angle, edge };
 }
 
+// A wall-mounted speaker hangs on the nearest wall, facing into the room: the same
+// snap a touch panel or display uses.
+export function placeSpeakerOnWall({ x, y }, room) {
+  const { x: sx, y: sy, angle } = snapToNearestEdge(x, y, room);
+  return { x: sx, y: sy, angle };
+}
+
 export function resolvePlacement(category, x, y, room) {
   if (category === "door" || category === "bookingPanel") {
     const e = snapToNearestEdge(x, y, room);
@@ -1181,7 +1193,7 @@ export function cameraFacingToward(camAbs, targetAbs) {
   return faceCenterAngle(camAbs.x - targetAbs.x, camAbs.y - targetAbs.y);
 }
 
-const WALL_ANGLE = { top: 180, bottom: 0, left: 90, right: 270 };
+export const WALL_ANGLE = { top: 180, bottom: 0, left: 90, right: 270 };
 
 export function nearestEdge(x, y, room) {
   const d = { top: y, bottom: room.width - y, left: x, right: room.length - x };
@@ -1580,17 +1592,14 @@ export function refreshAutoDevices(devices, room, layout, table, tableOffset) {
 // pickup reach is used for planning) but no speaker, and it only works paired with a
 // video bar at the display — which is also where the room's sound comes from.
 export const TABLE_CAM_LABEL = "360° camera";
-export const TABLE_CAM_MIC_RANGE_M = 3;
+// TABLE_CAM_MIC_RANGE_M lives in roomPlannerShared.
 
 // How many seats (room coordinates, from `state.seats`) the built-in microphones of
 // 360° cameras (~3 m around them) and all-in-one displays (each its own reach) pick up.
 export function builtInMicCoverage(state) {
   const cams = state.devices.camera.filter((c) => c.isTableCam);
   const allInOnes = state.devices.allInOne || [];
-  const pickups = [
-    ...cams.map((c) => ({ x: c.x, y: c.y, reach: TABLE_CAM_MIC_RANGE_M })),
-    ...allInOnes.map((d) => ({ x: d.x, y: d.y, reach: d.micReach ?? typicalAllInOneMicReach(d.sizeInches) })),
-  ];
+  const pickups = asPickups(builtInSources(micSources(state)));
   const seats = state.seats || [];
   return {
     cams: cams.length,
@@ -1603,41 +1612,37 @@ export function builtInMicCoverage(state) {
 
 // --- dedicated microphone pickup ------------------------------------------------------
 
-// How far dedicated microphones pick up a talker: a ceiling array about 5 m (straight
-// line, from the ceiling down to a seated head), a table microphone about 5 ft.
-export const CEILING_MIC_RANGE_M = 5;
-export const TABLE_MIC_RANGE_M = 1.524; // 5 ft
-export const CEILING_MIC_AUDIO = AUDIO_PREFERENCES[0];
-const SEATED_HEAD_M = 1.2;
-
-// Whether the room's microphones hang from the ceiling or sit on the table (table
-// pods and wireless boundary mics both do; so does an audio setup not yet chosen).
-export const micMount = (audioPreference) => (audioPreference === CEILING_MIC_AUDIO ? "ceiling" : "table");
+// The mic reaches, CEILING_MIC_AUDIO and micMount live in roomPlannerShared.
 
 // A dedicated microphone's pickup as a radius across the floor plan. A ceiling array's
 // 5 m is measured on the slant down to people's heads, so a higher ceiling reaches a
 // little less far across the room.
-export function dedicatedMicReach(audioPreference, room) {
-  if (micMount(audioPreference) === "table") return TABLE_MIC_RANGE_M;
-  const drop = Math.max(0, (room?.height ?? 2.8) - SEATED_HEAD_M);
-  return Math.sqrt(Math.max(0, CEILING_MIC_RANGE_M ** 2 - drop ** 2));
-}
+export const dedicatedMicReach = (audioPreference, room) => derivedMicRange(null, "microphone", { audioPreference, room });
 
-// How the pickup is described: "~5 m" for ceiling arrays, "~1.5 m (5 ft)" for table mics.
-export const micRangeLabel = (audioPreference) => (micMount(audioPreference) === "ceiling" ? `~${CEILING_MIC_RANGE_M} m` : "~1.5 m (5 ft)");
+// How a pickup is described in advice text, from the range actually in force — the one
+// resolveMicRange returns, which is what the plan's discs and the PDF's coverage table
+// both use. Never the catalogue figure: a ceiling array's 5 m is measured on the slant,
+// so it is already wrong by the ceiling height before any room-wide or per-device range
+// moves it, and advice that contradicts the table beside it is worse than no advice.
+export const micRangeLabel = (reachM) => `~${+reachM.toFixed(2)} m`;
 
-// The built-in mic pickups in the room: 360° cameras and all-in-one displays.
-export const builtInPickups = (devices) => [
-  ...devices.camera.filter((c) => c.isTableCam).map((c) => ({ x: c.x, y: c.y, reach: TABLE_CAM_MIC_RANGE_M })),
-  ...(devices.allInOne || []).map((d) => ({ x: d.x, y: d.y, reach: d.micReach ?? typicalAllInOneMicReach(d.sizeInches) })),
-];
+const asPickups = (sources) => sources.map((s) => ({ x: s.x, y: s.y, reach: s.range }));
 
-// Every microphone pickup in the room: the built-in ones, and each dedicated
-// microphone at its mount's reach.
-function micPickups(state) {
-  const reach = dedicatedMicReach(state.audioPreference, state.room);
-  return [...builtInPickups(state.devices), ...state.devices.microphone.map((m) => ({ x: m.x, y: m.y, reach }))];
-}
+// The built-in mic pickups in the room: 360° cameras and all-in-one displays. A video
+// bar is a mic source too, but not a "built-in" one for the advice below, which contrasts
+// a table camera's or all-in-one's own pickup against adding dedicated microphones.
+const builtInSources = (sources) => sources.filter((s) => s.category === "camera" || s.category === "allInOne");
+
+// Kept for the external callers (the viewer and the PDF) that hold only a device bag; it
+// cannot see a room-wide range, so in-engine callers use builtInSources(micSources(state)).
+export const builtInPickups = (devices) => asPickups(builtInSources(micSources({ devices })));
+
+// The same for a caller that holds the whole plan, so a room-wide range reaches the
+// built-in pickups too (the page asks micsToCover how many mics the built-ins leave).
+export const builtInPickupsIn = (state) => asPickups(builtInSources(micSources(state)));
+
+// Every microphone pickup in the room, each at its resolved range.
+const micPickups = (state) => asPickups(micSources(state));
 const heardBy = (seat, pickups) => pickups.some((p) => Math.hypot(seat.x - p.x, seat.y - p.y) <= p.reach + 1e-6);
 
 // Seats no microphone picks up — dedicated or built in.
@@ -1645,14 +1650,27 @@ export function micCoverage(state) {
   const seats = state.seats || [];
   const pickups = micPickups(state);
   const unheard = seats.filter((s) => !heardBy(s, pickups));
-  return { seats: seats.length, dedicated: state.devices.microphone.length, heard: seats.length - unheard.length, unheard, reach: dedicatedMicReach(state.audioPreference, state.room) };
+  // `reach` explains `unheard`, so it has to come from the same sources: the farthest of
+  // the dedicated microphones actually in the room, each resolved through its own range.
+  // Resolving a null item instead gave the room-level figure, so a mic with a hand-set
+  // range put a number in the advice and on screen that the PDF's coverage table — drawn
+  // from these same sources — then contradicted. With no dedicated mic, `dedicated` is 0
+  // and nothing quotes this, so the mount's own resolved range stands in.
+  const dedicated = micSources(state).filter((s) => s.category === "microphone");
+  const reach = dedicated.length ? Math.max(...dedicated.map((s) => s.range)) : resolveMicRange(null, "microphone", state);
+  return { seats: seats.length, dedicated: state.devices.microphone.length, heard: seats.length - unheard.length, unheard, reach };
 }
 
 // The fewest dedicated microphones, laid out the way a set is spread (see
 // spreadDevicePositions), that pick up every seat the built-in mics (`builtIn`
 // pickups) don't. 0 when those already cover everyone.
-export function micsToCover({ layout, room, table, tableOffset, seats, seatArea, audioPreference, builtIn = [], max = 24 }) {
-  const reach = dedicatedMicReach(audioPreference, room);
+//
+// `micRange` is the room-wide override (state.audio.micRange): when finite it is the reach,
+// otherwise the reach derives from the mount as before. It resolves through the same
+// resolveMicRange the overlay uses, so the count asked for here and the discs drawn on the
+// plan always come from one number.
+export function micsToCover({ layout, room, table, tableOffset, seats, seatArea, audioPreference, micRange, builtIn = [], max = 24 }) {
+  const reach = resolveMicRange(null, "microphone", { audioPreference, room, audio: { micRange } });
   const need = (seats || []).filter((s) => !heardBy(s, builtIn));
   if (!need.length) return 0;
   for (let n = 1; n <= max; n++) {
@@ -2008,13 +2026,15 @@ export function buildRecommendations(state) {
   if (devices.microphone.length === 0) {
     const outOfReach = coverage.seats - coverage.micCovered;
     if (coverage.sources) {
-      const reaches = devices.allInOne.map((d) => d.micReach ?? typicalAllInOneMicReach(d.sizeInches));
+      // Both figures come from micSources, so they are the ranges actually drawn and
+      // tabled — a 360° camera's catalogue 3 m is as movable as an all-in-one's reach.
+      const farthest = (category) => +Math.max(...micSources(state).filter((s) => s.category === category).map((s) => s.range)).toFixed(2);
       const pickup =
         coverage.cams && coverage.allInOnes
           ? "the built-in mics' pickup"
           : coverage.cams
-          ? `the 360° camera's ~${TABLE_CAM_MIC_RANGE_M}m mic pickup`
-          : `the all-in-one display's ~${Math.max(...reaches)}m mic pickup`;
+          ? `the 360° camera's ~${farthest("camera")}m mic pickup`
+          : `the all-in-one display's ~${farthest("allInOne")}m mic pickup`;
       if (outOfReach > 0)
         add("builtin-mic-range", "suggestion", `${seatsWord(outOfReach)} beyond ${pickup} — add table or ceiling microphones to cover them.`, ["microphone"]);
     } else if (soundbar) {
@@ -2042,7 +2062,7 @@ export function buildRecommendations(state) {
       add(
         "mic-coverage",
         "suggestion",
-        `${seatsWord(mics.unheard.length)} beyond the ${kind} ${micRangeLabel(state.audioPreference)} pickup — add microphones or move them closer to those seats.`,
+        `${seatsWord(mics.unheard.length)} beyond the ${kind} ${micRangeLabel(mics.reach)} pickup — add microphones or move them closer to those seats.`,
         ["microphone"]
       );
     }

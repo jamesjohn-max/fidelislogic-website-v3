@@ -18,8 +18,9 @@ import { hasPrerenderedSchema } from "../lib/prerenderedSchema";
  * trails that sit inside another bar (e.g. a tool's title bar).
  *
  * `tone` picks the ink for the surface the trail sits on: "light" for the site's
- * white and grey pages, "dark" for a dark surface such as the Room Planner's
- * title bar, where the default greys are unreadable.
+ * white and grey pages, "dark" for a dark surface, where the default greys are
+ * unreadable. The Room Planner was the only caller passing "dark"; it is a light
+ * surface since the retheme, so nothing uses it today. Kept for the next dark bar.
  */
 export const Breadcrumbs = ({ items = [], className = "", compact = false, tone = "light" }) => {
   if (!items.length) return null;

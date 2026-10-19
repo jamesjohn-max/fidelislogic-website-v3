@@ -11,11 +11,11 @@ import {
   TABLE_KIND_LABELS,
   seatingDensityLabel,
   seatingSpacingSummary,
-  TABLE_CAM_MIC_RANGE_M,
   allInOneSpec,
   CLASSROOM_DESK_DEPTH,
   displaySpec,
 } from "./roomConfiguratorEngine";
+import { resolveMicRange, micCoverageReport, speakerCoverageReport } from "./roomAudioCoverage";
 
 // This report is built from the configurator's data model with jsPDF's own drawing
 // primitives (text/rect/ellipse/lines); only the room diagram comes from the live
@@ -336,7 +336,10 @@ function drawTableShape(doc, tableShape, centerMm, mPerMm) {
   }
 }
 
-function drawDiagram(doc, y, height, boxW, state, layoutResult, removedChairIndices, chairOffsets) {
+// `overlay` draws into the room before the furniture and devices go on top, given the
+// diagram's own transform — that's how the audio coverage plan gets its discs without a
+// second copy of the scale maths (see drawAudioCoverage).
+function drawDiagram(doc, y, height, boxW, state, layoutResult, removedChairIndices, chairOffsets, overlay = null) {
   const { room, devices, tableOffset } = state;
   const boxX = MARGIN, boxY = y, boxH = height;
 
@@ -372,6 +375,8 @@ function drawDiagram(doc, y, height, boxW, state, layoutResult, removedChairIndi
   setDraw(doc, ROOM_BORDER);
   doc.setLineWidth(0.6);
   doc.rect(originX, originY, room.length * scale, room.width * scale, "S");
+
+  if (overlay) overlay({ toPage, scale, roomRect: [originX, originY, room.length * scale, room.width * scale] });
 
   // Ruler ticks + labels along the bottom and left edges.
   const stepX = niceTickStep(room.length);
@@ -835,7 +840,7 @@ function layoutSummaryGrid(doc, state, audience, unconfirmed = new Set()) {
       ];
   const deviceRows = [
     ["Display", devices.display.length ? devices.display.map((d, i) => `${refCode("display", i)}: ${displaySpec(d)}`).join(", ") : "0"],
-    ...(devices.allInOne.length ? [["All-in-one display", devices.allInOne.map((d, i) => `${refCode("allInOne", i)}: ${allInOneSpec(d)}`).join(", ")]] : []),
+    ...(devices.allInOne.length ? [["All-in-one display", devices.allInOne.map((d, i) => `${refCode("allInOne", i)}: ${allInOneSpec(d, state)}`).join(", ")]] : []),
     ["Camera", devices.camera.length ? devices.camera.map((c, i) => `${refCode("camera", i)}: ${c.isTableCam ? "360°" : `${c.fov}°`}`).join(", ") : "0"],
     ["Video bar", devices.videoBar.length ? devices.videoBar.map((v, i) => `${refCode("videoBar", i)}: ${v.fov}°`).join(", ") : "0"],
     ["Camera features", cameraFeatures?.length ? cameraFeatures.map((id) => CAMERA_FEATURES.find((f) => f.id === id)?.label || id).join(", ") : "None selected"],
@@ -926,13 +931,14 @@ const DEFAULT_NOTE = "(default) — a starting value nobody changed or confirmed
 
 const onDisplayText = (item) => (item.mountedOn && item.mountSide ? `, ${item.mountSide} the display` : "");
 
-function deviceSpecText(category, item) {
+function deviceSpecText(category, item, state) {
   switch (category) {
     case "display": return `${displaySpec(item)} display`;
-    case "allInOne": return `${item.sizeInches}" all-in-one — built-in ${item.fov}° camera, mics (~${item.micReach}m) and speakers`;
+    // The resolved mic reach, as everywhere else: a room-wide or per-device range moves it.
+    case "allInOne": return `${item.sizeInches}" all-in-one — built-in ${item.fov}° camera, mics (~${+resolveMicRange(item, "allInOne", state).toFixed(2)}m) and speakers`;
     case "camera":
       return item.isTableCam
-        ? `360° camera — built-in mics (~${TABLE_CAM_MIC_RANGE_M}m), no speaker; paired with a video bar or all-in-one display`
+        ? `360° camera — built-in mics (~${+resolveMicRange(item, "camera", state).toFixed(2)}m), no speaker; paired with a video bar or all-in-one display`
         : `${item.fov}° FOV camera${onDisplayText(item)}`;
     case "videoBar": return `${item.fov}° FOV video bar${onDisplayText(item)}`;
     case "microphone": return "Microphone";
@@ -957,24 +963,24 @@ const DEVICE_TABLE_COLS = [
 const DEVICE_TABLE_HEADER_H = 6.2;
 const DEVICE_TABLE_ROW_H = 4.6;
 
-function deviceTableRows(devices) {
+function deviceTableRows(state) {
   const rows = [];
   DEVICE_ORDER.forEach((category) => {
-    devices[category].forEach((item, idx) => {
-      rows.push([refCode(category, idx), DEVICE_LABELS[category], deviceSpecText(category, item), `${item.x.toFixed(2)}, ${item.y.toFixed(2)} m`]);
+    state.devices[category].forEach((item, idx) => {
+      rows.push([refCode(category, idx), DEVICE_LABELS[category], deviceSpecText(category, item, state), `${item.x.toFixed(2)}, ${item.y.toFixed(2)} m`]);
     });
   });
   return rows;
 }
 
-function drawDeviceTableHeader(doc, y) {
+function drawDeviceTableHeader(doc, y, cols = DEVICE_TABLE_COLS) {
   setFill(doc, SLATE_100);
   doc.rect(MARGIN, y, CONTENT_W, DEVICE_TABLE_HEADER_H, "F");
   let colX = MARGIN;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(7);
   setText(doc, SLATE_500);
-  DEVICE_TABLE_COLS.forEach((c) => {
+  cols.forEach((c) => {
     doc.text(c.label.toUpperCase(), colX + 2, y + 4.1);
     colX += c.w;
   });
@@ -982,31 +988,31 @@ function drawDeviceTableHeader(doc, y) {
 }
 
 // Outline, header rule, and column rules for one page's worth of the table.
-function strokeDeviceTableFrame(doc, top, bottom) {
+function strokeDeviceTableFrame(doc, top, bottom, cols = DEVICE_TABLE_COLS) {
   setDraw(doc, SLATE_200);
   doc.setLineWidth(0.3);
   doc.rect(MARGIN, top, CONTENT_W, bottom - top, "S");
   doc.line(MARGIN, top + DEVICE_TABLE_HEADER_H, MARGIN + CONTENT_W, top + DEVICE_TABLE_HEADER_H);
   let colX = MARGIN;
-  for (let i = 0; i < DEVICE_TABLE_COLS.length - 1; i++) {
-    colX += DEVICE_TABLE_COLS[i].w;
+  for (let i = 0; i < cols.length - 1; i++) {
+    colX += cols[i].w;
     doc.line(colX, top, colX, bottom);
   }
 }
 
 // Rows that would run past the bottom of the page continue on the next one
 // (`newPage` adds it and returns where content starts), under a repeated header row.
-function drawDeviceTable(doc, y, rows, newPage) {
+function drawDeviceTable(doc, y, rows, newPage, cols = DEVICE_TABLE_COLS) {
   if (!rows.length) return y;
   let segmentTop = y;
-  let cursorY = drawDeviceTableHeader(doc, y);
+  let cursorY = drawDeviceTableHeader(doc, y, cols);
 
   // Alternating row tint reads as a real data table rather than a loose text list.
   rows.forEach((row, r) => {
     if (cursorY + DEVICE_TABLE_ROW_H > CONTENT_BOTTOM) {
-      strokeDeviceTableFrame(doc, segmentTop, cursorY);
+      strokeDeviceTableFrame(doc, segmentTop, cursorY, cols);
       segmentTop = newPage();
-      cursorY = drawDeviceTableHeader(doc, segmentTop);
+      cursorY = drawDeviceTableHeader(doc, segmentTop, cols);
     }
     if (r % 2 === 1) {
       setFill(doc, CARD_TINT);
@@ -1018,13 +1024,217 @@ function drawDeviceTable(doc, y, rows, newPage) {
       setText(doc, i === 0 ? BRAND_NAVY : SLATE_700);
       doc.setFont("helvetica", i === 0 ? "bold" : "normal");
       doc.text(String(cell), colX + 2, cursorY + DEVICE_TABLE_ROW_H / 2 + 1.3);
-      colX += DEVICE_TABLE_COLS[i].w;
+      colX += cols[i].w;
     });
     cursorY += DEVICE_TABLE_ROW_H;
   });
 
-  strokeDeviceTableFrame(doc, segmentTop, cursorY);
+  strokeDeviceTableFrame(doc, segmentTop, cursorY, cols);
   return cursorY + 3;
+}
+
+// --- audio coverage ----------------------------------------------------------------------
+
+// The coverage plan is the native vector plan (never the rasterized live canvas) so the
+// discs can be drawn into it in the PDF's own coordinates.
+const AUDIO_PLAN_H = 86;
+// A mic reads as a tinted area, a speaker as a dashed ring — the same way round as the
+// on-screen overlay, where a mic is tinted and a speaker dotted.
+const MIC_AREA = [219, 238, 248];
+const AUDIO_CAVEAT = "These are geometric planning ranges, not measured SPL coverage.";
+
+// The caveat goes wherever coverage rings are drawn, whatever the report is for. The
+// customer report has no device table and no gap lists, but its Room Layout Diagram is
+// rasterized from the same plan, and a customer room with an all-in-one carries that
+// device's mic and speaker rings — so the hedge has to reach page 1 too, or the picture
+// implies an acoustic survey nobody performed (spec §10).
+function drawCoverageCaveat(doc, y) {
+  doc.setFont("helvetica", "italic");
+  doc.setFontSize(7.5);
+  setText(doc, SLATE_500);
+  doc.text(AUDIO_CAVEAT, MARGIN, y);
+  return y + 3;
+}
+const MOUNT_LABEL = { ceiling: "Ceiling", wall: "Wall", table: "Table" };
+// Per-device names: DEVICE_LABELS has the plural category names ("Microphones").
+const AUDIO_DEVICE_LABEL = { microphone: "Microphone", speaker: "Speaker", camera: "360° camera" };
+// Cells are drawn, never wrapped or clipped, so each column is sized to the widest value
+// it can hold at 7.6pt — Range has to take "15 m · whole room", not just "1.52 m".
+const AUDIO_TABLE_COLS = [
+  { label: "Ref", w: 15 },
+  { label: "Device", w: 32 },
+  { label: "Covers", w: 22 },
+  { label: "Mount", w: 18 },
+  { label: "Range", w: 30 },
+  { label: "Range from", w: CONTENT_W - 15 - 32 - 22 - 18 - 30 },
+];
+
+// Every source's disc at once, each clipped to the room rect — the jsPDF equivalent of
+// the clipPath the on-screen overlay uses. Mic discs go down first as one tinted union
+// (a flat tint, not alpha, so overlapping discs read as one covered area instead of
+// darkening where they meet), then the speakers' dashed rings on top.
+// A ring wider than the room has its whole stroke clipped away, which would draw nothing
+// at all and read as covering nothing — the opposite of the truth — so a speaker that
+// reaches every corner is drawn on the room's own edge instead (the same case the
+// on-screen overlay calls out). A mic that wide still shows, because it is filled.
+const coversRoom = (s, room) =>
+  [[0, 0], [room.length, 0], [0, room.width], [room.length, room.width]]
+    .every(([cx, cy]) => Math.hypot(cx - s.x, cy - s.y) <= s.range);
+
+function drawCoverageDiscs(doc, { toPage, scale, roomRect }, room, mics, speakers) {
+  const [rx, ry, rw, rh] = roomRect;
+  const clipped = (draw) => {
+    doc.saveGraphicsState();
+    doc.rect(rx, ry, rw, rh, null);
+    doc.clip();
+    doc.discardPath();
+    draw();
+    doc.restoreGraphicsState();
+  };
+  const disc = (s, style) => {
+    const [px, py] = toPage(s.x, s.y);
+    doc.circle(px, py, s.range * scale, style);
+  };
+
+  // Every fill first, then every outline: otherwise the next mic's fill paints over the
+  // last one's ring, and a mic inside another's reach loses its own edge entirely.
+  setFill(doc, MIC_AREA);
+  mics.forEach((s) => clipped(() => disc(s, "F")));
+  setDraw(doc, BRAND_BLUE);
+  doc.setLineWidth(0.4);
+  mics.forEach((s) => clipped(() => disc(s, "S")));
+
+  setDraw(doc, BRAND_NAVY);
+  doc.setLineWidth(0.5);
+  doc.setLineDashPattern([1.2, 1.2], 0);
+  speakers.forEach((s) => {
+    if (coversRoom(s, room)) doc.rect(rx + 0.7, ry + 0.7, rw - 1.4, rh - 1.4, "S");
+    else clipped(() => disc(s, "S"));
+  });
+  doc.setLineDashPattern([], 0);
+}
+
+// Says which disc is which — the plan's own labelling of mic against speaker.
+function drawCoverageLegend(doc, x, y, mics, speakers) {
+  const cy = y + 1.6;
+  let cursorX = x;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(6.3);
+  const item = (label, swatch) => {
+    swatch(cursorX + 1.4, cy);
+    setText(doc, SLATE_700);
+    doc.text(label, cursorX + 4.4, y + 2.2);
+    cursorX += 4.4 + doc.getTextWidth(label) + 7;
+  };
+  if (mics.length) {
+    item("Microphone pickup", (cx, ccy) => {
+      setFill(doc, MIC_AREA); setDraw(doc, BRAND_BLUE); doc.setLineWidth(0.3);
+      doc.circle(cx, ccy, 1.4, "FD");
+    });
+  }
+  if (speakers.length) {
+    item("Speaker coverage", (cx, ccy) => {
+      setDraw(doc, BRAND_NAVY); doc.setLineWidth(0.4);
+      doc.setLineDashPattern([0.6, 0.6], 0);
+      doc.circle(cx, ccy, 1.4, "S");
+      doc.setLineDashPattern([], 0);
+    });
+  }
+  return y + 5;
+}
+
+// Which of the three levels the drawn range came from (see resolveMicRange): what the
+// planner set on this device, else the room-wide range, else what the device derives.
+export const rangeOrigin = (source, state) =>
+  source.isCustom
+    ? "Custom (this device)"
+    : Number.isFinite(state.audio?.[source.kind === "mic" ? "micRange" : "speakerRange"])
+      ? "Room default"
+      : "Device default";
+
+// A source that reaches every corner is drawn as the room's own edge, and two of them
+// draw that one shape twice — so the row says so in words, as the on-screen label does.
+// Without it the plan shows one outline where the table lists two devices.
+const audioTableRows = (state, sources) =>
+  sources.map((s) => [
+    s.code,
+    AUDIO_DEVICE_LABEL[s.category] || DEVICE_LABELS[s.category] || s.category,
+    s.kind === "mic" ? "Microphone" : "Speaker",
+    MOUNT_LABEL[s.mount] || "—",
+    `${+s.range.toFixed(2)} m${coversRoom(s, state.room) ? " · whole room" : ""}`,
+    rangeOrigin(s, state),
+  ]);
+
+// Seats no mic hears and seats no speaker reaches are reported separately: they are
+// different problems with different fixes, so merging them would cost the integrator
+// reading this the one thing the list is for. Seats carry their room coordinates, since
+// the plan's rulers are what locates them.
+export const coverageGapText = (report, seats, kindWord) => {
+  if (!report.sources.length) return `no ${kindWord} in this plan.`;
+  if (!report.seats) return "no seats in this plan.";
+  if (!report.uncovered.length) return `none — all ${report.seats} seats are in range.`;
+  const listed = report.uncovered.map((i) => `seat ${i + 1} (${seats[i].x.toFixed(2)}, ${seats[i].y.toFixed(2)} m)`);
+  return `${report.uncovered.length} of ${report.seats} — ${listed.join(", ")}`;
+};
+
+const GAP_LINE_H = 3.6;
+
+function drawCoverageGaps(doc, y, rows) {
+  let cursorY = y;
+  rows.forEach(([label, text]) => {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.8);
+    setText(doc, SLATE_900);
+    doc.text(label, MARGIN, cursorY);
+    const labelW = doc.getTextWidth(label) + 1.6;
+    doc.setFont("helvetica", "normal");
+    setText(doc, SLATE_700);
+    const lines = doc.splitTextToSize(text, CONTENT_W - labelW);
+    doc.text(lines[0], MARGIN + labelW, cursorY);
+    lines.slice(1).forEach((line, i) => doc.text(line, MARGIN, cursorY + (i + 1) * GAP_LINE_H));
+    cursorY += lines.length * GAP_LINE_H + 1.8;
+  });
+  return cursorY;
+}
+
+// Whether this plan has anything to say about audio at all — micSources / speakerSources
+// decide what counts as a source (a 360 camera does, a front-of-room camera doesn't), so
+// this asks them rather than second-guessing the device lists.
+const hasAudioSources = (state) => micCoverageReport(state).sources.length > 0 || speakerCoverageReport(state).sources.length > 0;
+
+// The whole section below its title: the plan with every disc on it, the per-source
+// table, the two gap lists, then the caveat. `newPage` is the entry point's, so a long
+// table pages itself and the verdict is never left hanging over the footer.
+function drawAudioCoverage(doc, y, state, layoutResult, removedChairIndices, chairOffsets, newPage) {
+  const micReport = micCoverageReport(state);
+  const speakerReport = speakerCoverageReport(state);
+  const mics = micReport.sources;
+  const speakers = speakerReport.sources;
+  const seats = state.seats ?? [];
+
+  drawDiagram(doc, y, AUDIO_PLAN_H, CONTENT_W, state, layoutResult, removedChairIndices, chairOffsets, (ctx) =>
+    drawCoverageDiscs(doc, ctx, state.room, mics, speakers)
+  );
+  let cursorY = drawCoverageLegend(doc, MARGIN, y + AUDIO_PLAN_H + 4, mics, speakers) + 2;
+
+  cursorY = drawDeviceTable(doc, cursorY, audioTableRows(state, [...mics, ...speakers]), newPage, AUDIO_TABLE_COLS) + 2;
+
+  const gaps = [
+    ["Seats no microphone hears:", coverageGapText(micReport, seats, "microphone")],
+    ["Seats no speaker reaches:", coverageGapText(speakerReport, seats, "speaker")],
+  ];
+  const gapsH = gaps.reduce((h, [label, text]) => {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.8);
+    const labelW = doc.getTextWidth(label) + 1.6;
+    doc.setFont("helvetica", "normal");
+    return h + doc.splitTextToSize(text, CONTENT_W - labelW).length * GAP_LINE_H + 1.8;
+  }, 0);
+  if (cursorY + gapsH + 7 > CONTENT_BOTTOM) cursorY = newPage();
+
+  cursorY = drawCoverageGaps(doc, cursorY + 2, gaps);
+
+  return drawCoverageCaveat(doc, cursorY + 2);
 }
 
 // --- recommended notes ---------------------------------------------------------------------
@@ -1203,7 +1413,12 @@ export async function exportRoomConfigPdf({ state, layoutResult, removedChairInd
     drawDiagram(doc, y, diagramH, diagramBoxW, state, layoutResult, removedChairIndices, chairOffsets);
   }
   y += diagramH + 4;
-  y = drawDiagramLegendRow(doc, MARGIN, y, customer ? customerLegend(state.layout) : undefined) + 5;
+  y = drawDiagramLegendRow(doc, MARGIN, y, customer ? customerLegend(state.layout) : undefined) + 2;
+  // Only the rasterized live plan carries the coverage rings (the vector fallback draws
+  // none), so the caveat follows that picture exactly — on every report, not just the
+  // reseller's, since a customer plan keeps its all-in-one and its rings with it.
+  if (diagramCanvas && hasAudioSources(state)) y = drawCoverageCaveat(doc, y + 1.5);
+  y += 3;
 
   const summary = layoutSummaryGrid(doc, state, audience, unconfirmed);
   const marked = summary.columns.some(([, rows]) => rows.some(([, v]) => String(v).endsWith(DEFAULT_MARK)));
@@ -1218,12 +1433,21 @@ export async function exportRoomConfigPdf({ state, layoutResult, removedChairInd
     y += 6;
   }
 
-  const deviceRows = customer ? [] : deviceTableRows(state.devices);
+  const deviceRows = customer ? [] : deviceTableRows(state);
   if (deviceRows.length) {
     // Keep the section title with at least its header and first couple of rows.
     ensureSpace(SECTION_TITLE_H + DEVICE_TABLE_HEADER_H + DEVICE_TABLE_ROW_H * Math.min(deviceRows.length, 2));
     y = drawSectionTitle(doc, y, "Device Placement");
     y = drawDeviceTable(doc, y, deviceRows, newPage) + 2;
+  }
+
+  // Audio coverage: what each mic and speaker reaches, and the seats nothing does.
+  // Reseller-only, like the device table — a customer's report carries no devices.
+  if (!customer && hasAudioSources(state)) {
+    // Keep the title with the plan, its legend and the first couple of table rows.
+    ensureSpace(SECTION_TITLE_H + AUDIO_PLAN_H + 11 + DEVICE_TABLE_HEADER_H + DEVICE_TABLE_ROW_H * 2);
+    y = drawSectionTitle(doc, y, "Audio Coverage");
+    y = drawAudioCoverage(doc, y, state, layoutResult, removedChairIndices, chairOffsets, newPage) + 4;
   }
 
   if (state.additionalNotes?.trim()) {

@@ -1,5 +1,4 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
-import { ResponsiveImage } from "../components/ResponsiveImage";
 import { siteImages } from "../data/siteImages";
 import { Link } from "react-router-dom";
 import { Box, FileDown, Info, Loader2, Map as MapIcon } from "lucide-react";
@@ -16,6 +15,8 @@ import {
   TableTopField,
   PlatformField,
   AudioPreferenceField,
+  AudioRangeFields,
+  SpeakerMountSwitch,
   DeviceList,
   CameraFeaturePicker,
   NotesField,
@@ -27,7 +28,7 @@ import { RecommendationList, ReadinessCard } from "../components/roomConfigurato
 import { ReviewSummary, UncheckedSections } from "../components/roomConfigurator/ReviewSummary";
 import { RoomPhotos } from "../components/roomConfigurator/RoomPhotos";
 import { DetailsForm, detailsValid } from "../components/roomConfigurator/DetailsForm";
-import { AudiencePicker } from "../components/roomConfigurator/AudiencePicker";
+import { PlannerIntroHero } from "../components/roomConfigurator/PlannerIntroHero";
 import { TemplatePicker } from "../components/roomConfigurator/TemplatePicker";
 import { AUDIENCES, STEPS_BY_AUDIENCE, RECOMMENDATION_STEP } from "../components/roomConfigurator/workflowSteps";
 import { exportRoomConfigPdf } from "../lib/exportRoomConfigPdf";
@@ -35,6 +36,7 @@ import { analytics } from "../lib/analytics";
 import { toast } from "../components/ui/sonner";
 import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
 import { api } from "../lib/api";
+import { micSources, speakerSources, derivedMicRange, derivedSpeakerRange } from "../lib/roomAudioCoverage";
 import { initialHistory, planReducer } from "../lib/roomPlanState";
 import { ROOM_TEMPLATES, emptyDevices } from "../lib/roomTemplates";
 import { loadDraft, saveDraft, clearDraft, loadPhotos, savePhotos, hasPlanLink, readPlanLink, planLink } from "../lib/roomPlannerDraft";
@@ -59,10 +61,8 @@ import {
   defaultTableSize,
   ULTRAWIDE,
   builtInMicCoverage,
-  builtInPickups,
+  builtInPickupsIn,
   micCoverage,
-  dedicatedMicReach,
-  micRangeLabel,
   recommendedAllInOneSize,
   recommendedDisplaySize,
   recommendedDeviceCount,
@@ -76,6 +76,8 @@ import {
   screensOf,
   addSpreadDevices,
   resolvePlacement,
+  placeSpeakerOnWall,
+  defaultSpeakerMount,
   followMountedCameras,
   refLabel,
 } from "../lib/roomConfiguratorEngine";
@@ -117,6 +119,16 @@ const INTRO_POINTS = [
   "Produce a document ready to share with the customer and your technical team or distributor, so they can prepare a BOQ quickly",
   "Private by design: nothing you enter is sent anywhere. Your draft stays in this browser until you start over, and the PDF is built right here",
 ];
+
+// The landing hero shows three of the points above plus the privacy one, not all five:
+// the page has to fit one screen, and five bullets beside the Get Started cards pushes
+// the fold. These are references into INTRO_POINTS rather than copies, so the two cannot
+// drift. The only point the hero leaves out is INTRO_POINTS[1] ("Close the gap between
+// what the customer needs and what gets installed"), which restates the INTRO paragraph
+// the hero already prints above the visual — so nothing is actually lost. Add a point
+// here and the fit has to be re-measured.
+const HERO_HIGHLIGHTS = [INTRO_POINTS[0], INTRO_POINTS[3], INTRO_POINTS[2]];
+const HERO_PRIVACY_NOTE = INTRO_POINTS[4];
 
 function IntroText({ className = "" }) {
   return (
@@ -171,7 +183,7 @@ function PlanViewToggle({ value, onChange }) {
     { id: "3d", label: "3D view", icon: Box },
   ];
   return (
-    <div role="radiogroup" aria-label="Plan view" className="mb-3 flex w-fit shrink-0 rounded-lg border border-white/[0.08] bg-white/[0.03] p-0.5 lg:mb-2">
+    <div role="radiogroup" aria-label="Plan view" className="mb-3 flex w-fit shrink-0 rounded-lg border rc-border rc-fill p-0.5 lg:mb-2">
       {options.map(({ id, label, icon: Icon }) => (
         <button
           key={id}
@@ -180,7 +192,7 @@ function PlanViewToggle({ value, onChange }) {
           aria-checked={value === id}
           onClick={() => onChange(id)}
           className={`flex min-h-[32px] items-center gap-1.5 rounded-md px-3 text-xs font-semibold transition-[background-color,color,transform] duration-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 active:scale-[0.97] ${
-            value === id ? "bg-blue-600 text-white" : "text-white/60 hover:bg-white/10 hover:text-white"
+            value === id ? "bg-blue-600 text-white" : "rc-ink-muted rc-fill-hover"
           }`}
         >
           <Icon aria-hidden="true" className="h-3.5 w-3.5" />
@@ -202,9 +214,9 @@ function MountSideSwitch({ devices, onChange }) {
   return (
     <div className="mt-3 flex flex-col gap-2">
       {mounted.map(({ category, item, label, side: current }) => (
-        <div key={item.id} className="flex items-center justify-between gap-3 text-xs font-medium text-white/70">
+        <div key={item.id} className="flex items-center justify-between gap-3 text-xs font-medium rc-ink-soft">
           <span>{label} on the display</span>
-          <div role="radiogroup" aria-label={`${label} position on the display`} className="flex shrink-0 rounded-lg border border-white/[0.08] bg-white/[0.03] p-0.5">
+          <div role="radiogroup" aria-label={`${label} position on the display`} className="flex shrink-0 rounded-lg border rc-border rc-fill p-0.5">
             {["above", "below"].map((side) => (
               <button
                 key={side}
@@ -213,7 +225,7 @@ function MountSideSwitch({ devices, onChange }) {
                 aria-checked={current === side}
                 onClick={() => onChange(category, item.id, side)}
                 className={`min-h-[28px] rounded-md px-3 text-xs font-semibold capitalize transition-[background-color,color] duration-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 ${
-                  current === side ? "bg-blue-600 text-white" : "text-white/60 hover:bg-white/10 hover:text-white"
+                  current === side ? "bg-blue-600 text-white" : "rc-ink-muted rc-fill-hover"
                 }`}
               >
                 {side}
@@ -233,12 +245,12 @@ const ConsultationHandoff = ({ audience }) => (
   <Link
     to={`/contact?audience=${audience === "reseller" ? "partner" : "organisation"}`}
     onClick={() => analytics.roomPlannerConsultation({ audience })}
-    className="flex items-start gap-2 rounded-lg border border-white/10 bg-white/[0.03] p-3 text-xs leading-relaxed text-white/70 transition-colors hover:border-blue-500/60 hover:text-white"
+    className="flex items-start gap-2 rounded-lg border rc-border rc-fill p-3 text-xs leading-relaxed rc-ink-soft transition-colors hover:border-blue-500/60 rc-ink-hover"
     data-testid="room-planner-consultation"
   >
     <span>
       Want a second opinion on this room?{" "}
-      <span className="font-semibold text-blue-300">Book a consultation</span> — we'll
+      <span className="font-semibold text-blue-700">Book a consultation</span> — we'll
       review the plan with you. Nothing is sent until you choose to share it.
     </span>
   </Link>
@@ -264,6 +276,8 @@ export const RoomConfigurator = ({ with3d = false }) => {
     layout,
     platform,
     audioPreference,
+    // Room-wide mic / speaker range. A draft saved before these existed has no `audio`.
+    audio = {},
     wallMaterials,
     floorType,
     ceilingType,
@@ -564,6 +578,8 @@ export const RoomConfigurator = ({ with3d = false }) => {
         next.mount = resolved.mount;
         if (resolved.mount === "wall") next.angle = resolved.angle;
       }
+      // A wall speaker stays on a wall wherever it is dragged, facing into the room.
+      if (category === "speaker" && item.mount === "wall") Object.assign(next, placeSpeakerOnWall({ x: rawX, y: rawY }, room));
       const devices = { ...p.devices, [category]: p.devices[category].map((d) => (d.id === id ? next : d)) };
       // A display carries the cameras mounted on it.
       const moved = { devices: category === "display" ? followMountedCameras(devices, next, p) : devices };
@@ -580,6 +596,46 @@ export const RoomConfigurator = ({ with3d = false }) => {
       return chairOffsets === p.chairOffsets ? moved : { ...moved, chairOffsets };
     });
   };
+
+  // The selected device's own range, in metres: `null` DELETES the field, so the device
+  // follows the room-wide value (or the derived default) again — writing the current
+  // default in instead would silently freeze it there. A slider drag coalesces into one
+  // undo step. Only `micRange` / `speakerRange` are ever touched: an all-in-one's
+  // `micReach` is its own spec, which the report prints and nothing here may remove.
+  const handleSetSourceRange = (category, id, kind, metres) => {
+    const field = kind === "speaker" ? "speakerRange" : "micRange";
+    update(
+      (p) => ({
+        devices: {
+          ...p.devices,
+          [category]: p.devices[category].map((item) => {
+            if (item.id !== id) return item;
+            const next = { ...item };
+            if (metres == null) {
+              delete next[field];
+            } else {
+              next[field] = metres;
+            }
+            return next;
+          }),
+        },
+      }),
+      { coalesce: "audio-range" }
+    );
+  };
+
+  // A speaker's mount: it sets how far the speaker reaches and, on a wall, snaps it onto
+  // the nearest one. Clearing autoSpread keeps it there — otherwise the next change to the
+  // room would re-spread it back off its wall.
+  const handleSetSpeakerMount = (id, mount) =>
+    update((p) => ({
+      devices: {
+        ...p.devices,
+        speaker: p.devices.speaker.map((item) =>
+          item.id === id ? { ...item, mount, autoSpread: false, ...(mount === "wall" ? placeSpeakerOnWall(item, p.room) : {}) } : item
+        ),
+      },
+    }));
 
   const handleTableDragCommit = (rawOffset) => update({ tableOffset: rawOffset });
 
@@ -685,6 +741,7 @@ export const RoomConfigurator = ({ with3d = false }) => {
     layout,
     platform,
     audioPreference,
+    audio,
     devices,
     tableOffset,
     wallMaterials,
@@ -867,10 +924,16 @@ export const RoomConfigurator = ({ with3d = false }) => {
   // They're about the AV plan, so only the reseller path has them.
   const recommendations = audience === "reseller" ? buildRecommendations(state) : [];
   const camCoverage = builtInMicCoverage(state);
+  // The built-in pickups as they are actually resolved (a room-wide or per-device range
+  // moves them too), so the notes below quote the number the plan draws.
+  const resolvedMicReaches = (category) => micSources(state).filter((s) => s.category === category).map((s) => s.range);
+  const camReaches = resolvedMicReaches("camera");
   // What the inline options suggest: the screen size for this room's viewing distance,
   // and how many more microphones/speakers it needs (the 360° camera's mics included).
   // Microphones are counted by pickup range over the seats as they are.
-  const micCover = { seats, seatArea: spreadContext.seats, table, tableOffset, builtIn: builtInPickups(devices) };
+  // `micRange` and the built-in pickups both resolve through the room-wide range, so the
+  // "add N microphones" count and the discs drawn on the plan come from one number.
+  const micCover = { seats, seatArea: spreadContext.seats, table, tableOffset, micRange: audio.micRange, builtIn: builtInPickupsIn(state) };
   const suggestedMore = (category) =>
     clamp(recommendedDeviceCount(category, layout, room, effectiveChairCount, camCoverage, audioPreference, category === "microphone" ? micCover : null) - devices[category].length, 1, 24);
   const deviceListProps = {
@@ -1209,9 +1272,22 @@ export const RoomConfigurator = ({ with3d = false }) => {
               {...group("audio")}
             >
               <AudioPreferenceField value={audioPreference} onChange={(v) => update({ audioPreference: v })} />
-              <BuiltInMicNote coverage={camCoverage} reaches={devices.allInOne.map((d) => d.micReach)} />
+              <AudioRangeFields
+                audio={audio}
+                micDefault={derivedMicRange(null, "microphone", state)}
+                speakerDefault={derivedSpeakerRange(null, state)}
+                onChange={(field, metres) => update((p) => ({ audio: { ...p.audio, [field]: metres } }), { coalesce: "audio-range" })}
+              />
+              {/* The resolved reaches, not the raw field: an all-in-one may follow the
+                  room-wide range, or have had its legacy micReach reset away. */}
+              <BuiltInMicNote
+                coverage={camCoverage}
+                camReach={camReaches.length ? Math.max(...camReaches) : undefined}
+                reaches={resolvedMicReaches("allInOne")}
+              />
               <MicCoverageNote coverage={micCoverage(state)} audioPreference={audioPreference} />
               <DeviceList categories={["microphone", "speaker"]} {...deviceListProps} />
+              <SpeakerMountSwitch speakers={devices.speaker} defaultMount={defaultSpeakerMount(audioPreference)} onChange={handleSetSpeakerMount} />
               <RecommendationList recommendations={audioRecs} onAddDevice={handleAddDevice} />
             </StepGroup>
             <StepGroup
@@ -1271,7 +1347,7 @@ export const RoomConfigurator = ({ with3d = false }) => {
             </StepSection>
             <StepSection title="Your configuration">{summary}</StepSection>
             <StepSection title="PDF options">
-              <label className="flex min-h-[32px] cursor-pointer items-center gap-2 text-xs font-medium text-white/70">
+              <label className="flex min-h-[32px] cursor-pointer items-center gap-2 text-xs font-medium rc-ink-soft">
                 <input
                   type="checkbox"
                   checked={includeRecommendations}
@@ -1307,6 +1383,8 @@ export const RoomConfigurator = ({ with3d = false }) => {
     onRedo: redo,
   };
 
+  const canvasDevices = isCustomer ? customerDevices(devices) : devices;
+  const coverageState = { ...state, devices: canvasDevices };
   const canvasProps = {
     room,
     table,
@@ -1314,25 +1392,27 @@ export const RoomConfigurator = ({ with3d = false }) => {
     layout,
     layoutResult,
     tableOffset,
-    devices: isCustomer ? customerDevices(devices) : devices,
+    devices: canvasDevices,
     removedChairIndices,
     chairOffsets,
-    micPickup: { reach: dedicatedMicReach(audioPreference, room), label: micRangeLabel(audioPreference) },
+    coverageSources: [...micSources(coverageState), ...speakerSources(coverageState)],
+    onSetSourceRange: handleSetSourceRange,
   };
 
   return (
     // Desktop: the configurator is exactly one screen below the fixed site header (a
     // title bar with the stepper, then the plan and the step panel filling the rest),
     // so nothing needs a scroll. Below lg it flows as a normal page instead.
-    // The working planner is an app shell locked to one viewport, so the plan and
-    // the step panel fill the screen side by side. The start screen is an
-    // ordinary page — intro, path picker, 3D preview — and must scroll, so the
-    // height lock applies only once a path is chosen.
-    <div
-      className={`rc-theme rc-surface lg:flex lg:flex-col lg:pt-20 ${
-        steps ? "lg:h-dvh lg:min-h-[640px]" : "lg:min-h-dvh"
-      }`}
-    >
+    // Both states are an app shell locked to one viewport on desktop: the working
+    // planner fills the screen with the plan beside the step panel, and the landing
+    // state fills it with the hero beside Get Started, so the path a visitor has to
+    // pick is never below the fold.
+    //
+    // The lock has to be `h-dvh`, not `min-h-dvh`. A minimum only sets a floor, which
+    // leaves the height unresolved — and the hero's figure shrinks via `flex-1` plus
+    // `min-h-0`, which need a resolved height above them to shrink against. With only
+    // a floor the figure took its natural size and pushed the hero past the fold.
+    <div className="rc-theme rc-surface lg:flex lg:flex-col lg:pt-20 lg:h-dvh lg:min-h-[640px]">
       <SEO
         title="Room Planner"
         description="Plan a meeting room with Fidelis Logic's Room Planner: capture the room's design and requirements, cut repeat site visits, and share a BOQ-ready plan with your customer or technology partner."
@@ -1350,33 +1430,37 @@ export const RoomConfigurator = ({ with3d = false }) => {
         <div className={`px-4 pt-24 sm:px-6 lg:p-0 ${steps ? "pb-3 lg:shrink-0" : "pb-5"}`}>
           <Breadcrumbs
             compact
-            tone="dark"
             items={[{ name: "Solutions", href: "/solutions" }, { name: "Room Planner" }]}
           />
+          {/* Before a path is chosen the hero owns the heading, the 3D badge and the
+              introduction. This row is not rendered at all then — hiding it with a class
+              would leave a second <h1> in the document for assistive tech and crawlers,
+              even though nobody can see it. */}
+          {steps && (
           <div className="mt-3 flex items-center gap-1.5 lg:mt-0.5">
             <h1
-              className={`text-[28px] font-semibold leading-[1.1] tracking-[-0.02em] text-white sm:text-[34px] ${
+              className={`text-[28px] font-semibold leading-[1.1] tracking-[-0.02em] rc-ink sm:text-[34px] ${
                 steps ? "lg:text-xl lg:font-semibold lg:tracking-[-0.01em]" : "lg:text-[30px]"
               }`}
             >
               Room Planner
             </h1>
             {with3d && (
-              <span className="whitespace-nowrap rounded-full border border-cyan-400/30 bg-cyan-400/10 px-2 py-0.5 text-[11px] font-semibold text-cyan-300">3D</span>
+              <span className="whitespace-nowrap rounded-full border border-blue-500/30 bg-blue-500/10 px-2 py-0.5 text-[11px] font-semibold text-blue-700">3D</span>
             )}
             <Popover>
               <PopoverTrigger asChild>
                 <button
                   type="button"
                   aria-label="About Room Planner"
-                  className={`h-8 w-8 items-center justify-center rounded-full text-white/35 transition-colors hover:bg-white/10 hover:text-white/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 ${
+                  className={`h-8 w-8 items-center justify-center rounded-full rc-ink-muted transition-colors rc-fill-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 ${
                     steps ? "flex" : "hidden"
                   }`}
                 >
                   <Info className="h-4 w-4" />
                 </button>
               </PopoverTrigger>
-              <PopoverContent align="start" className="rc-theme w-[min(24rem,calc(100vw-2rem))] rounded-xl border-white/[0.08] bg-[color:var(--rc-panel-glass)] text-[13px] leading-relaxed text-white/60 shadow-xl backdrop-blur-xl">
+              <PopoverContent align="start" className="rc-theme w-[min(24rem,calc(100vw-2rem))] rounded-xl rc-border bg-[color:var(--rc-panel-glass)] text-[13px] leading-relaxed rc-ink-muted shadow-xl backdrop-blur-xl">
                 <IntroText />
               </PopoverContent>
             </Popover>
@@ -1384,16 +1468,17 @@ export const RoomConfigurator = ({ with3d = false }) => {
               <button
                 type="button"
                 onClick={() => update({ audience: null })}
-                className="ml-1 flex min-h-[28px] items-center gap-1 whitespace-nowrap rounded-full border border-white/[0.08] bg-white/[0.03] px-2.5 text-xs font-medium text-white/60 transition-[background-color,border-color,transform] duration-100 hover:border-blue-400/40 hover:text-cyan-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 active:scale-[0.97]"
+                className="ml-1 flex min-h-[28px] items-center gap-1 whitespace-nowrap rounded-full border rc-border rc-fill px-2.5 text-xs font-medium rc-ink-muted transition-[background-color,border-color,transform] duration-100 hover:border-blue-400/40 hover:text-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 active:scale-[0.97]"
               >
                 {AUDIENCES[audience].label}
-                <span className="text-white/35">· Change</span>
+                <span className="rc-ink-muted">· Change</span>
               </button>
             )}
           </div>
+          )}
           {/* Once a path is chosen the introduction moves into the info button, so the
-              steps start right below the title on a phone too. */}
-          {!steps && <IntroText className="mt-2.5 max-w-3xl text-[15px] leading-relaxed text-white/45 lg:text-sm" />}
+              steps start right below the title on a phone too. Before one is chosen it
+              lives in the hero, beside the visual. */}
         </div>
         {steps && <WorkflowStepper steps={steps} current={stepIndex} visited={visitedSteps} attention={attention} pending={pendingByStep} onSelect={goToStep} />}
       </div>
@@ -1402,7 +1487,7 @@ export const RoomConfigurator = ({ with3d = false }) => {
         <div
           className={`grid grid-cols-1 gap-6 lg:h-full ${
             !steps
-              ? "lg:mx-auto lg:max-w-[1120px] lg:content-start"
+              ? "lg:mx-auto lg:max-w-[1400px] lg:grid-rows-[minmax(0,1fr)]"
               : showPlan
               ? "lg:grid-cols-[minmax(0,1fr)_380px] lg:grid-rows-[minmax(0,1fr)] xl:grid-cols-[minmax(0,1fr)_400px] xl:gap-8"
               : "lg:mx-auto lg:max-w-[560px] lg:grid-rows-[minmax(0,1fr)]"
@@ -1423,7 +1508,7 @@ export const RoomConfigurator = ({ with3d = false }) => {
                   <div className="h-[min(78vh,640px)] min-h-[520px] lg:h-auto lg:min-h-0 lg:flex-1">
                   <Suspense
                     fallback={
-                      <div className="flex h-full items-center justify-center gap-2 rounded-3xl border border-white/[0.08] bg-[color:var(--rc-panel)] text-sm text-white/55">
+                      <div className="flex h-full items-center justify-center gap-2 rounded-3xl border rc-border bg-[color:var(--rc-panel)] text-sm rc-ink-muted">
                         <Loader2 className="h-4 w-4 animate-spin" />
                         Building the 3D room…
                       </div>
@@ -1466,27 +1551,14 @@ export const RoomConfigurator = ({ with3d = false }) => {
           )}
 
           {!steps ? (
-            <>
-              <AudiencePicker audience={audience} onChoose={chooseAudience} />
-              {/* What the visitor ends up with, before they commit to a path.
-                  Swap the image in data/siteImages.js (roomPlanner3d). */}
-              <figure className="rc-step-enter overflow-hidden rounded-3xl border border-white/[0.08] bg-white/[0.03]">
-                <ResponsiveImage
-                  basePath={siteImages.roomPlanner3d.base}
-                  widths={siteImages.roomPlanner3d.widths}
-                  sizes="(min-width: 1120px) 1120px, 100vw"
-                  width={siteImages.roomPlanner3d.width}
-                  height={siteImages.roomPlanner3d.height}
-                  alt={siteImages.roomPlanner3d.alt}
-                  className="block w-full h-auto"
-                  testId="room-planner-3d-preview"
-                />
-                <figcaption className="px-5 py-3.5 text-[13px] leading-relaxed text-white/60">
-                  Where you'll end up: your room in 3D. Sit in any seat to check its view of the
-                  screen, then export everything as a PDF.
-                </figcaption>
-              </figure>
-            </>
+            <PlannerIntroHero
+              audience={audience}
+              onChoose={chooseAudience}
+              intro={INTRO}
+              highlights={HERO_HIGHLIGHTS}
+              privacyNote={HERO_PRIVACY_NOTE}
+              image={siteImages.roomPlanner3d}
+            />
           ) : (
             <StepPanel
               fitContent={!showPlan}
@@ -1512,7 +1584,7 @@ export const RoomConfigurator = ({ with3d = false }) => {
                         setPlanView("3d");
                         if (!window.matchMedia("(min-width: 1024px)").matches) planRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
                       }}
-                      className="flex min-h-[44px] items-center gap-2 whitespace-nowrap rounded-lg border border-blue-500/50 bg-blue-500/10 px-3.5 text-sm font-semibold text-blue-200 transition-[background-color,border-color,transform] duration-100 hover:border-blue-400 hover:bg-blue-500/20 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 active:scale-[0.97]"
+                      className="flex min-h-[44px] items-center gap-2 whitespace-nowrap rounded-lg border border-blue-500/50 bg-blue-500/10 px-3.5 text-sm font-semibold text-blue-700 transition-[background-color,border-color,transform] duration-100 hover:border-blue-400 hover:bg-blue-500/20 hover:text-blue-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 active:scale-[0.97]"
                     >
                       <Box aria-hidden="true" className="h-4 w-4" />
                       3D view
@@ -1541,7 +1613,7 @@ export const RoomConfigurator = ({ with3d = false }) => {
           nothing selected, that the report's diagram is taken from. */}
       {exporting && (
         <div aria-hidden="true" inert className="pointer-events-none fixed -left-[10000px] top-0 w-[1000px]">
-          <RoomCanvas {...canvasProps} theme="print" selection={null} onSelect={() => {}} diagramRef={diagramRef} />
+          <RoomCanvas {...canvasProps} theme="print" selection={null} coverageMode="all" onSelect={() => {}} diagramRef={diagramRef} />
         </div>
       )}
     </div>

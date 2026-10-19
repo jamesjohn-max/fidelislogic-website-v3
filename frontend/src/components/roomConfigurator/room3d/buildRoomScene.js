@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { HEIGHTS, dirVector } from "../../../lib/roomSightlines";
-import { AUDIO_PREFERENCES, SOUNDBAR_AUDIO, nearestEdge } from "../../../lib/roomConfiguratorEngine";
+import { AUDIO_PREFERENCES, defaultSpeakerMount, nearestEdge } from "../../../lib/roomConfiguratorEngine";
 import { createPeopleKit } from "./buildPerson";
 import { ROOMZ_SIZE, WIRED_SIZE, buildRoomzScheduler, buildWiredRoomPanel, roomzTexture, wiredPanelTexture } from "./roomzScheduler";
 import {
@@ -448,6 +448,8 @@ function buildSmallDevice(category, item, room, ctx, materials) {
   const dark = materials.device;
   const g = new THREE.Group();
   let h = HEIGHTS.table;
+  let facing = item.angle || 0;
+  let offset = [0, 0]; // plan metres, to keep a wall box clear of the wall face
   if (category === "microphone") {
     const ceiling = ctx.audioPreference === CEILING_MIC;
     if (ceiling) {
@@ -462,9 +464,18 @@ function buildSmallDevice(category, item, room, ctx, materials) {
       h = HEIGHTS.table + 0.0125;
     }
   } else if (category === "speaker") {
-    if (ctx.audioPreference === SOUNDBAR_AUDIO) {
+    // A plan saved before speakers had a mount draws as the audio setup would have it.
+    const mount = item.mount ?? defaultSpeakerMount(ctx.audioPreference);
+    if (mount === "table") {
       g.add(box(0.5, 0.1, 0.1, dark));
       h = 0.8;
+    } else if (mount === "wall") {
+      // A small box flat on the wall, facing into the room.
+      g.add(box(0.14, 0.24, 0.1, dark));
+      h = 1.8;
+      facing = facingIntoRoom(item, room);
+      const rad = (facing * Math.PI) / 180;
+      offset = [Math.sin(rad) * 0.05, -Math.cos(rad) * 0.05];
     } else {
       const grille = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.02, 28), materials.ceilingDevice);
       g.add(grille);
@@ -487,8 +498,8 @@ function buildSmallDevice(category, item, room, ctx, materials) {
   }
   // Nothing up at the ceiling should shade the room below it.
   if (h > room.height - 0.1) g.traverse((o) => { o.castShadow = false; });
-  g.position.copy(toWorld(room, item.x, item.y, h));
-  faceAngle(g, item.angle || 0);
+  g.position.copy(toWorld(room, item.x + offset[0], item.y + offset[1], h));
+  faceAngle(g, facing);
   return g;
 }
 

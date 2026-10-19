@@ -1,5 +1,5 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { X, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { X, Trash2, Radar } from "lucide-react";
 import {
   GRID_STEP,
   ROOM_MARGIN,
@@ -16,8 +16,10 @@ import {
   nearestGridPoint,
   rotateBy,
   clampTableOffset,
-  TABLE_CAM_MIC_RANGE_M,
 } from "../../lib/roomConfiguratorEngine";
+import { PaletteContext, usePalette } from "./PaletteContext";
+import { CoverageOverlay } from "./CoverageOverlay";
+import { RangeControl } from "./RangeControl";
 import "./roomConfigurator.css";
 
 // Two colour sets for the plan: dark to sit in the page, and light for the PDF, which is
@@ -42,8 +44,6 @@ const PALETTES = {
     handleFill: "#FFFFFF", badgeFill: "#0F172A", badgeText: "#FFFFFF", badgeStroke: "#FFFFFF", coord: "#0F172A",
   },
 };
-const PaletteContext = createContext(PALETTES.screen);
-const usePalette = () => useContext(PaletteContext);
 
 // A device's fill, outline and detail colours, selected or not.
 function useDeviceColors(selected) {
@@ -249,79 +249,10 @@ const BookingPanelIcon = ({ selected }) => {
   );
 };
 
-// How far a device's built-in microphones reach: a ring clipped to the room, labelled
-// on whichever side stays inside it. A 360° camera sees the whole room, so it shows
-// this (tinted) instead of a view cone; an all-in-one display shows it as a dashed
-// outline over its view cone.
-function MicRange({ cam, reach, room, labelScale, outline = false, text = `Mic pickup ~${reach}m` }) {
-  const c = usePalette();
-  const clipId = `rc-range-${cam.id}`;
-  const fontSize = 0.11 * labelScale;
-  // Just inside the ring's top edge, else its bottom, left or right — the first spot
-  // that's inside the room (a ring can be wider than the room in both directions). A
-  // wall-mounted device's ring is labelled where it meets the top or bottom wall
-  // first, clear of the furniture it reaches over.
-  const label = (r, text) => {
-    const inset = fontSize * 0.5;
-    const alongWall = (wallY, y) => {
-      const dy = Math.abs(wallY - cam.y);
-      if (!outline || dy >= r) return [];
-      const dx = Math.sqrt(r * r - dy * dy);
-      return [cam.x + dx, cam.x - dx].map((x) => ({ x, y, anchor: "middle" }));
-    };
-    const spots = [
-      ...alongWall(0, fontSize * 1.3),
-      ...alongWall(room.width, room.width - inset),
-      { x: cam.x, y: cam.y - r + fontSize * 1.3, anchor: "middle" },
-      { x: cam.x, y: cam.y + r - inset, anchor: "middle" },
-      { x: cam.x - r + inset, y: cam.y + fontSize * 0.35, anchor: "start" },
-      { x: cam.x + r - inset, y: cam.y + fontSize * 0.35, anchor: "end" },
-    ];
-    // A centered label needs half its width clear of the side walls.
-    const clearance = (p) => (p.anchor === "middle" ? fontSize * 4 : inset);
-    const spot = spots.find((p) => p.y > fontSize && p.y < room.width - inset && p.x > clearance(p) && p.x < room.length - clearance(p));
-    if (!spot) return null;
-    return (
-      <text x={spot.x} y={spot.y} textAnchor={spot.anchor} fontSize={fontSize} fontWeight={600} fill={c.fovLabel} fillOpacity={0.85} stroke={c.halo} strokeWidth={0.03 * labelScale} paintOrder="stroke">
-        {text}
-      </text>
-    );
-  };
-  return (
-    <g pointerEvents="none">
-      <defs>
-        <clipPath id={clipId}>
-          <rect x={0} y={0} width={room.length} height={room.width} />
-        </clipPath>
-      </defs>
-      <g clipPath={`url(#${clipId})`}>
-        <circle
-          cx={cam.x}
-          cy={cam.y}
-          r={reach}
-          fill={outline ? "none" : c.fov}
-          fillOpacity={0.08}
-          stroke={c.fov}
-          strokeOpacity={0.55}
-          strokeWidth={1.2}
-          strokeDasharray={outline ? "6 5" : undefined}
-          vectorEffect="non-scaling-stroke"
-        />
-      </g>
-      {label(reach, text)}
-    </g>
-  );
-}
-
 // Shared by cameras, video bars and all-in-one displays — anything with a field of view.
-function FovRay({ cam, room, labelScale }) {
-  if (cam.isTableCam) return <MicRange cam={cam} reach={TABLE_CAM_MIC_RANGE_M} room={room} labelScale={labelScale} />;
-  return (
-    <>
-      <ViewCone cam={cam} room={room} />
-      {cam.micReach && <MicRange cam={cam} reach={cam.micReach} room={room} labelScale={labelScale} outline />}
-    </>
-  );
+// A 360° camera sees the whole room, so it has no cone; its pickup is drawn by CoverageOverlay.
+function FovRay({ cam, room }) {
+  return cam.isTableCam ? null : <ViewCone cam={cam} room={room} />;
 }
 
 // Front-of-room cameras and video bars: the fan of what the lens sees, out to the walls.
@@ -602,9 +533,13 @@ export function RoomCanvas({
   onPodDragCommit,
   onSetPodAngle,
   diagramRef,
-  // A dedicated microphone's pickup across the plan ({ reach, label }), drawn round
-  // the selected microphone.
-  micPickup = null,
+  // Every mic and speaker's reach (micSources + speakerSources). coverageMode picks which
+  // are drawn: "selected" (the selected device's), "all" or "off".
+  coverageSources = [],
+  coverageMode = "selected",
+  // Sets the selected device's own range: (category, id, kind, metres) — metres null
+  // deletes the override, so the device follows the room-wide value again.
+  onSetSourceRange,
   // Guidance under the plan for the current step; falls back to how to move the seating.
   hint,
   // Shown above the plan, at the plan's width.
@@ -623,6 +558,9 @@ export function RoomCanvas({
   const [liveTableOffset, setLiveTableOffset] = useState(null);
   const [liveDevicePos, setLiveDevicePos] = useState(null);
   const [liveAngle, setLiveAngle] = useState(null);
+  // Show every source's range at once (spec decision 5). A view setting, not part of the
+  // plan, so it is not undone or saved with it.
+  const [showAllCoverage, setShowAllCoverage] = useState(false);
 
   const effectiveOffset = liveTableOffset || tableOffset;
   // Memoized because the pointer-up callback depends on it; as a fresh object
@@ -1022,6 +960,10 @@ export function RoomCanvas({
     ? `Chair ${selection.index + 1}`
     : DEVICE_LABELS[selection.category];
   const selectionDeletable = selection && selection.category !== "table" && selection.category !== "tablePod";
+  // The selected device's own pickup/throw, at most one of each kind (an all-in-one or a
+  // video bar has both). `range` is already resolved, so it reads as the override when the
+  // device has one and as the default it follows when it has not.
+  const selectedSources = selection ? coverageSources.filter((src) => src.category === selection.category && src.id === selection.id) : [];
 
   // x, y in meters from the room's top-left corner — the same origin the ruler is
   // drawn from, so this always reads consistently with the marks on the diagram.
@@ -1077,7 +1019,7 @@ export function RoomCanvas({
           <div className="rc-plan-frame relative">
             <div
               ref={diagramRef}
-              className="h-full w-full overflow-hidden rounded-3xl border border-white/[0.08] shadow-sm"
+              className={`h-full w-full overflow-hidden rounded-3xl border rc-border shadow-sm${theme === "screen" ? " rc-stage" : ""}`}
               style={{ backgroundColor: palette.margin }}
             >
               <svg
@@ -1101,30 +1043,20 @@ export function RoomCanvas({
                 <RulerTicks marks={marksY} orientation="vertical" wallAt={0} sign={-1} />
                 <RulerTicks marks={marksY} orientation="vertical" wallAt={room.length} sign={1} />
 
-                {micPickup &&
-                  selection?.category === "microphone" &&
-                  devices.microphone
-                    .filter((m) => m.id === selection.id)
-                    .map((m) => {
-                      const pos = renderDevicePos("microphone", m);
-                      return (
-                        <MicRange
-                          key={`pickup-${m.id}`}
-                          cam={{ ...m, x: pos.x, y: pos.y }}
-                          reach={micPickup.reach}
-                          room={room}
-                          labelScale={labelScale}
-                          text={`Mic pickup ${micPickup.label}`}
-                        />
-                      );
-                    })}
                 {FOV_CATEGORIES.map((category) =>
                   devices[category].map((cam) => {
                     const pos = renderDevicePos(category, cam);
                     const angle = renderDeviceAngle(category, cam);
-                    return <FovRay key={cam.id} cam={{ ...cam, x: pos.x, y: pos.y, angle }} room={room} labelScale={labelScale} />;
+                    return <FovRay key={cam.id} cam={{ ...cam, x: pos.x, y: pos.y, angle }} room={room} />;
                   })
                 )}
+                <CoverageOverlay
+                  sources={coverageSources.map((s) => ({ ...s, ...renderDevicePos(s.category, s) }))}
+                  room={room}
+                  labelScale={labelScale}
+                  mode={coverageMode !== "off" && showAllCoverage ? "all" : coverageMode}
+                  selection={selection}
+                />
 
                 <g
                   {...(layout && !isPods ? focusable("Table and chairs", { category: "table", id: "table" }) : {})}
@@ -1276,46 +1208,84 @@ export function RoomCanvas({
             item's actions once something is. On desktop it keeps a fixed minimum height
             (part of --rc-plan-chrome) so selecting something never resizes the plan. */}
           {interactive && (
-            <div className="shrink-0 lg:min-h-[60px]">
-              {!selection && (
-                <p className="mt-2 text-xs leading-relaxed text-white/45">
-                  {hint ||
-                    (isPods
-                      ? "Drag a table to move it with its chairs, or use its handle to turn it. Double-click (or double-tap on a phone or tablet) a chair to move just that one."
-                      : "Drag the table to move the whole layout. Double-click (or double-tap on a phone or tablet) a chair to move just that one.")}
-                </p>
-              )}
+            <div className="shrink-0 lg:min-h-[84px]">
+              <div className="mt-2 flex items-start gap-2">
+                <div className="min-w-0 flex-1">
+                  {!selection && (
+                    <p className="text-xs leading-relaxed rc-ink-muted">
+                      {hint ||
+                        (isPods
+                          ? "Drag a table to move it with its chairs, or use its handle to turn it. Double-click (or double-tap on a phone or tablet) a chair to move just that one."
+                          : "Drag the table to move the whole layout. Double-click (or double-tap on a phone or tablet) a chair to move just that one.")}
+                    </p>
+                  )}
 
-              {selection && (
-                <div className="rc-banner-in mt-2 flex items-center justify-between gap-3 rounded-lg border border-blue-400/30 bg-blue-500/10 px-3 py-2 text-sm">
-                  <span className="font-medium text-cyan-100">
-                    {selectionLabel} selected
-                    {selection.category === "table" ? ": drag or use the arrow keys to move it" : ""}
-                    {selection.category === "tablePod" ? `: drag to move, ${turnHint}, resize under Seating` : ""}
-                    {selectedPosition && (
-                      <span className="font-normal text-cyan-300"> at {selectedPosition.x.toFixed(2)}m, {selectedPosition.y.toFixed(2)}m</span>
-                    )}
-                  </span>
-                  <div className="flex items-center gap-1">
-                    {selectionDeletable && (
-                      <button
-                        onClick={handleDeleteSelected}
-                        className="flex min-h-[36px] items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold text-red-400 transition-transform duration-100 hover:bg-red-500/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-500 active:scale-[0.96]"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                        Delete
-                      </button>
-                    )}
-                    <button
-                      aria-label="Deselect"
-                      onClick={() => onSelect(null)}
-                      className="flex h-9 w-9 items-center justify-center rounded-md text-cyan-300 hover:bg-blue-500/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
+                  {selection && (
+                    <div className="rc-banner-in flex flex-col gap-1.5 rounded-lg border border-blue-400/30 bg-blue-500/10 px-3 py-2 text-sm">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="font-medium text-blue-700">
+                          {selectionLabel} selected
+                          {selection.category === "table" ? ": drag or use the arrow keys to move it" : ""}
+                          {selection.category === "tablePod" ? `: drag to move, ${turnHint}, resize under Seating` : ""}
+                          {selectedPosition && (
+                            <span className="font-normal text-blue-700"> at {selectedPosition.x.toFixed(2)}m, {selectedPosition.y.toFixed(2)}m</span>
+                          )}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          {selectionDeletable && (
+                            <button
+                              onClick={handleDeleteSelected}
+                              className="flex min-h-[36px] items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold rc-danger transition-transform duration-100 hover:bg-red-500/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-500 active:scale-[0.96]"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              Delete
+                            </button>
+                          )}
+                          <button
+                            aria-label="Deselect"
+                            onClick={() => onSelect(null)}
+                            className="flex h-9 w-9 items-center justify-center rounded-md text-blue-600 hover:bg-blue-500/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                      {/* How far this device reaches, in metres, over the room-wide default
+                          it otherwise follows. Both kinds sit on one line where there is room. */}
+                      {onSetSourceRange && selectedSources.length > 0 && (
+                        <div className={`grid gap-x-4 gap-y-1 border-t border-blue-400/20 pt-1.5 ${selectedSources.length > 1 ? "sm:grid-cols-2" : ""}`}>
+                          {selectedSources.map((src) => (
+                            <RangeControl
+                              key={src.kind}
+                              id={`rc-device-range-${src.kind}`}
+                              label={src.kind === "speaker" ? "Speaker range" : "Mic pickup"}
+                              value={src.isCustom ? src.range : null}
+                              fallback={src.range}
+                              isCustom={src.isCustom}
+                              onChange={(metres) => onSetSourceRange(selection.category, selection.id, src.kind, metres)}
+                              onReset={() => onSetSourceRange(selection.category, selection.id, src.kind, null)}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-              )}
+                {coverageSources.length > 0 && coverageMode !== "off" && (
+                  <button
+                    type="button"
+                    aria-pressed={showAllCoverage}
+                    onClick={() => setShowAllCoverage((on) => !on)}
+                    title="Draw every microphone and speaker's range on the plan at once"
+                    className={`flex min-h-[36px] shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 ${
+                      showAllCoverage ? "border-blue-500 bg-blue-500/15 text-blue-700" : "rc-border rc-fill rc-ink-muted rc-ink-hover"
+                    }`}
+                  >
+                    <Radar aria-hidden="true" className="h-3.5 w-3.5" />
+                    {showAllCoverage ? "All coverage shown" : "Show all coverage"}
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </div>

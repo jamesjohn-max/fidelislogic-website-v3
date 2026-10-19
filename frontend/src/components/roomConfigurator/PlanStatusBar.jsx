@@ -15,15 +15,15 @@ import {
 function Stat({ icon: Icon, label, children }) {
   return (
     <div className="flex items-center gap-2">
-      <Icon aria-hidden="true" className="h-4 w-4 shrink-0 text-white/35" />
+      <Icon aria-hidden="true" className="h-4 w-4 shrink-0 rc-ink-muted" />
       <span className="sr-only">{label}: </span>
-      <span className="text-sm font-medium tabular-nums text-white/70">{children}</span>
+      <span className="text-sm font-medium tabular-nums rc-ink-soft">{children}</span>
     </div>
   );
 }
 
 const ICON_BUTTON =
-  "flex h-9 w-9 items-center justify-center rounded-lg text-white/60 transition-[background-color,color,transform] duration-100 hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 active:scale-[0.94] disabled:pointer-events-none disabled:text-white/20";
+  "flex h-9 w-9 items-center justify-center rounded-lg rc-ink-muted transition-[background-color,color,transform] duration-100 rc-fill-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 active:scale-[0.94] disabled:pointer-events-none disabled:opacity-40";
 
 // Live read-out above the plan (room type, capacity, size), so each change made in a
 // step is confirmed at a glance, with undo and redo beside it. Starting over throws away
@@ -51,13 +51,13 @@ export function PlanStatusBar({
     <div className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-x-5 gap-y-2 lg:mb-2">
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5">
         <Stat icon={Building2} label="Room type">
-          <span className="font-semibold text-white">{roomType}</span>
+          <span className="font-semibold rc-ink">{roomType}</span>
         </Stat>
         <Stat icon={Users} label="Capacity">
           {capacity ? `${capacity} ${capacity === 1 ? "person" : "people"}` : "No seating yet"}
         </Stat>
         <Stat icon={Ruler} label="Room size">
-          {room.length.toFixed(1)} × {room.width.toFixed(1)} m <span className="text-white/45">· {area.toFixed(1)} m²</span>
+          {room.length.toFixed(1)} × {room.width.toFixed(1)} m <span className="rc-ink-muted">· {area.toFixed(1)} m²</span>
         </Stat>
       </div>
       <div className="-mr-2 flex items-center gap-0.5">
@@ -75,7 +75,7 @@ export function PlanStatusBar({
           <AlertDialogTrigger asChild>
             <button
               type="button"
-              className="ml-1 flex min-h-[36px] items-center gap-1.5 rounded-lg px-2.5 text-[13px] font-medium text-orange-400 transition-[background-color,color,transform] duration-100 hover:bg-orange-500/10 hover:text-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 active:scale-[0.97]"
+              className="ml-1 flex min-h-[36px] items-center gap-1.5 rounded-lg px-2.5 text-[13px] font-medium text-orange-700 transition-[background-color,color,transform] duration-100 hover:bg-orange-500/10 hover:text-orange-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 active:scale-[0.97]"
             >
               <RotateCcw className="h-3.5 w-3.5" />
               Start Over

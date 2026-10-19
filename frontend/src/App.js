@@ -56,8 +56,17 @@ const suppressResizeObserverError = () => {
 
 suppressResizeObserverError();
 
-// Layout wrapper for public pages
-const PublicLayout = ({ children }) => (
+// Layout wrapper for public pages.
+//
+// `lockedToViewport` is for the pages that are an app shell rather than a document —
+// today just the Room Planner, which fills the screen exactly so the path a visitor has
+// to pick is never below the fold. The footer is what would otherwise make that page
+// scroll, so it is dropped at `lg:` and up, where the viewport lock applies.
+//
+// It stays on smaller screens deliberately: the planner stacks and scrolls there
+// anyway, so hiding the footer would remove real navigation and buy nothing. Contact
+// and the main sections are reachable from the header on every size either way.
+const PublicLayout = ({ children, lockedToViewport = false }) => (
   <>
     <Header />
     {children}
@@ -65,7 +74,9 @@ const PublicLayout = ({ children }) => (
       <FloatingConfiguratorButton />
       <FloatingDealsButton />
     </div>
-    <Footer />
+    <div className={lockedToViewport ? "lg:hidden" : undefined}>
+      <Footer />
+    </div>
   </>
 );
 
@@ -88,7 +99,7 @@ function App() {
                 here, and the 3D view is offered on the review step. The planner
                 still opens on the 2D plan while the visitor works through the
                 steps. */}
-            <Route path="/tools/room-configurator" element={<PublicLayout><RoomConfigurator with3d /></PublicLayout>} />
+            <Route path="/tools/room-configurator" element={<PublicLayout lockedToViewport><RoomConfigurator with3d /></PublicLayout>} />
             {/* The old v2 address, kept working for anyone who bookmarked or
                 shared it while 3D was being built. */}
             <Route path="/tools/room-configurator-v2" element={<Navigate to="/tools/room-configurator" replace />} />

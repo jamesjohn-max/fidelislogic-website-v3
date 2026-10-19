@@ -22,8 +22,8 @@ export const detailsValid = (audience, details) => FIELDS[audience].every((f) =>
 function TextField({ id, label, value, onChange, onBlur, placeholder, error, inputRef, autoComplete = "off" }) {
   return (
     <div className="flex flex-col gap-1">
-      <label htmlFor={id} className="text-xs font-medium text-white/60">
-        {label} <span className="text-[color:var(--rc-accent)]">*</span>
+      <label htmlFor={id} className="text-xs font-medium rc-ink-muted">
+        {label} <span className="rc-accent-ink">*</span>
       </label>
       <input
         ref={inputRef}
@@ -36,12 +36,12 @@ function TextField({ id, label, value, onChange, onBlur, placeholder, error, inp
         placeholder={placeholder}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? `${id}-error` : undefined}
-        className={`h-10 w-full rounded-lg border bg-white/[0.03] px-3 text-sm text-white/85 shadow-sm outline-none transition-[border-color,box-shadow] placeholder:text-white/35 focus:ring-2 ${
-          error ? "border-red-400/50 focus:border-red-400/60 focus:ring-red-500/20" : "border-white/[0.08] focus:border-blue-400/60 focus:ring-blue-500/20"
+        className={`h-10 w-full rounded-lg border rc-fill px-3 text-sm rc-ink shadow-sm outline-none transition-[border-color,box-shadow] rc-placeholder-muted focus:ring-2 ${
+          error ? "border-red-400/50 focus:border-red-400/60 focus:ring-red-500/20" : "rc-border focus:border-blue-400/60 focus:ring-blue-500/20"
         }`}
       />
       {error && (
-        <span id={`${id}-error`} className="text-xs font-medium text-red-400">
+        <span id={`${id}-error`} className="text-xs font-medium rc-danger">
           {error}
         </span>
       )}
@@ -93,8 +93,8 @@ export function DetailsForm({ audience, details, onChange, onSubmit, attempt }) 
       ))}
       {/* Lets Enter in any field move on, like the footer button. */}
       <button type="submit" className="sr-only" aria-hidden="true" tabIndex={-1} />
-      <p className="flex items-start gap-1.5 text-xs leading-snug text-emerald-200">
-        <ShieldCheck className="mt-px h-3.5 w-3.5 shrink-0 text-emerald-300" />
+      <p className="flex items-start gap-1.5 text-xs leading-snug rc-ok">
+        <ShieldCheck className="mt-px h-3.5 w-3.5 shrink-0 rc-ok" />
         Nothing you enter is sent anywhere. Your draft stays in this browser, and the PDF is built here too.
       </p>
     </form>

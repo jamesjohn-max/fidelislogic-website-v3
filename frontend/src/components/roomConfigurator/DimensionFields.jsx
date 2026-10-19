@@ -21,11 +21,11 @@ const formatNum = (v, decimals) => {
 };
 
 const STEPPER_BUTTON =
-  "flex h-full w-8 shrink-0 items-center justify-center text-white/45 transition-[background-color,transform] duration-100 hover:bg-white/[0.05] hover:text-white/85 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:active:scale-100 active:scale-90 active:bg-white/10";
+  "flex h-full w-8 shrink-0 items-center justify-center rc-ink-muted transition-[background-color,transform] duration-100 rc-fill-hover rc-fill-active focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:active:scale-100 active:scale-90";
 
 function FieldLabel({ htmlFor, id, children }) {
   return (
-    <label htmlFor={htmlFor} id={id} className="text-xs font-medium text-white/60">
+    <label htmlFor={htmlFor} id={id} className="text-xs font-medium rc-ink-muted">
       {children}
     </label>
   );
@@ -63,8 +63,8 @@ function NumberField({ id, label, value, min, max, step, helper, onChange, decim
     <div className={`flex min-w-0 flex-col gap-1 ${disabled ? "opacity-40" : ""} ${className}`}>
       {label && <FieldLabel htmlFor={id}>{label}</FieldLabel>}
       <div
-        className={`flex h-10 items-center overflow-hidden rounded-lg border bg-white/[0.03] shadow-sm transition-[border-color,box-shadow] focus-within:ring-2 ${
-          error ? "border-red-400/50 focus-within:border-red-400/60 focus-within:ring-red-500/20" : "border-white/[0.08] focus-within:border-blue-400/60 focus-within:ring-blue-500/20"
+        className={`flex h-10 items-center overflow-hidden rounded-lg border rc-fill shadow-sm transition-[border-color,box-shadow] focus-within:ring-2 ${
+          error ? "border-red-400/50 focus-within:border-red-400/60 focus-within:ring-red-500/20" : "rc-border focus-within:border-blue-400/60 focus-within:ring-blue-500/20"
         }`}
       >
         <button type="button" aria-label={`Decrease ${label || id}`} disabled={disabled || empty || value <= min} onClick={() => bump(-step)} className={STEPPER_BUTTON}>
@@ -93,18 +93,18 @@ function NumberField({ id, label, value, min, max, step, helper, onChange, decim
             if (e.key === "Escape") { setText(shown(value)); e.currentTarget.blur(); }
           }}
           onWheel={(e) => e.currentTarget.blur()}
-          className="h-full w-full min-w-0 border-x border-white/[0.06] bg-transparent text-center text-[15px] font-semibold tabular-nums text-white outline-none disabled:cursor-not-allowed"
+          className="h-full w-full min-w-0 border-x rc-border bg-transparent text-center text-[15px] font-semibold tabular-nums rc-ink outline-none disabled:cursor-not-allowed"
         />
         <button type="button" aria-label={`Increase ${label || id}`} disabled={disabled || (!empty && value >= max)} onClick={() => bump(step)} className={STEPPER_BUTTON}>
           <Plus className="h-3.5 w-3.5" />
         </button>
       </div>
       {error && (
-        <span id={`${id}-error`} className="text-xs font-medium text-red-400">
+        <span id={`${id}-error`} className="text-xs font-medium rc-danger">
           {error}
         </span>
       )}
-      {helper && <span className="text-xs text-white/45">{helper}</span>}
+      {helper && <span className="text-xs rc-ink-muted">{helper}</span>}
     </div>
   );
 }
@@ -116,11 +116,11 @@ export function Segmented({ label, options, value, onChange, helper, disabledIds
   const labelId = `rc-seg-${label.replace(/\W+/g, "-").toLowerCase()}`;
   return (
     <div className="flex min-w-0 flex-col gap-1">
-      <span id={labelId} className="text-xs font-medium text-white/60">{label}</span>
-      <div role="radiogroup" aria-labelledby={labelId} className="relative flex h-10 rounded-lg bg-white/[0.05] p-1">
+      <span id={labelId} className="text-xs font-medium rc-ink-muted">{label}</span>
+      <div role="radiogroup" aria-labelledby={labelId} className="relative flex h-10 rounded-lg rc-fill p-1">
         <span
           aria-hidden="true"
-          className="absolute bottom-1 left-1 top-1 rounded-md bg-white/[0.03] shadow-[0_1px_3px_rgba(15,23,42,0.12),0_0_0_0.5px_rgba(15,23,42,0.06)] transition-transform duration-300 ease-out-strong motion-reduce:transition-none"
+          className="absolute bottom-1 left-1 top-1 rounded-md bg-[color:var(--rc-panel)] shadow-[0_1px_3px_rgba(15,23,42,0.12),0_0_0_0.5px_rgba(15,23,42,0.06)] transition-transform duration-300 ease-out-strong motion-reduce:transition-none"
           style={{ width: `calc((100% - 0.5rem) / ${options.length})`, transform: `translateX(${index * 100}%)` }}
         />
         {options.map((o) => {
@@ -138,7 +138,7 @@ export function Segmented({ label, options, value, onChange, helper, disabledIds
               disabled={disabled}
               onClick={() => onChange(o.id)}
               className={`relative z-[1] flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 text-[13px] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:opacity-40 ${
-                active ? "text-white" : "text-white/45 hover:text-white/85"
+                active ? "rc-ink" : "rc-ink-muted rc-ink-hover"
               }`}
             >
               {Icon && <Icon className="h-4 w-4" />}
@@ -147,7 +147,7 @@ export function Segmented({ label, options, value, onChange, helper, disabledIds
           );
         })}
       </div>
-      {helper && <span className="text-xs text-white/45">{helper}</span>}
+      {helper && <span className="text-xs rc-ink-muted">{helper}</span>}
     </div>
   );
 }
@@ -297,7 +297,7 @@ export function TableFields({
       </div>
       {/* Boardroom tables: nobody sits with their back to the screen and camera. */}
       {layout === "rectangular" && (
-        <label className="flex min-h-[32px] cursor-pointer items-center gap-2 text-xs font-medium text-white/70">
+        <label className="flex min-h-[32px] cursor-pointer items-center gap-2 text-xs font-medium rc-ink-soft">
           <input
             type="checkbox"
             checked={!!table.screenEndFree}
@@ -320,8 +320,8 @@ export function SeatingFields({ room, table, layout, chairCount, onChairCountCha
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <label htmlFor="rc-chairs" className="block text-sm font-semibold text-white/85">Chairs</label>
-          <span className="block text-xs text-white/45">
+          <label htmlFor="rc-chairs" className="block text-sm font-semibold rc-ink">Chairs</label>
+          <span className="block text-xs rc-ink-muted">
             {cappedByCode
               ? `Up to ${occupancy}: Dubai Building Code allows 1 person per ${DBC_M2_PER_PERSON} m² (${(room.length * room.width).toFixed(1)} m² room)`
               : `Up to ${chairLimits[1]} fit this layout`}
