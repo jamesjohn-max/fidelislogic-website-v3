@@ -131,10 +131,8 @@
 .rc-divide > * + * { border-color: var(--rc-line); }
 .rc-fill { background-color: rgb(15 23 42 / 0.04); }
 .rc-fill-strong { background-color: rgb(15 23 42 / 0.07); }
-.rc-fill-active:active { background-color: rgb(15 23 42 / 0.07); }
 .rc-stage .rc-fill { background-color: rgb(255 255 255 / 0.05); }
 .rc-stage .rc-fill-strong { background-color: rgb(255 255 255 / 0.1); }
-.rc-stage .rc-fill-active:active { background-color: rgb(255 255 255 / 0.1); }
 /* Hover fills. These carry the ink change too: the old pairing was
    `text-white/60 hover:bg-white/10 hover:text-white`, which hardcodes a dark surface
    twice over. One class now covers both halves, on either surface. */
@@ -143,6 +141,12 @@
   color: var(--rc-ink);
 }
 .rc-stage .rc-fill-hover:hover { background-color: rgb(255 255 255 / 0.1); }
+/* The pressed fill, and it has to stay BELOW the hover rules above: a mouse press is
+   also a hover, the two selectors tie on specificity (0,2,0 here, 0,3,0 on the stage),
+   and a tie is settled by source order. Declared first, the press simply never painted
+   on a mouse — which is the same inert-affordance bug the rc-* variant classes had. */
+.rc-fill-active:active { background-color: rgb(15 23 42 / 0.07); }
+.rc-stage .rc-fill-active:active { background-color: rgb(255 255 255 / 0.1); }
 
 .rc-device {
   cursor: grab;
