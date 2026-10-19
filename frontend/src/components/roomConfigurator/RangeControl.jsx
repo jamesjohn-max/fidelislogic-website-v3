@@ -17,7 +17,7 @@ export function RangeControl({ id, label, value, fallback, isCustom = Number.isF
   const shown = clampRange(Number.isFinite(value) ? value : fallback);
   return (
     <div className="flex min-w-0 items-center gap-2">
-      <label htmlFor={id} className="shrink-0 text-xs font-medium text-white/60">{label}</label>
+      <label htmlFor={id} className="shrink-0 text-xs font-medium rc-ink-muted">{label}</label>
       <input
         id={id}
         type="range"
@@ -34,14 +34,14 @@ export function RangeControl({ id, label, value, fallback, isCustom = Number.isF
         aria-valuetext={`${shown.toFixed(2)} metres${isCustom ? ", custom" : ", default"}`}
         className="h-9 min-w-0 flex-1 accent-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
       />
-      <span className="shrink-0 text-xs font-semibold tabular-nums text-white/85">{shown.toFixed(2)}m</span>
-      <span className={`shrink-0 text-xs ${isCustom ? "font-semibold text-cyan-200" : "text-white/45"}`}>{isCustom ? "Custom" : "Default"}</span>
+      <span className="shrink-0 text-xs font-semibold tabular-nums rc-ink">{shown.toFixed(2)}m</span>
+      <span className={`shrink-0 text-xs ${isCustom ? "font-semibold text-blue-700" : "rc-ink-muted"}`}>{isCustom ? "Custom" : "Default"}</span>
       {isCustom && (
         <button
           type="button"
           onClick={onReset}
           aria-label={`Reset ${label} to the default`}
-          className="flex min-h-[28px] shrink-0 items-center gap-1 rounded-md px-1.5 text-xs font-semibold text-white/60 hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+          className="flex min-h-[28px] shrink-0 items-center gap-1 rounded-md px-1.5 text-xs font-semibold rc-ink-muted rc-fill-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
         >
           <RotateCcw aria-hidden="true" className="h-3 w-3" />
           Reset

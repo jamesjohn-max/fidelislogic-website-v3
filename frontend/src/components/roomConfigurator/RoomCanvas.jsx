@@ -1019,7 +1019,7 @@ export function RoomCanvas({
           <div className="rc-plan-frame relative">
             <div
               ref={diagramRef}
-              className="h-full w-full overflow-hidden rounded-3xl border border-white/[0.08] shadow-sm"
+              className="h-full w-full overflow-hidden rounded-3xl border rc-border shadow-sm"
               style={{ backgroundColor: palette.margin }}
             >
               <svg
@@ -1212,7 +1212,7 @@ export function RoomCanvas({
               <div className="mt-2 flex items-start gap-2">
                 <div className="min-w-0 flex-1">
                   {!selection && (
-                    <p className="text-xs leading-relaxed text-white/45">
+                    <p className="text-xs leading-relaxed rc-ink-muted">
                       {hint ||
                         (isPods
                           ? "Drag a table to move it with its chairs, or use its handle to turn it. Double-click (or double-tap on a phone or tablet) a chair to move just that one."
@@ -1223,12 +1223,12 @@ export function RoomCanvas({
                   {selection && (
                     <div className="rc-banner-in flex flex-col gap-1.5 rounded-lg border border-blue-400/30 bg-blue-500/10 px-3 py-2 text-sm">
                       <div className="flex items-center justify-between gap-3">
-                        <span className="font-medium text-cyan-100">
+                        <span className="font-medium text-blue-700">
                           {selectionLabel} selected
                           {selection.category === "table" ? ": drag or use the arrow keys to move it" : ""}
                           {selection.category === "tablePod" ? `: drag to move, ${turnHint}, resize under Seating` : ""}
                           {selectedPosition && (
-                            <span className="font-normal text-cyan-300"> at {selectedPosition.x.toFixed(2)}m, {selectedPosition.y.toFixed(2)}m</span>
+                            <span className="font-normal text-blue-600"> at {selectedPosition.x.toFixed(2)}m, {selectedPosition.y.toFixed(2)}m</span>
                           )}
                         </span>
                         <div className="flex items-center gap-1">
@@ -1244,7 +1244,7 @@ export function RoomCanvas({
                           <button
                             aria-label="Deselect"
                             onClick={() => onSelect(null)}
-                            className="flex h-9 w-9 items-center justify-center rounded-md text-cyan-300 hover:bg-blue-500/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+                            className="flex h-9 w-9 items-center justify-center rounded-md text-blue-600 hover:bg-blue-500/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
                           >
                             <X className="h-4 w-4" />
                           </button>
@@ -1278,7 +1278,7 @@ export function RoomCanvas({
                     onClick={() => setShowAllCoverage((on) => !on)}
                     title="Draw every microphone and speaker's range on the plan at once"
                     className={`flex min-h-[36px] shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 ${
-                      showAllCoverage ? "border-blue-500 bg-blue-500/15 text-cyan-100" : "border-white/[0.08] bg-white/[0.03] text-white/60 hover:text-white"
+                      showAllCoverage ? "border-blue-500 bg-blue-500/15 text-blue-700" : "rc-border rc-fill rc-ink-muted rc-ink-hover"
                     }`}
                   >
                     <Radar aria-hidden="true" className="h-3.5 w-3.5" />

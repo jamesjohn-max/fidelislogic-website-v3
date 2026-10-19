@@ -16,7 +16,7 @@ function RecommendationItem({ rec, onAddDevice }) {
     >
       <Icon className={`mt-px h-3.5 w-3.5 shrink-0 ${essential ? "text-amber-300" : "text-[color:var(--rc-accent)]"}`} />
       {/* The one-tap fixes flow on after the sentence rather than taking a line of their own. */}
-      <p className={`min-w-0 flex-1 text-xs leading-[1.6] ${essential ? "text-amber-100" : "text-white/70"}`}>
+      <p className={`min-w-0 flex-1 text-xs leading-[1.6] ${essential ? "text-amber-100" : "rc-ink-soft"}`}>
         {essential && <span className="font-semibold">Essential · </span>}
         {rec.text}
         {rec.addCategories.map((category) => (
@@ -24,7 +24,7 @@ function RecommendationItem({ rec, onAddDevice }) {
             key={category}
             type="button"
             onClick={() => onAddDevice(category)}
-            className="ml-1.5 inline-flex h-6 items-center gap-0.5 whitespace-nowrap rounded-full border border-blue-400/30 bg-white/[0.03] px-2 align-middle text-xs font-semibold text-cyan-300 transition-[background-color,transform] duration-100 hover:bg-blue-500/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 active:scale-[0.96]"
+            className="ml-1.5 inline-flex h-6 items-center gap-0.5 whitespace-nowrap rounded-full border border-blue-400/30 rc-fill px-2 align-middle text-xs font-semibold text-blue-600 transition-[background-color,transform] duration-100 hover:bg-blue-500/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 active:scale-[0.96]"
           >
             <Plus className="h-3 w-3" />
             Add {DEVICE_LABELS[category].toLowerCase()}
@@ -84,7 +84,7 @@ export function ReadinessCard({ recommendations, onAddDevice }) {
           type="button"
           onClick={() => setShowSuggestions((v) => !v)}
           aria-expanded={showSuggestions}
-          className="self-start rounded-lg px-1 py-1 text-xs font-semibold text-cyan-300 hover:text-cyan-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+          className="self-start rounded-lg px-1 py-1 text-xs font-semibold text-blue-600 hover:text-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
         >
           {showSuggestions ? "Hide suggestions" : `Show ${suggestionRecs.length} optional suggestion${suggestionRecs.length === 1 ? "" : "s"}`}
         </button>

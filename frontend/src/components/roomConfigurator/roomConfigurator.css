@@ -1,46 +1,105 @@
-/* The Room Planner's own colour scheme.
-   The planner is deliberately independent of the site's theme: it paints its own
-   surface and defines its own ink, accent and panel colours here, and it redefines
-   shadcn's design tokens within itself, so the selects, popovers, dialogs and toasts
-   it opens follow these values instead of whatever the rest of the site is using.
-   Content that React portals to <body> (select and popover panels, dialogs, toasts)
-   carries .rc-theme itself, so it takes these tokens with it.
-   To restyle the planner, change the values here — nothing else needs touching. */
+/* The Room Planner's colour scheme, in the site's colours.
+   The planner used to paint its own dark surface, independent of the site. It now
+   takes the site's light theme: the brand values here are the ones tailwind.config.js
+   already defines (fidelis-blue #2563EB, brand-dark #0B1220), referenced rather than
+   restated, so the two can no longer drift apart.
+   It still redefines shadcn's tokens within itself, so the selects, popovers, dialogs
+   and toasts it opens follow these values. Content React portals to <body> carries
+   .rc-theme itself, so it takes these tokens with it.
+   To restyle the planner, change the values here. That is now true: the ink, line and
+   fill classes below are what the components use, in place of the 216 hardcoded
+   text-white/border-white utilities that used to bypass this block. */
 .rc-theme {
-  --rc-surface: #080d16;
+  /* The page surface and its panels. Slate-50 under white, matching an interior page. */
+  --rc-surface: #f8fafc;
+  --rc-panel: #ffffff;
+  --rc-panel-glass: rgb(255 255 255 / 0.85);
+  --rc-panel-bar: rgb(255 255 255 / 0.8);
+  /* fidelis-blue. The old cyan (#22D3EE) is a dark-surface accent — on white it fails
+     contrast for anything it needs to carry, and blue is what the site's own controls
+     use. Cyan survives where it belongs: on the dark stage, see --rc-stage-accent. */
+  --rc-accent: #2563eb;
+  --rc-line: rgb(15 23 42 / 0.10);
+
+  /* The plan and the 3D view keep a dark stage: the 3D scene is lit for a dark room,
+     and a floor plan reads better on one. brand-dark, as tailwind.config.js has it. */
+  --rc-stage: #0b1220;
+  --rc-stage-line: rgb(255 255 255 / 0.08);
+  --rc-stage-accent: #22d3ee;
+
+  /* Ink. Three steps, so a component picks a role rather than an opacity. */
+  --rc-ink: #0f172a;
+  --rc-ink-soft: #334155;
+  --rc-ink-muted: #64748b;
+
+  /* shadcn's tokens, in the planner's colours (h s l, as the site's theme writes them). */
+  --background: 0 0% 100%;
+  --foreground: 222 47% 11%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
+  --primary: 221 83% 53%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 210 40% 96%;
+  --secondary-foreground: 222 47% 11%;
+  --muted: 210 40% 96%;
+  --muted-foreground: 215 16% 47%;
+  --accent: 210 40% 96%;
+  --accent-foreground: 222 47% 11%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 214 32% 91%;
+  --input: 214 32% 91%;
+  --ring: 221 83% 53%;
+}
+
+/* The planner's page surface. */
+.rc-surface {
+  background-color: var(--rc-surface);
+  color: var(--rc-ink-soft);
+}
+
+/* The dark rendering stages: the 2D plan and the 3D viewer. Inside one of these, ink
+   and lines flip back to the light-on-dark set, so a component nested in a stage uses
+   the same class names and still reads correctly. */
+.rc-stage {
+  background-color: var(--rc-stage);
+  --rc-ink: rgb(255 255 255 / 0.92);
+  --rc-ink-soft: rgb(255 255 255 / 0.72);
+  --rc-ink-muted: rgb(255 255 255 / 0.5);
+  --rc-line: var(--rc-stage-line);
+  --rc-accent: var(--rc-stage-accent);
+  /* The panel vars too, so chrome floating over a stage — the 3D viewer's view
+     switcher and seat report — stays dark. Those controls still use white ink, which
+     is correct over a dark stage and wrong anywhere else. */
   --rc-panel: #0b1220;
   --rc-panel-glass: rgb(11 18 32 / 0.85);
   --rc-panel-bar: rgb(11 18 32 / 0.8);
-  --rc-accent: #22d3ee;
-  --rc-line: rgb(255 255 255 / 0.08);
-
-  /* shadcn's tokens, in the planner's colours (h s l, as the site's theme writes them). */
-  --background: 218 45% 6%;
-  --foreground: 0 0% 98%;
-  --card: 220 49% 8%;
-  --card-foreground: 0 0% 98%;
-  --popover: 220 49% 8%;
-  --popover-foreground: 0 0% 92%;
-  --primary: 221 83% 53%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 220 20% 16%;
-  --secondary-foreground: 0 0% 98%;
-  --muted: 220 20% 16%;
-  --muted-foreground: 220 12% 65%;
-  --accent: 220 25% 18%;
-  --accent-foreground: 0 0% 98%;
-  --destructive: 0 72% 51%;
-  --destructive-foreground: 0 0% 98%;
-  --border: 220 20% 22%;
-  --input: 220 20% 22%;
-  --ring: 217 91% 60%;
 }
 
-/* The planner's page surface: its own background and ink, whatever the site's is. */
-.rc-surface {
-  background-color: var(--rc-surface);
-  color: rgb(255 255 255 / 0.85);
+/* Ink, lines and fills by role. These replace text-white/N, border-white/N and
+   bg-white/N throughout the planner — that family hardcodes a dark surface, so it
+   cannot follow a theme. */
+.rc-ink { color: var(--rc-ink); }
+.rc-ink-hover:hover { color: var(--rc-ink); }
+.group:hover .rc-ink-group-hover { color: var(--rc-ink); }
+.rc-ink-soft { color: var(--rc-ink-soft); }
+.rc-ink-muted { color: var(--rc-ink-muted); }
+.rc-border { border-color: var(--rc-line); }
+.rc-divide > * + * { border-color: var(--rc-line); }
+.rc-fill { background-color: rgb(15 23 42 / 0.04); }
+.rc-fill-strong { background-color: rgb(15 23 42 / 0.07); }
+.rc-stage .rc-fill { background-color: rgb(255 255 255 / 0.05); }
+.rc-stage .rc-fill-strong { background-color: rgb(255 255 255 / 0.1); }
+/* Hover fills. These carry the ink change too: the old pairing was
+   `text-white/60 hover:bg-white/10 hover:text-white`, which hardcodes a dark surface
+   twice over. One class now covers both halves, on either surface. */
+.rc-fill-hover:hover {
+  background-color: rgb(15 23 42 / 0.06);
+  color: var(--rc-ink);
 }
+.rc-stage .rc-fill-hover:hover { background-color: rgb(255 255 255 / 0.1); }
 
 .rc-device {
   cursor: grab;

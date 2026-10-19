@@ -13,14 +13,14 @@ function SummaryRow({ title, facts, onEdit }) {
   return (
     <li className="flex items-start gap-3 py-2.5">
       <div className="min-w-0 flex-1">
-        <p className="text-[13px] font-semibold text-white">{title}</p>
-        <p className="mt-0.5 line-clamp-2 text-xs leading-snug text-white/60">{facts.filter(Boolean).join(" · ")}</p>
+        <p className="text-[13px] font-semibold rc-ink">{title}</p>
+        <p className="mt-0.5 line-clamp-2 text-xs leading-snug rc-ink-muted">{facts.filter(Boolean).join(" · ")}</p>
       </div>
       <button
         type="button"
         onClick={onEdit}
         aria-label={`Edit ${title.toLowerCase()}`}
-        className="-mr-2 flex min-h-[32px] shrink-0 items-center gap-1 rounded-lg px-2 text-xs font-semibold text-cyan-300 transition-[background-color,transform] duration-100 hover:bg-blue-500/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 active:scale-[0.96]"
+        className="-mr-2 flex min-h-[32px] shrink-0 items-center gap-1 rounded-lg px-2 text-xs font-semibold text-blue-600 transition-[background-color,transform] duration-100 hover:bg-blue-500/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 active:scale-[0.96]"
       >
         <Pencil className="h-3 w-3" />
         Edit
@@ -70,7 +70,7 @@ export function ReviewSummary({ state, audience, details, photoCount, onEditStep
   // A customer's plan is just the room, its furniture and its screen.
   if (audience === "customer") {
     return (
-      <ul className="-my-1 divide-y divide-white/[0.07]">
+      <ul className="-my-1 divide-y rc-divide">
         {about}
         <SummaryRow
           title="Room"
@@ -88,7 +88,7 @@ export function ReviewSummary({ state, audience, details, photoCount, onEditStep
   }
 
   return (
-    <ul className="-my-1 divide-y divide-white/[0.07]">
+    <ul className="-my-1 divide-y rc-divide">
       {about}
       <SummaryRow
         title="Room"
@@ -150,14 +150,14 @@ export function UncheckedSections({ items, onCheck }) {
       <ul className="mt-1 divide-y divide-amber-400/15">
         {items.map(({ step, section }) => (
           <li key={`${step.id}:${section.id}`} className="flex items-center justify-between gap-3 py-1">
-            <span className="min-w-0 text-xs text-white/70">
-              <span className="font-semibold text-white">{section.title}</span> · {step.label}
+            <span className="min-w-0 text-xs rc-ink-soft">
+              <span className="font-semibold rc-ink">{section.title}</span> · {step.label}
             </span>
             <button
               type="button"
               onClick={() => onCheck(step.id, section.id)}
               aria-label={`Check ${section.title.toLowerCase()} in ${step.label}`}
-              className="-mr-1 flex min-h-[32px] shrink-0 items-center rounded-lg px-2 text-xs font-semibold text-cyan-300 transition-[background-color,transform] duration-100 hover:bg-white/[0.03] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 active:scale-[0.96]"
+              className="-mr-1 flex min-h-[32px] shrink-0 items-center rounded-lg px-2 text-xs font-semibold text-blue-600 transition-[background-color,transform] duration-100 rc-fill-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 active:scale-[0.96]"
             >
               Check
             </button>

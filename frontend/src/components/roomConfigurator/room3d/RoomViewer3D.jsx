@@ -481,6 +481,10 @@ export default function RoomViewer3D({ room, layoutResult, tableOffset, seats, d
   }
 
   const cam = safeCam >= 0 ? viewCams[safeCam] : null;
+  // The root carries `rc-stage`: the scene is lit for a dark room, so the viewer and
+  // the chrome floating over it keep the dark palette while the page around them is
+  // light. That is also why this file's white ink is left alone — it is correct here
+  // and nowhere else in the planner.
   return (
     <div
       ref={containerRef}
@@ -488,7 +492,7 @@ export default function RoomViewer3D({ room, layoutResult, tableOffset, seats, d
       onKeyDown={onKeyDown}
       role="application"
       aria-label="3D view of the room. Arrow keys move between seats, Enter sits in the selected seat, Escape returns to the overview."
-      className="relative h-full w-full overflow-hidden rounded-3xl border border-white/[0.08] bg-[color:var(--rc-panel)] outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+      className="rc-stage relative h-full w-full overflow-hidden rounded-3xl border border-white/[0.08] outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
     >
       {/* Top bar: which view, and whether people are drawn in. */}
       <div className="pointer-events-none absolute inset-x-0 top-0 flex flex-wrap items-start justify-between gap-2 p-3">

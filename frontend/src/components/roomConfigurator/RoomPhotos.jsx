@@ -17,7 +17,7 @@ export function RoomPhotos({ images, onAddImages, onRemoveImage }) {
     <div className="flex flex-col gap-3">
       <div className="grid grid-cols-3 gap-2">
         {images.map((img, i) => (
-          <div key={img.id} className="rc-fade-in relative aspect-[4/3] overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.05]">
+          <div key={img.id} className="rc-fade-in relative aspect-[4/3] overflow-hidden rounded-xl border rc-border rc-fill">
             <img src={img.previewUrl} alt={`Room photo ${i + 1}`} className="h-full w-full object-cover" />
             <button
               type="button"
@@ -32,17 +32,17 @@ export function RoomPhotos({ images, onAddImages, onRemoveImage }) {
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
-          className={`flex aspect-[4/3] flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-white/15 bg-white/[0.02] text-white/60 transition-[background-color,border-color,transform] duration-150 hover:border-blue-400/60 hover:bg-blue-500/10 hover:text-cyan-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 active:scale-[0.97] ${
+          className={`flex aspect-[4/3] flex-col items-center justify-center gap-1 rounded-xl border border-dashed rc-border rc-fill rc-ink-muted transition-[background-color,border-color,transform] duration-150 hover:border-blue-400/60 hover:bg-blue-500/10 hover:text-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 active:scale-[0.97] ${
             images.length ? "" : "col-span-3 aspect-auto py-6"
           }`}
         >
           <ImagePlus className="h-5 w-5" />
           <span className="text-xs font-semibold">{images.length ? "Add more" : "Add room photos"}</span>
-          {!images.length && <span className="text-xs text-white/45">Take new ones or choose from your library</span>}
+          {!images.length && <span className="text-xs rc-ink-muted">Take new ones or choose from your library</span>}
         </button>
       </div>
       <input ref={inputRef} type="file" accept="image/*" multiple onChange={handleFilesSelected} className="hidden" />
-      <p className="text-xs leading-relaxed text-white/45">
+      <p className="text-xs leading-relaxed rc-ink-muted">
         Added to the PDF report, two per page. Photos stay on this device — they're never uploaded or stored, and
         closing the page discards them.
       </p>

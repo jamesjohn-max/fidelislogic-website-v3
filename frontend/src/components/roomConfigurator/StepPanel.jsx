@@ -19,7 +19,7 @@ export const StepPanel = forwardRef(function StepPanel(
     <section
       ref={ref}
       aria-labelledby="rc-step-title"
-      className={`relative flex scroll-mt-40 flex-col overflow-x-clip rounded-3xl border border-white/[0.08] bg-white/[0.03] shadow-sm lg:min-h-0 lg:overflow-hidden ${
+      className={`relative flex scroll-mt-40 flex-col overflow-x-clip rounded-3xl border rc-border rc-fill shadow-sm lg:min-h-0 lg:overflow-hidden ${
         fitContent ? "lg:max-h-full lg:self-start" : "lg:h-full"
       }`}
     >
@@ -33,28 +33,28 @@ export const StepPanel = forwardRef(function StepPanel(
               id="rc-step-title"
               ref={headingRef}
               tabIndex={-1}
-              className="mt-0.5 text-lg font-semibold leading-tight tracking-[-0.01em] text-white outline-none lg:mt-0"
+              className="mt-0.5 text-lg font-semibold leading-tight tracking-[-0.01em] rc-ink outline-none lg:mt-0"
             >
               {step.title}
             </h2>
             {progress && progress.total > 1 && (
-              <span className={`shrink-0 text-xs font-medium tabular-nums ${progress.done === progress.total ? "text-emerald-300" : "text-white/60"}`}>
+              <span className={`shrink-0 text-xs font-medium tabular-nums ${progress.done === progress.total ? "text-emerald-300" : "rc-ink-muted"}`}>
                 {progress.done} of {progress.total} done
               </span>
             )}
           </div>
           {/* On short desktop windows the stepper already names the step, so the line goes. */}
-          <p className="mt-1 text-[13px] leading-snug text-white/45 lg:[@media(max-height:760px)]:hidden">{step.description}</p>
+          <p className="mt-1 text-[13px] leading-snug rc-ink-muted lg:[@media(max-height:760px)]:hidden">{step.description}</p>
         </header>
         <div className={`rc-scroll-body mt-1 min-h-0 flex-1 px-5 pb-2 lg:overflow-y-auto lg:pt-1 lg:pb-20`}>{children}</div>
       </div>
 
-      <footer className="rc-material sticky bottom-0 z-10 flex items-center justify-between gap-3 rounded-b-2xl border-t border-white/[0.08] bg-[color:var(--rc-panel)]/75 px-5 py-3 backdrop-blur-xl backdrop-saturate-150 lg:absolute lg:inset-x-0">
+      <footer className="rc-material sticky bottom-0 z-10 flex items-center justify-between gap-3 rounded-b-2xl border-t rc-border bg-[color:var(--rc-panel)]/75 px-5 py-3 backdrop-blur-xl backdrop-saturate-150 lg:absolute lg:inset-x-0">
         {index > 0 ? (
           <button
             type="button"
             onClick={onBack}
-            className="-ml-3 flex min-h-[44px] items-center gap-1.5 rounded-lg px-3 text-sm font-medium text-white/60 transition-[background-color,transform] duration-100 hover:bg-white/[0.05] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 active:scale-[0.97] active:bg-white/10"
+            className="-ml-3 flex min-h-[44px] items-center gap-1.5 rounded-lg px-3 text-sm font-medium rc-ink-muted transition-[background-color,transform] duration-100 rc-fill-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 active:scale-[0.97] active:rc-fill-strong"
           >
             <ArrowLeft className="h-4 w-4" />
             Back
@@ -83,7 +83,7 @@ export const StepPanel = forwardRef(function StepPanel(
 function SectionStatus({ status }) {
   if (status === "attention") return <AlertCircle aria-hidden="true" className="h-[18px] w-[18px] shrink-0 text-amber-300" />;
   if (status === "checked") return <CircleCheck aria-hidden="true" className="h-[18px] w-[18px] shrink-0 text-emerald-300" />;
-  if (status === "optional") return <Circle aria-hidden="true" className="h-[18px] w-[18px] shrink-0 text-white/65" />;
+  if (status === "optional") return <Circle aria-hidden="true" className="h-[18px] w-[18px] shrink-0 rc-ink-soft" />;
   return <CircleDashed aria-hidden="true" className="h-[18px] w-[18px] shrink-0 text-amber-300" />;
 }
 
@@ -115,23 +115,23 @@ export function StepGroup({ title, description, summary, alerts = 0, error = nul
   }, [open]);
 
   return (
-    <div ref={ref} className="scroll-mt-2 border-b border-white/[0.06] last:border-b-0">
+    <div ref={ref} className="scroll-mt-2 border-b rc-border last:border-b-0">
       <h3>
         <button
           type="button"
           onClick={onToggle}
           aria-expanded={open}
           aria-controls={contentId}
-          className="group -mx-2 flex min-h-[48px] w-[calc(100%+1rem)] items-center gap-3 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-white/[0.02] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+          className="group -mx-2 flex min-h-[48px] w-[calc(100%+1rem)] items-center gap-3 rounded-lg px-2 py-1.5 text-left transition-colors rc-fill-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
         >
           <SectionStatus status={status} />
           <span className="min-w-0 flex-1">
-            <span className="flex flex-wrap items-center gap-x-1.5 text-sm font-semibold text-white">
+            <span className="flex flex-wrap items-center gap-x-1.5 text-sm font-semibold rc-ink">
               {title}
               {(status === "unchecked" || status === "optional") && (
                 <span
                   className={`rounded-md px-1.5 py-px text-xs font-semibold ${
-                    status === "unchecked" ? "bg-amber-400/15 text-amber-200" : "bg-white/[0.05] text-white/60"
+                    status === "unchecked" ? "bg-amber-400/15 text-amber-200" : "rc-fill rc-ink-muted"
                   }`}
                 >
                   {status === "unchecked" ? "Not checked" : "Optional"}
@@ -139,7 +139,7 @@ export function StepGroup({ title, description, summary, alerts = 0, error = nul
               )}
               <span className="sr-only">, {STATUS_WORDS[status]}</span>
             </span>
-            <span className="line-clamp-2 block text-xs leading-snug text-white/60">{open ? description || shownSummary : shownSummary}</span>
+            <span className="line-clamp-2 block text-xs leading-snug rc-ink-muted">{open ? description || shownSummary : shownSummary}</span>
           </span>
           {alerts > 0 && (
             <span className="shrink-0 rounded-full bg-amber-400/15 px-2 py-0.5 text-xs font-semibold text-amber-200">
@@ -148,7 +148,7 @@ export function StepGroup({ title, description, summary, alerts = 0, error = nul
           )}
           <ChevronDown
             aria-hidden="true"
-            className={`h-4 w-4 shrink-0 text-white/35 transition-transform duration-300 ease-out-strong group-hover:text-white/60 motion-reduce:transition-none ${open ? "rotate-180" : ""}`}
+            className={`h-4 w-4 shrink-0 rc-ink-muted transition-transform duration-300 ease-out-strong group-hover:rc-ink-muted motion-reduce:transition-none ${open ? "rotate-180" : ""}`}
           />
         </button>
       </h3>
@@ -173,8 +173,8 @@ export function StepGroup({ title, description, summary, alerts = 0, error = nul
 // A part of a step that's always shown (the review step's), headed like a section.
 export function StepSection({ title, children }) {
   return (
-    <section className="border-b border-white/[0.06] pb-3.5 pt-2 last:border-b-0">
-      <h3 className="mb-2 text-sm font-semibold text-white">{title}</h3>
+    <section className="border-b rc-border pb-3.5 pt-2 last:border-b-0">
+      <h3 className="mb-2 text-sm font-semibold rc-ink">{title}</h3>
       {children}
     </section>
   );

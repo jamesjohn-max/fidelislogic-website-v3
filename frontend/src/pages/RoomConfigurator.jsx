@@ -174,7 +174,7 @@ function PlanViewToggle({ value, onChange }) {
     { id: "3d", label: "3D view", icon: Box },
   ];
   return (
-    <div role="radiogroup" aria-label="Plan view" className="mb-3 flex w-fit shrink-0 rounded-lg border border-white/[0.08] bg-white/[0.03] p-0.5 lg:mb-2">
+    <div role="radiogroup" aria-label="Plan view" className="mb-3 flex w-fit shrink-0 rounded-lg border rc-border rc-fill p-0.5 lg:mb-2">
       {options.map(({ id, label, icon: Icon }) => (
         <button
           key={id}
@@ -183,7 +183,7 @@ function PlanViewToggle({ value, onChange }) {
           aria-checked={value === id}
           onClick={() => onChange(id)}
           className={`flex min-h-[32px] items-center gap-1.5 rounded-md px-3 text-xs font-semibold transition-[background-color,color,transform] duration-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 active:scale-[0.97] ${
-            value === id ? "bg-blue-600 text-white" : "text-white/60 hover:bg-white/10 hover:text-white"
+            value === id ? "bg-blue-600 text-white" : "rc-ink-muted rc-fill-hover"
           }`}
         >
           <Icon aria-hidden="true" className="h-3.5 w-3.5" />
@@ -205,9 +205,9 @@ function MountSideSwitch({ devices, onChange }) {
   return (
     <div className="mt-3 flex flex-col gap-2">
       {mounted.map(({ category, item, label, side: current }) => (
-        <div key={item.id} className="flex items-center justify-between gap-3 text-xs font-medium text-white/70">
+        <div key={item.id} className="flex items-center justify-between gap-3 text-xs font-medium rc-ink-soft">
           <span>{label} on the display</span>
-          <div role="radiogroup" aria-label={`${label} position on the display`} className="flex shrink-0 rounded-lg border border-white/[0.08] bg-white/[0.03] p-0.5">
+          <div role="radiogroup" aria-label={`${label} position on the display`} className="flex shrink-0 rounded-lg border rc-border rc-fill p-0.5">
             {["above", "below"].map((side) => (
               <button
                 key={side}
@@ -216,7 +216,7 @@ function MountSideSwitch({ devices, onChange }) {
                 aria-checked={current === side}
                 onClick={() => onChange(category, item.id, side)}
                 className={`min-h-[28px] rounded-md px-3 text-xs font-semibold capitalize transition-[background-color,color] duration-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 ${
-                  current === side ? "bg-blue-600 text-white" : "text-white/60 hover:bg-white/10 hover:text-white"
+                  current === side ? "bg-blue-600 text-white" : "rc-ink-muted rc-fill-hover"
                 }`}
               >
                 {side}
@@ -236,7 +236,7 @@ const ConsultationHandoff = ({ audience }) => (
   <Link
     to={`/contact?audience=${audience === "reseller" ? "partner" : "organisation"}`}
     onClick={() => analytics.roomPlannerConsultation({ audience })}
-    className="flex items-start gap-2 rounded-lg border border-white/10 bg-white/[0.03] p-3 text-xs leading-relaxed text-white/70 transition-colors hover:border-blue-500/60 hover:text-white"
+    className="flex items-start gap-2 rounded-lg border rc-border rc-fill p-3 text-xs leading-relaxed rc-ink-soft transition-colors hover:border-blue-500/60 rc-ink-hover"
     data-testid="room-planner-consultation"
   >
     <span>
@@ -1338,7 +1338,7 @@ export const RoomConfigurator = ({ with3d = false }) => {
             </StepSection>
             <StepSection title="Your configuration">{summary}</StepSection>
             <StepSection title="PDF options">
-              <label className="flex min-h-[32px] cursor-pointer items-center gap-2 text-xs font-medium text-white/70">
+              <label className="flex min-h-[32px] cursor-pointer items-center gap-2 text-xs font-medium rc-ink-soft">
                 <input
                   type="checkbox"
                   checked={includeRecommendations}
@@ -1420,33 +1420,32 @@ export const RoomConfigurator = ({ with3d = false }) => {
         <div className={`px-4 pt-24 sm:px-6 lg:p-0 ${steps ? "pb-3 lg:shrink-0" : "pb-5"}`}>
           <Breadcrumbs
             compact
-            tone="dark"
             items={[{ name: "Solutions", href: "/solutions" }, { name: "Room Planner" }]}
           />
           <div className="mt-3 flex items-center gap-1.5 lg:mt-0.5">
             <h1
-              className={`text-[28px] font-semibold leading-[1.1] tracking-[-0.02em] text-white sm:text-[34px] ${
+              className={`text-[28px] font-semibold leading-[1.1] tracking-[-0.02em] rc-ink sm:text-[34px] ${
                 steps ? "lg:text-xl lg:font-semibold lg:tracking-[-0.01em]" : "lg:text-[30px]"
               }`}
             >
               Room Planner
             </h1>
             {with3d && (
-              <span className="whitespace-nowrap rounded-full border border-cyan-400/30 bg-cyan-400/10 px-2 py-0.5 text-[11px] font-semibold text-cyan-300">3D</span>
+              <span className="whitespace-nowrap rounded-full border border-blue-500/30 bg-blue-500/10 px-2 py-0.5 text-[11px] font-semibold text-blue-700">3D</span>
             )}
             <Popover>
               <PopoverTrigger asChild>
                 <button
                   type="button"
                   aria-label="About Room Planner"
-                  className={`h-8 w-8 items-center justify-center rounded-full text-white/35 transition-colors hover:bg-white/10 hover:text-white/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 ${
+                  className={`h-8 w-8 items-center justify-center rounded-full rc-ink-muted transition-colors rc-fill-hover/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 ${
                     steps ? "flex" : "hidden"
                   }`}
                 >
                   <Info className="h-4 w-4" />
                 </button>
               </PopoverTrigger>
-              <PopoverContent align="start" className="rc-theme w-[min(24rem,calc(100vw-2rem))] rounded-xl border-white/[0.08] bg-[color:var(--rc-panel-glass)] text-[13px] leading-relaxed text-white/60 shadow-xl backdrop-blur-xl">
+              <PopoverContent align="start" className="rc-theme w-[min(24rem,calc(100vw-2rem))] rounded-xl rc-border bg-[color:var(--rc-panel-glass)] text-[13px] leading-relaxed rc-ink-muted shadow-xl backdrop-blur-xl">
                 <IntroText />
               </PopoverContent>
             </Popover>
@@ -1454,16 +1453,16 @@ export const RoomConfigurator = ({ with3d = false }) => {
               <button
                 type="button"
                 onClick={() => update({ audience: null })}
-                className="ml-1 flex min-h-[28px] items-center gap-1 whitespace-nowrap rounded-full border border-white/[0.08] bg-white/[0.03] px-2.5 text-xs font-medium text-white/60 transition-[background-color,border-color,transform] duration-100 hover:border-blue-400/40 hover:text-cyan-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 active:scale-[0.97]"
+                className="ml-1 flex min-h-[28px] items-center gap-1 whitespace-nowrap rounded-full border rc-border rc-fill px-2.5 text-xs font-medium rc-ink-muted transition-[background-color,border-color,transform] duration-100 hover:border-blue-400/40 hover:text-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 active:scale-[0.97]"
               >
                 {AUDIENCES[audience].label}
-                <span className="text-white/35">· Change</span>
+                <span className="rc-ink-muted">· Change</span>
               </button>
             )}
           </div>
           {/* Once a path is chosen the introduction moves into the info button, so the
               steps start right below the title on a phone too. */}
-          {!steps && <IntroText className="mt-2.5 max-w-3xl text-[15px] leading-relaxed text-white/45 lg:text-sm" />}
+          {!steps && <IntroText className="mt-2.5 max-w-3xl text-[15px] leading-relaxed rc-ink-muted lg:text-sm" />}
         </div>
         {steps && <WorkflowStepper steps={steps} current={stepIndex} visited={visitedSteps} attention={attention} pending={pendingByStep} onSelect={goToStep} />}
       </div>
@@ -1493,7 +1492,7 @@ export const RoomConfigurator = ({ with3d = false }) => {
                   <div className="h-[min(78vh,640px)] min-h-[520px] lg:h-auto lg:min-h-0 lg:flex-1">
                   <Suspense
                     fallback={
-                      <div className="flex h-full items-center justify-center gap-2 rounded-3xl border border-white/[0.08] bg-[color:var(--rc-panel)] text-sm text-white/55">
+                      <div className="flex h-full items-center justify-center gap-2 rounded-3xl border rc-border bg-[color:var(--rc-panel)] text-sm rc-ink-muted">
                         <Loader2 className="h-4 w-4 animate-spin" />
                         Building the 3D room…
                       </div>
@@ -1540,7 +1539,7 @@ export const RoomConfigurator = ({ with3d = false }) => {
               <AudiencePicker audience={audience} onChoose={chooseAudience} />
               {/* What the visitor ends up with, before they commit to a path.
                   Swap the image in data/siteImages.js (roomPlanner3d). */}
-              <figure className="rc-step-enter overflow-hidden rounded-3xl border border-white/[0.08] bg-white/[0.03]">
+              <figure className="rc-step-enter overflow-hidden rounded-3xl border rc-border rc-fill">
                 <ResponsiveImage
                   basePath={siteImages.roomPlanner3d.base}
                   widths={siteImages.roomPlanner3d.widths}
@@ -1551,7 +1550,7 @@ export const RoomConfigurator = ({ with3d = false }) => {
                   className="block w-full h-auto"
                   testId="room-planner-3d-preview"
                 />
-                <figcaption className="px-5 py-3.5 text-[13px] leading-relaxed text-white/60">
+                <figcaption className="px-5 py-3.5 text-[13px] leading-relaxed rc-ink-muted">
                   Where you'll end up: your room in 3D. Sit in any seat to check its view of the
                   screen, then export everything as a PDF.
                 </figcaption>
@@ -1582,7 +1581,7 @@ export const RoomConfigurator = ({ with3d = false }) => {
                         setPlanView("3d");
                         if (!window.matchMedia("(min-width: 1024px)").matches) planRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
                       }}
-                      className="flex min-h-[44px] items-center gap-2 whitespace-nowrap rounded-lg border border-blue-500/50 bg-blue-500/10 px-3.5 text-sm font-semibold text-blue-200 transition-[background-color,border-color,transform] duration-100 hover:border-blue-400 hover:bg-blue-500/20 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 active:scale-[0.97]"
+                      className="flex min-h-[44px] items-center gap-2 whitespace-nowrap rounded-lg border border-blue-500/50 bg-blue-500/10 px-3.5 text-sm font-semibold text-blue-200 transition-[background-color,border-color,transform] duration-100 hover:border-blue-400 hover:bg-blue-500/20 rc-ink-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 active:scale-[0.97]"
                     >
                       <Box aria-hidden="true" className="h-4 w-4" />
                       3D view

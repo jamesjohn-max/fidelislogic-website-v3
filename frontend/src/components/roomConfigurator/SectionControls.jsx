@@ -121,17 +121,17 @@ const DEVICE_DESCRIPTIONS = {
 
 const CHOICE_BASE =
   "transition-[background-color,border-color,color,transform] duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500";
-const CHOICE_ON = "border-blue-500 bg-blue-500/10 text-cyan-100 shadow-[0_0_0_1px_rgba(59,130,246,1)]";
-const CHOICE_OFF = "border-white/[0.08] bg-white/[0.03] text-white/70 hover:border-white/15 hover:bg-white/[0.02]";
+const CHOICE_ON = "border-blue-500 bg-blue-500/10 text-blue-700 shadow-[0_0_0_1px_rgba(59,130,246,1)]";
+const CHOICE_OFF = "rc-border rc-fill rc-ink-soft hover:rc-border rc-fill-hover";
 
 // Starts on "Choose one" when nothing has been picked (value null), so an untouched
 // field never passes for an answer.
 function SelectField({ id, label, value, onChange, options, disabled }) {
   return (
     <div className={`flex min-w-0 flex-col gap-1 ${disabled ? "opacity-50" : ""}`}>
-      <label htmlFor={id} className="text-xs font-medium text-white/60">{label}</label>
+      <label htmlFor={id} className="text-xs font-medium rc-ink-muted">{label}</label>
       <Select value={value ?? ""} onValueChange={onChange} disabled={disabled}>
-        <SelectTrigger id={id} className="h-10 rounded-lg border-white/[0.08] bg-white/[0.03] text-sm text-white/85 shadow-sm data-[placeholder]:text-white/45">
+        <SelectTrigger id={id} className="h-10 rounded-lg rc-border rc-fill text-sm rc-ink shadow-sm data-[placeholder]:rc-ink-muted">
           <SelectValue placeholder="Choose one" />
         </SelectTrigger>
         <SelectContent className="rc-theme">
@@ -163,13 +163,13 @@ export function LayoutPicker({ layout, onLayoutChange }) {
               onClick={() => onLayoutChange(l.id)}
               className={`flex min-h-[64px] flex-col items-center justify-center gap-1 rounded-xl border px-1 py-2 text-center active:scale-[0.97] ${CHOICE_BASE} ${active ? CHOICE_ON : CHOICE_OFF}`}
             >
-              <Icon className={`h-[18px] w-[18px] ${active ? "text-[color:var(--rc-accent)]" : "text-white/35"}`} />
+              <Icon className={`h-[18px] w-[18px] ${active ? "text-[color:var(--rc-accent)]" : "rc-ink-muted"}`} />
               <span className="text-xs font-semibold leading-tight">{l.label}</span>
             </button>
           );
         })}
       </div>
-      <p id="rc-layout-hint" className="text-xs text-white/45">{current?.hint}</p>
+      <p id="rc-layout-hint" className="text-xs rc-ink-muted">{current?.hint}</p>
     </div>
   );
 }
@@ -179,7 +179,7 @@ export function FinishesFields({ wallMaterials, onToggleWallMaterial, floorType,
     <div className="flex flex-col gap-3">
       {showWalls && (
         <div className="flex flex-col gap-1.5">
-          <span id="rc-walls-label" className="text-xs font-medium text-white/60">Walls — choose all that apply</span>
+          <span id="rc-walls-label" className="text-xs font-medium rc-ink-muted">Walls — choose all that apply</span>
           <div role="group" aria-labelledby="rc-walls-label" className="flex flex-wrap gap-1.5">
             {WALL_MATERIALS.map((m) => {
               const active = wallMaterials.includes(m);
@@ -190,7 +190,7 @@ export function FinishesFields({ wallMaterials, onToggleWallMaterial, floorType,
                   onClick={() => onToggleWallMaterial(m)}
                   aria-pressed={active}
                   className={`flex min-h-[32px] items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium active:scale-[0.97] ${CHOICE_BASE} ${
-                    active ? "border-blue-500 bg-blue-500/10 text-cyan-200" : CHOICE_OFF
+                    active ? "border-blue-500 bg-blue-500/10 text-blue-700" : CHOICE_OFF
                   }`}
                 >
                   {active && <Check className="h-3 w-3" strokeWidth={2.5} />}
@@ -243,7 +243,7 @@ export function AudioRangeFields({ audio, micDefault, speakerDefault, onChange }
         onChange={(metres) => onChange("speakerRange", metres)}
         onReset={() => onChange("speakerRange", null)}
       />
-      <p className="text-xs text-white/45">
+      <p className="text-xs rc-ink-muted">
         Applies to every microphone and speaker without a range of its own. Select one on the plan to give it a different reach.
       </p>
     </div>
@@ -259,14 +259,14 @@ export function SpeakerMountSwitch({ speakers, defaultMount, onChange }) {
   if (!speakers.length) return null;
   return (
     <div className="mt-3 flex flex-col gap-2">
-      <p className="text-xs text-white/45">Speakers already on the plan keep their mount when the setup above changes — switch them here.</p>
+      <p className="text-xs rc-ink-muted">Speakers already on the plan keep their mount when the setup above changes — switch them here.</p>
       {speakers.map((item, i) => {
         const label = refLabel("speaker", i);
         const current = item.mount ?? defaultMount;
         return (
-          <div key={item.id} className="flex items-center justify-between gap-3 text-xs font-medium text-white/70">
+          <div key={item.id} className="flex items-center justify-between gap-3 text-xs font-medium rc-ink-soft">
             <span>{label}</span>
-            <div role="radiogroup" aria-label={`${label} mount`} className="flex shrink-0 rounded-lg border border-white/[0.08] bg-white/[0.03] p-0.5">
+            <div role="radiogroup" aria-label={`${label} mount`} className="flex shrink-0 rounded-lg border rc-border rc-fill p-0.5">
               {SPEAKER_MOUNTS.map((mount) => (
                 <button
                   key={mount}
@@ -275,7 +275,7 @@ export function SpeakerMountSwitch({ speakers, defaultMount, onChange }) {
                   aria-checked={current === mount}
                   onClick={() => onChange(item.id, mount)}
                   className={`min-h-[28px] rounded-md px-3 text-xs font-semibold capitalize transition-[background-color,color] duration-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 ${
-                    current === mount ? "bg-blue-600 text-white" : "text-white/60 hover:bg-white/10 hover:text-white"
+                    current === mount ? "bg-blue-600 text-white" : "rc-ink-muted rc-fill-hover"
                   }`}
                 >
                   {mount}
@@ -302,11 +302,11 @@ function OptionChip({ label, sub, highlighted, onClick, className = "" }) {
       type="button"
       onClick={onClick}
       className={`flex min-h-[44px] flex-col items-center justify-center rounded-lg border px-1 py-1 leading-tight active:scale-[0.96] ${CHOICE_BASE} ${
-        highlighted ? "border-blue-500 bg-blue-500/10 text-cyan-100" : "border-white/[0.08] bg-white/[0.03] text-white/85 hover:border-blue-400/40 hover:bg-blue-500/10"
+        highlighted ? "border-blue-500 bg-blue-500/10 text-blue-700" : "rc-border rc-fill rc-ink hover:border-blue-400/40 hover:bg-blue-500/10"
       } ${className}`}
     >
       <span className="text-[13px] font-semibold tabular-nums">{label}</span>
-      {sub && <span className={`text-xs ${highlighted ? "font-semibold text-[color:var(--rc-accent)]" : "text-white/45"}`}>{sub}</span>}
+      {sub && <span className={`text-xs ${highlighted ? "font-semibold text-[color:var(--rc-accent)]" : "rc-ink-muted"}`}>{sub}</span>}
     </button>
   );
 }
@@ -332,12 +332,12 @@ function AllInOneChooser({ info, onChoose }) {
   );
   return (
     <>
-      <p className="mb-1 text-xs font-medium text-white/45">Built-in mic reach — from the model's datasheet, if you know it</p>
+      <p className="mb-1 text-xs font-medium rc-ink-muted">Built-in mic reach — from the model's datasheet, if you know it</p>
       <div role="radiogroup" aria-label="Built-in mic reach" className="grid grid-cols-6 gap-1">
         {reachChip(null, "Typical")}
         {ALL_IN_ONE_MIC_REACH_M.map((m) => reachChip(m, `${m} m`))}
       </div>
-      <p className="mb-1.5 mt-2 text-xs text-white/45">
+      <p className="mb-1.5 mt-2 text-xs rc-ink-muted">
         Pick a size — {info.allInOneSize}" suits this room's viewing distance. Seats beyond the mics' reach get extra microphones suggested.
       </p>
       <div className="grid grid-cols-5 gap-1">
@@ -365,7 +365,7 @@ function DeviceChooser({ category, info, onChoose }) {
     const ultra = info.preferUltraWide;
     return (
       <>
-        <p className="mb-1.5 text-xs text-white/45">
+        <p className="mb-1.5 text-xs rc-ink-muted">
           Pick a size — {ultra ? `a ${info.ultraWideSize}" ultra-wide` : `${info.displaySize}"`} suits this room's viewing distance.
         </p>
         <div className="grid grid-cols-5 gap-1">
@@ -374,7 +374,7 @@ function DeviceChooser({ category, info, onChoose }) {
             return <OptionChip key={size} label={`${size}"`} sub={best ? "Best fit" : size >= LED_WALL_MIN_SIZE ? "LED wall" : null} highlighted={best} onClick={() => choose({ sizeInches: size })} />;
           })}
         </div>
-        <p className="mb-1 mt-2 text-xs font-medium text-white/45">Ultra-wide 21:9 — for front-row rooms</p>
+        <p className="mb-1 mt-2 text-xs font-medium rc-ink-muted">Ultra-wide 21:9 — for front-row rooms</p>
         <div className="grid grid-cols-5 gap-1">
           {ULTRAWIDE_DISPLAY_SIZES.map((size) => {
             const best = ultra && size === info.ultraWideSize;
@@ -395,7 +395,7 @@ function DeviceChooser({ category, info, onChoose }) {
   if (category === "camera" || category === "videoBar") {
     return (
       <>
-        <p className="mb-1.5 text-xs text-white/45">
+        <p className="mb-1.5 text-xs rc-ink-muted">
           {category === "camera" ? "Pick a front-of-room lens, or a 360° camera for the table." : "Pick the video bar's field of view."}
         </p>
         <div className="grid grid-cols-6 gap-1">
@@ -411,8 +411,8 @@ function DeviceChooser({ category, info, onChoose }) {
           >
             <Radar className="h-4 w-4 shrink-0 text-[color:var(--rc-accent)]" />
             <span className="min-w-0">
-              <span className="block text-[13px] font-semibold text-white/85">360° camera</span>
-              <span className="block text-xs leading-snug text-white/45">
+              <span className="block text-[13px] font-semibold rc-ink">360° camera</span>
+              <span className="block text-xs leading-snug rc-ink-muted">
                 Middle of the table · built-in mics (~{TABLE_CAM_MIC_RANGE_M}m), no speaker · needs a video bar or all-in-one
               </span>
             </span>
@@ -430,14 +430,14 @@ function DeviceChooser({ category, info, onChoose }) {
       >
         <Glyph className="h-4 w-4 shrink-0 text-[color:var(--rc-accent)]" />
         <span className="min-w-0">
-          <span className="block text-[13px] font-semibold text-white/85">{title}</span>
-          <span className="block text-xs leading-snug text-white/45">{description}</span>
+          <span className="block text-[13px] font-semibold rc-ink">{title}</span>
+          <span className="block text-xs leading-snug rc-ink-muted">{description}</span>
         </span>
       </button>
     );
     return (
       <>
-        <p className="mb-1.5 text-xs text-white/45">How is the panel outside the door powered and connected?</p>
+        <p className="mb-1.5 text-xs rc-ink-muted">How is the panel outside the door powered and connected?</p>
         <div className="flex flex-col gap-1">
           {option("Wireless", "ROOMZ wireless room display — battery powered, no cabling to the door", { wired: false }, Wifi)}
           {option("Wired", "Generic room display — power and network cable dropped from the ceiling", { wired: true }, Cable)}
@@ -450,7 +450,7 @@ function DeviceChooser({ category, info, onChoose }) {
   const counts = [...new Set([...QUICK_COUNTS, suggested])].sort((x, y) => x - y);
   return (
     <>
-      <p className="mb-1.5 text-xs text-white/45">
+      <p className="mb-1.5 text-xs rc-ink-muted">
         How many? {suggested} suit{suggested === 1 ? "s" : ""} this room — they spread out evenly.
       </p>
       <div className="flex flex-wrap gap-1">
@@ -481,14 +481,14 @@ function DeviceRow({ category, count, onAdd, onRemove, choosing, onChoose, onClo
         <div className="flex min-w-0 items-center gap-3">
           <span
             className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] transition-colors duration-200 ${
-              count ? "bg-blue-600 text-white" : "bg-white/[0.05] text-white/45"
+              count ? "bg-blue-600 text-white" : "rc-fill rc-ink-muted"
             }`}
           >
             <Icon className="h-4 w-4" />
           </span>
           <span className="min-w-0">
-            <span className="block text-sm font-semibold text-white/85">{label}</span>
-            <span className="line-clamp-2 block text-xs leading-snug text-white/45">{DEVICE_DESCRIPTIONS[category]}</span>
+            <span className="block text-sm font-semibold rc-ink">{label}</span>
+            <span className="line-clamp-2 block text-xs leading-snug rc-ink-muted">{DEVICE_DESCRIPTIONS[category]}</span>
           </span>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
@@ -497,18 +497,18 @@ function DeviceRow({ category, count, onAdd, onRemove, choosing, onChoose, onClo
             aria-label={`Remove ${label}`}
             onClick={() => onRemove(category)}
             disabled={count === 0}
-            className="flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.08] text-white/45 transition-[background-color,transform] duration-100 hover:bg-white/[0.05] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:opacity-30 disabled:active:scale-100 active:scale-90 active:bg-white/10"
+            className="flex h-8 w-8 items-center justify-center rounded-full border rc-border rc-ink-muted transition-[background-color,transform] duration-100 rc-fill-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:opacity-30 disabled:active:scale-100 active:scale-90 active:rc-fill-strong"
           >
             <Minus className="h-3.5 w-3.5" />
           </button>
-          <span aria-live="polite" className="w-6 text-center text-[15px] font-semibold tabular-nums text-white">{count}</span>
+          <span aria-live="polite" className="w-6 text-center text-[15px] font-semibold tabular-nums rc-ink">{count}</span>
           <button
             type="button"
             aria-label={choosing ? `Close ${label} options` : `Add ${label}`}
             aria-expanded={hasChooser ? choosing : undefined}
             onClick={() => onAdd(category)}
             className={`flex h-8 w-8 items-center justify-center rounded-full transition-[background-color,color,transform] duration-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 active:scale-90 ${
-              choosing ? "bg-white/10 text-white/70 hover:bg-white/15" : "bg-blue-500/10 text-cyan-300 hover:bg-blue-500/15 active:bg-blue-500/25"
+              choosing ? "rc-fill-strong rc-ink-soft rc-fill-hover" : "bg-blue-500/10 text-blue-600 hover:bg-blue-500/15 active:bg-blue-500/25"
             }`}
           >
             {/* The plus turns into a close cross while the options are open. */}
@@ -541,7 +541,7 @@ function DeviceRow({ category, count, onAdd, onRemove, choosing, onChoose, onClo
 // selected (or most recently added) one.
 export function DeviceList({ categories, devices, onAddDevice, onRemoveDevice, chooser, onChoose, onCloseChooser, chooserInfo }) {
   return (
-    <ul className="-my-2 divide-y divide-white/[0.07]">
+    <ul className="-my-2 divide-y rc-divide">
       {categories.map((cat) => (
         <DeviceRow
           key={cat}
@@ -575,18 +575,18 @@ export function CameraFeaturePicker({ cameraFeatures, onToggleCameraFeature }) {
             title={feature.description}
             className={`relative flex flex-col gap-1.5 rounded-xl border p-1.5 text-left active:scale-[0.98] ${CHOICE_BASE} ${active ? CHOICE_ON : CHOICE_OFF}`}
           >
-            <div className="h-12 w-full overflow-hidden rounded-lg border border-white/[0.06] bg-white/[0.03]">
+            <div className="h-12 w-full overflow-hidden rounded-lg border rc-border rc-fill">
               <Illustration />
             </div>
             <span
               aria-hidden="true"
               className={`absolute right-2.5 top-2.5 flex h-4 w-4 items-center justify-center rounded-full border shadow-sm transition-colors ${
-                active ? "border-blue-500 bg-blue-600 text-white" : "border-white/15 bg-[color:var(--rc-panel-glass)]"
+                active ? "border-blue-500 bg-blue-600 text-white" : "rc-border bg-[color:var(--rc-panel-glass)]"
               }`}
             >
               {active && <Check className="h-2.5 w-2.5" strokeWidth={3.5} />}
             </span>
-            <span className={`px-0.5 text-xs font-semibold leading-tight ${active ? "text-cyan-100" : "text-white/85"}`}>{feature.label}</span>
+            <span className={`px-0.5 text-xs font-semibold leading-tight ${active ? "text-blue-700" : "rc-ink"}`}>{feature.label}</span>
           </button>
         );
       })}
@@ -604,9 +604,9 @@ export function NotesField({ value, onChange }) {
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="Cable routes, power points, furniture staying in the room, access times…"
-        className="w-full resize-y rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2.5 text-sm leading-relaxed text-white/85 shadow-sm outline-none transition-[border-color,box-shadow] placeholder:text-white/35 focus:border-blue-400/60 focus:ring-2 focus:ring-blue-500/20"
+        className="w-full resize-y rounded-lg border rc-border rc-fill px-3 py-2.5 text-sm leading-relaxed rc-ink shadow-sm outline-none transition-[border-color,box-shadow] placeholder:rc-ink-muted focus:border-blue-400/60 focus:ring-2 focus:ring-blue-500/20"
       />
-      <span className="text-xs text-white/45">Included in the PDF report.</span>
+      <span className="text-xs rc-ink-muted">Included in the PDF report.</span>
     </div>
   );
 }
@@ -625,11 +625,11 @@ export function BuiltInMicNote({ coverage, camReach = TABLE_CAM_MIC_RANGE_M, rea
     coverage.allInOnes && reaches.length > 0 && `the all-in-one display (~${+Math.max(...reaches).toFixed(2)}m)`,
   ].filter(Boolean);
   return (
-    <div className="flex items-start gap-2 rounded-xl bg-blue-500/10 px-2.5 py-2 text-xs leading-snug text-white/70">
+    <div className="flex items-start gap-2 rounded-xl bg-blue-500/10 px-2.5 py-2 text-xs leading-snug rc-ink-soft">
       <Radar aria-hidden="true" className="mt-px h-3.5 w-3.5 shrink-0 text-[color:var(--rc-accent)]" />
       <p>
         Built-in mics in {from.join(" and ")} reach{" "}
-        <span className="font-semibold text-white">
+        <span className="font-semibold rc-ink">
           {coverage.micCovered} of {coverage.seats}
         </span>{" "}
         seats.
@@ -644,11 +644,11 @@ export function MicCoverageNote({ coverage, audioPreference }) {
   if (!coverage.dedicated || !coverage.seats) return null;
   const all = coverage.heard === coverage.seats;
   return (
-    <div className={`flex items-start gap-2 rounded-xl px-2.5 py-2 text-xs leading-snug text-white/70 ${all ? "bg-emerald-500/10" : "bg-amber-400/10"}`}>
+    <div className={`flex items-start gap-2 rounded-xl px-2.5 py-2 text-xs leading-snug rc-ink-soft ${all ? "bg-emerald-500/10" : "bg-amber-400/10"}`}>
       <Radar aria-hidden="true" className={`mt-px h-3.5 w-3.5 shrink-0 ${all ? "text-emerald-300" : "text-amber-300"}`} />
       <p>
         Microphones pick up{" "}
-        <span className="font-semibold text-white">
+        <span className="font-semibold rc-ink">
           {coverage.heard} of {coverage.seats}
         </span>{" "}
         {/* `reach` is the figure the plan draws: the room-wide range if there is one, else

@@ -22,7 +22,7 @@ export const detailsValid = (audience, details) => FIELDS[audience].every((f) =>
 function TextField({ id, label, value, onChange, onBlur, placeholder, error, inputRef, autoComplete = "off" }) {
   return (
     <div className="flex flex-col gap-1">
-      <label htmlFor={id} className="text-xs font-medium text-white/60">
+      <label htmlFor={id} className="text-xs font-medium rc-ink-muted">
         {label} <span className="text-[color:var(--rc-accent)]">*</span>
       </label>
       <input
@@ -36,8 +36,8 @@ function TextField({ id, label, value, onChange, onBlur, placeholder, error, inp
         placeholder={placeholder}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? `${id}-error` : undefined}
-        className={`h-10 w-full rounded-lg border bg-white/[0.03] px-3 text-sm text-white/85 shadow-sm outline-none transition-[border-color,box-shadow] placeholder:text-white/35 focus:ring-2 ${
-          error ? "border-red-400/50 focus:border-red-400/60 focus:ring-red-500/20" : "border-white/[0.08] focus:border-blue-400/60 focus:ring-blue-500/20"
+        className={`h-10 w-full rounded-lg border rc-fill px-3 text-sm rc-ink shadow-sm outline-none transition-[border-color,box-shadow] placeholder:rc-ink-muted focus:ring-2 ${
+          error ? "border-red-400/50 focus:border-red-400/60 focus:ring-red-500/20" : "rc-border focus:border-blue-400/60 focus:ring-blue-500/20"
         }`}
       />
       {error && (
