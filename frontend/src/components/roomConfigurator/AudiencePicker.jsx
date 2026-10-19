@@ -6,7 +6,9 @@ const ICONS = { customer: Building2, reseller: Briefcase };
 // Where Room Planner starts: who's planning the room decides which steps follow and
 // what the report holds. Shown in the same kind of card as the steps, the two paths side
 // by side where there's room.
-export function AudiencePicker({ audience, onChoose }) {
+// `stacked` keeps the two paths one above the other: the intro hero puts this in a
+// narrow right-hand rail, where the side-by-side grid would squeeze both cards.
+export function AudiencePicker({ audience, onChoose, stacked = false }) {
   return (
     <section
       aria-labelledby="rc-start-title"
@@ -19,7 +21,11 @@ export function AudiencePicker({ audience, onChoose }) {
         </h2>
         <p className="mt-1 text-[13px] leading-snug rc-ink-muted">Pick the path that fits you — you can switch at any time.</p>
       </header>
-      <div role="radiogroup" aria-labelledby="rc-start-title" className="flex flex-col gap-2.5 px-5 pb-5 pt-4 md:grid md:grid-cols-2">
+      <div
+        role="radiogroup"
+        aria-labelledby="rc-start-title"
+        className={`flex flex-col gap-2.5 px-5 pb-5 pt-4 ${stacked ? "" : "md:grid md:grid-cols-2"}`}
+      >
         {Object.entries(AUDIENCES).map(([id, a]) => {
           const Icon = ICONS[id];
           const active = audience === id;

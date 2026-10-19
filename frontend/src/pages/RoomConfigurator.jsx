@@ -1,5 +1,4 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
-import { ResponsiveImage } from "../components/ResponsiveImage";
 import { siteImages } from "../data/siteImages";
 import { Link } from "react-router-dom";
 import { Box, FileDown, Info, Loader2, Map as MapIcon } from "lucide-react";
@@ -29,7 +28,7 @@ import { RecommendationList, ReadinessCard } from "../components/roomConfigurato
 import { ReviewSummary, UncheckedSections } from "../components/roomConfigurator/ReviewSummary";
 import { RoomPhotos } from "../components/roomConfigurator/RoomPhotos";
 import { DetailsForm, detailsValid } from "../components/roomConfigurator/DetailsForm";
-import { AudiencePicker } from "../components/roomConfigurator/AudiencePicker";
+import { PlannerIntroHero } from "../components/roomConfigurator/PlannerIntroHero";
 import { TemplatePicker } from "../components/roomConfigurator/TemplatePicker";
 import { AUDIENCES, STEPS_BY_AUDIENCE, RECOMMENDATION_STEP } from "../components/roomConfigurator/workflowSteps";
 import { exportRoomConfigPdf } from "../lib/exportRoomConfigPdf";
@@ -120,6 +119,16 @@ const INTRO_POINTS = [
   "Produce a document ready to share with the customer and your technical team or distributor, so they can prepare a BOQ quickly",
   "Private by design: nothing you enter is sent anywhere. Your draft stays in this browser until you start over, and the PDF is built right here",
 ];
+
+// The landing hero shows three of the points above plus the privacy one, not all five:
+// the page has to fit one screen, and five bullets beside the Get Started cards pushes
+// the fold. These are references into INTRO_POINTS rather than copies, so the two cannot
+// drift. The only point the hero leaves out is INTRO_POINTS[1] ("Close the gap between
+// what the customer needs and what gets installed"), which restates the INTRO paragraph
+// the hero already prints above the visual — so nothing is actually lost. Add a point
+// here and the fit has to be re-measured.
+const HERO_HIGHLIGHTS = [INTRO_POINTS[0], INTRO_POINTS[3], INTRO_POINTS[2]];
+const HERO_PRIVACY_NOTE = INTRO_POINTS[4];
 
 function IntroText({ className = "" }) {
   return (
@@ -1394,15 +1403,16 @@ export const RoomConfigurator = ({ with3d = false }) => {
     // Desktop: the configurator is exactly one screen below the fixed site header (a
     // title bar with the stepper, then the plan and the step panel filling the rest),
     // so nothing needs a scroll. Below lg it flows as a normal page instead.
-    // The working planner is an app shell locked to one viewport, so the plan and
-    // the step panel fill the screen side by side. The start screen is an
-    // ordinary page — intro, path picker, 3D preview — and must scroll, so the
-    // height lock applies only once a path is chosen.
-    <div
-      className={`rc-theme rc-surface lg:flex lg:flex-col lg:pt-20 ${
-        steps ? "lg:h-dvh lg:min-h-[640px]" : "lg:min-h-dvh"
-      }`}
-    >
+    // Both states are an app shell locked to one viewport on desktop: the working
+    // planner fills the screen with the plan beside the step panel, and the landing
+    // state fills it with the hero beside Get Started, so the path a visitor has to
+    // pick is never below the fold.
+    //
+    // The lock has to be `h-dvh`, not `min-h-dvh`. A minimum only sets a floor, which
+    // leaves the height unresolved — and the hero's figure shrinks via `flex-1` plus
+    // `min-h-0`, which need a resolved height above them to shrink against. With only
+    // a floor the figure took its natural size and pushed the hero past the fold.
+    <div className="rc-theme rc-surface lg:flex lg:flex-col lg:pt-20 lg:h-dvh lg:min-h-[640px]">
       <SEO
         title="Room Planner"
         description="Plan a meeting room with Fidelis Logic's Room Planner: capture the room's design and requirements, cut repeat site visits, and share a BOQ-ready plan with your customer or technology partner."
@@ -1422,6 +1432,11 @@ export const RoomConfigurator = ({ with3d = false }) => {
             compact
             items={[{ name: "Solutions", href: "/solutions" }, { name: "Room Planner" }]}
           />
+          {/* Before a path is chosen the hero owns the heading, the 3D badge and the
+              introduction. This row is not rendered at all then — hiding it with a class
+              would leave a second <h1> in the document for assistive tech and crawlers,
+              even though nobody can see it. */}
+          {steps && (
           <div className="mt-3 flex items-center gap-1.5 lg:mt-0.5">
             <h1
               className={`text-[28px] font-semibold leading-[1.1] tracking-[-0.02em] rc-ink sm:text-[34px] ${
@@ -1460,9 +1475,10 @@ export const RoomConfigurator = ({ with3d = false }) => {
               </button>
             )}
           </div>
+          )}
           {/* Once a path is chosen the introduction moves into the info button, so the
-              steps start right below the title on a phone too. */}
-          {!steps && <IntroText className="mt-2.5 max-w-3xl text-[15px] leading-relaxed rc-ink-muted lg:text-sm" />}
+              steps start right below the title on a phone too. Before one is chosen it
+              lives in the hero, beside the visual. */}
         </div>
         {steps && <WorkflowStepper steps={steps} current={stepIndex} visited={visitedSteps} attention={attention} pending={pendingByStep} onSelect={goToStep} />}
       </div>
@@ -1471,7 +1487,7 @@ export const RoomConfigurator = ({ with3d = false }) => {
         <div
           className={`grid grid-cols-1 gap-6 lg:h-full ${
             !steps
-              ? "lg:mx-auto lg:max-w-[1120px] lg:content-start"
+              ? "lg:mx-auto lg:max-w-[1400px] lg:grid-rows-[minmax(0,1fr)]"
               : showPlan
               ? "lg:grid-cols-[minmax(0,1fr)_380px] lg:grid-rows-[minmax(0,1fr)] xl:grid-cols-[minmax(0,1fr)_400px] xl:gap-8"
               : "lg:mx-auto lg:max-w-[560px] lg:grid-rows-[minmax(0,1fr)]"
@@ -1535,27 +1551,14 @@ export const RoomConfigurator = ({ with3d = false }) => {
           )}
 
           {!steps ? (
-            <>
-              <AudiencePicker audience={audience} onChoose={chooseAudience} />
-              {/* What the visitor ends up with, before they commit to a path.
-                  Swap the image in data/siteImages.js (roomPlanner3d). */}
-              <figure className="rc-step-enter overflow-hidden rounded-3xl border rc-border rc-fill">
-                <ResponsiveImage
-                  basePath={siteImages.roomPlanner3d.base}
-                  widths={siteImages.roomPlanner3d.widths}
-                  sizes="(min-width: 1120px) 1120px, 100vw"
-                  width={siteImages.roomPlanner3d.width}
-                  height={siteImages.roomPlanner3d.height}
-                  alt={siteImages.roomPlanner3d.alt}
-                  className="block w-full h-auto"
-                  testId="room-planner-3d-preview"
-                />
-                <figcaption className="px-5 py-3.5 text-[13px] leading-relaxed rc-ink-muted">
-                  Where you'll end up: your room in 3D. Sit in any seat to check its view of the
-                  screen, then export everything as a PDF.
-                </figcaption>
-              </figure>
-            </>
+            <PlannerIntroHero
+              audience={audience}
+              onChoose={chooseAudience}
+              intro={INTRO}
+              highlights={HERO_HIGHLIGHTS}
+              privacyNote={HERO_PRIVACY_NOTE}
+              image={siteImages.roomPlanner3d}
+            />
           ) : (
             <StepPanel
               fitContent={!showPlan}
