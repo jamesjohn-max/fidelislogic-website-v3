@@ -1610,7 +1610,7 @@ export const RoomConfigurator = ({ with3d = false }) => {
           nothing selected, that the report's diagram is taken from. */}
       {exporting && (
         <div aria-hidden="true" inert className="pointer-events-none fixed -left-[10000px] top-0 w-[1000px]">
-          <RoomCanvas {...canvasProps} theme="print" selection={null} onSelect={() => {}} diagramRef={diagramRef} />
+          <RoomCanvas {...canvasProps} theme="print" selection={null} coverageMode="all" onSelect={() => {}} diagramRef={diagramRef} />
         </div>
       )}
     </div>
