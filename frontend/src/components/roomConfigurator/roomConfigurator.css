@@ -19,6 +19,14 @@
      contrast for anything it needs to carry, and blue is what the site's own controls
      use. Cyan survives where it belongs: on the dark stage, see --rc-stage-accent. */
   --rc-accent: #2563eb;
+  /* The accent again, at a step that is safe to set TEXT in. fidelis-blue is 4.57:1 on
+     the panel — over AA, but 4.21:1 once a second rc-fill sits under it (a highlighted
+     chip), which is under. blue-700 is 5.92:1 and 5.46:1 there. Kept as its own token
+     rather than darkening --rc-accent, so the brand value above stays the one
+     tailwind.config.js defines, and rather than hardcoding blue-700 at the call site,
+     which would be 2.79:1 on a stage — worse than what it replaces. .rc-stage flips it
+     to cyan-300 (12.92:1), so accent text is correct on the dark surfaces too. */
+  --rc-accent-ink: #1d4ed8;
   --rc-line: rgb(15 23 42 / 0.10);
   /* A line that has to be felt rather than just seen: the hover state of a bordered
      control, where the resting line is deliberately faint. */
@@ -91,6 +99,7 @@
   --rc-line: var(--rc-stage-line);
   --rc-line-strong: rgb(255 255 255 / 0.2);
   --rc-accent: var(--rc-stage-accent);
+  --rc-accent-ink: #67e8f9; /* cyan-300: 12.92:1 on the stage */
   --rc-warn: #fcd34d;   /* amber-300 */
   --rc-ok: #6ee7b7;     /* emerald-300 */
   --rc-danger: #fca5a5; /* red-300 */
@@ -110,6 +119,7 @@
 .group:hover .rc-ink-group-hover { color: var(--rc-ink); }
 .rc-ink-soft { color: var(--rc-ink-soft); }
 .rc-ink-muted { color: var(--rc-ink-muted); }
+.rc-accent-ink { color: var(--rc-accent-ink); }
 .rc-warn { color: var(--rc-warn); }
 .rc-ok { color: var(--rc-ok); }
 .rc-danger { color: var(--rc-danger); }

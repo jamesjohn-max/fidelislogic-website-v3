@@ -306,7 +306,7 @@ function OptionChip({ label, sub, highlighted, onClick, className = "" }) {
       } ${className}`}
     >
       <span className="text-[13px] font-semibold tabular-nums">{label}</span>
-      {sub && <span className={`text-xs ${highlighted ? "font-semibold text-[color:var(--rc-accent)]" : "rc-ink-muted"}`}>{sub}</span>}
+      {sub && <span className={`text-xs ${highlighted ? "font-semibold rc-accent-ink" : "rc-ink-muted"}`}>{sub}</span>}
     </button>
   );
 }

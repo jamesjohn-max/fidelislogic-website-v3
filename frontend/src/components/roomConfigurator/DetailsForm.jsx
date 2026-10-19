@@ -23,7 +23,7 @@ function TextField({ id, label, value, onChange, onBlur, placeholder, error, inp
   return (
     <div className="flex flex-col gap-1">
       <label htmlFor={id} className="text-xs font-medium rc-ink-muted">
-        {label} <span className="text-[color:var(--rc-accent)]">*</span>
+        {label} <span className="rc-accent-ink">*</span>
       </label>
       <input
         ref={inputRef}
