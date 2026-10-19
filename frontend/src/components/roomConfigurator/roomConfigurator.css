@@ -39,10 +39,18 @@
   --rc-stage-line: rgb(255 255 255 / 0.08);
   --rc-stage-accent: #22d3ee;
 
-  /* Ink. Three steps, so a component picks a role rather than an opacity. */
+  /* Ink. Three steps, so a component picks a role rather than an opacity.
+     Measured against the surface these actually sit on, which is NOT white: the step
+     panel carries an rc-fill of its own, so muted ink composites over #EFF1F4 (and
+     #E6E8EC on a chip that stacks a second fill). slate-500 passed on white at 4.76:1
+     and failed there at 4.21:1 — the gap between those two numbers is what an audit of
+     the white page intro could not see. slate-600 holds 6.7:1 on the panel and 6.18:1
+     on the chip. It sits closer to --rc-ink-soft than slate-500 did, but the two stay a
+     visible step apart (dE 8.6); if a future change narrows that, re-space soft rather
+     than lifting muted back over the line. .rc-stage overrides all three below. */
   --rc-ink: #0f172a;
   --rc-ink-soft: #334155;
-  --rc-ink-muted: #64748b;
+  --rc-ink-muted: #475569;
 
   /* shadcn's tokens, in the planner's colours (h s l, as the site's theme writes them). */
   --background: 0 0% 100%;

@@ -1228,7 +1228,7 @@ export function RoomCanvas({
                           {selection.category === "table" ? ": drag or use the arrow keys to move it" : ""}
                           {selection.category === "tablePod" ? `: drag to move, ${turnHint}, resize under Seating` : ""}
                           {selectedPosition && (
-                            <span className="font-normal text-blue-600"> at {selectedPosition.x.toFixed(2)}m, {selectedPosition.y.toFixed(2)}m</span>
+                            <span className="font-normal text-blue-700"> at {selectedPosition.x.toFixed(2)}m, {selectedPosition.y.toFixed(2)}m</span>
                           )}
                         </span>
                         <div className="flex items-center gap-1">
