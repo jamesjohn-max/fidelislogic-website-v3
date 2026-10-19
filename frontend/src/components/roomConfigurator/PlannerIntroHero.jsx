@@ -43,18 +43,15 @@ export function PlannerIntroHero({ audience, onChoose, intro, highlights, privac
         />
 
         <div className="relative">
-          <h1>
-            <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-[color:var(--rc-accent)]/30 bg-[color:var(--rc-accent)]/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-[color:var(--rc-accent)]">
-              Room Planner 3D · Free tool
-            </span>
-            {/* The cap goes on the headline, not the <h1>: on the <h1> it also squeezed
-                the pill above into a column. 20ch holds it to two lines here. */}
-            <span className="mt-3.5 block max-w-[20ch] text-[32px] font-semibold leading-[1.07] tracking-[-0.02em] rc-ink xl:text-[38px]">
-              Plan the room{" "}
-              <span className="text-[color:var(--rc-accent)]">before</span> you quote it.
-            </span>
+          {/* No kicker above the heading. One sat here reading "Room Planner 3D · Free
+              tool", which repeated the breadcrumb immediately above it — the heading
+              carries its own weight. The "free, no sign-up" signal moved into the Get
+              Started rail, where it informs a decision instead of decorating a title. */}
+          <h1 className="rc-display max-w-[19ch] rc-ink">
+            Plan the room <span className="text-[color:var(--rc-accent)]">before</span> you
+            quote it.
           </h1>
-          <p className="mt-3 max-w-[46ch] text-sm leading-relaxed rc-ink-soft">{intro}</p>
+          <p className="rc-body mt-4 max-w-[58ch] rc-ink-soft">{intro}</p>
         </div>
 
         <figure className="relative mt-5 flex min-h-0 flex-1 overflow-hidden rounded-2xl border rc-border shadow-[0_24px_60px_-20px_rgba(0,0,0,0.7)]">
@@ -72,7 +69,7 @@ export function PlannerIntroHero({ audience, onChoose, intro, highlights, privac
             loading="eager"
             fetchPriority="high"
           />
-          <figcaption className="absolute bottom-3 left-3 flex items-center gap-2 rounded-lg border rc-border bg-[color:var(--rc-panel-bar)] px-2.5 py-1.5 text-[11px] font-semibold rc-ink-soft backdrop-blur-md">
+          <figcaption className="rc-support absolute bottom-3 left-3 flex items-center gap-2 rounded-lg border rc-border bg-[color:var(--rc-panel-bar)] px-2.5 py-1.5 font-medium rc-ink-soft backdrop-blur-md">
             <Play aria-hidden="true" className="h-3 w-3 fill-current" />
             Your room in 3D — sit in any seat, then export the PDF
           </figcaption>
@@ -82,9 +79,9 @@ export function PlannerIntroHero({ audience, onChoose, intro, highlights, privac
       {/* Right: the rail. Get Started sits here so it is the nearest thing to the
           visitor's cursor, which is what the layout exists for. */}
       <div className="flex min-h-0 flex-col justify-center gap-4">
-        <ul className="rc-step-enter flex flex-col gap-2.5">
+        <ul className="rc-step-enter flex flex-col gap-3">
           {highlights.map((point) => (
-            <li key={point} className="flex gap-2.5 text-[13px] leading-snug rc-ink-soft">
+            <li key={point} className="rc-body flex gap-2.5 rc-ink-soft">
               <span
                 aria-hidden="true"
                 className="mt-px flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[color:var(--rc-accent)]/10 text-[color:var(--rc-accent-ink)]"
@@ -98,8 +95,8 @@ export function PlannerIntroHero({ audience, onChoose, intro, highlights, privac
 
         <AudiencePicker audience={audience} onChoose={onChoose} stacked />
 
-        <p className="rc-step-enter flex items-start gap-2 text-[12px] leading-snug rc-ink-muted">
-          <ShieldCheck aria-hidden="true" className="mt-px h-3.5 w-3.5 shrink-0 text-emerald-700" />
+        <p className="rc-support rc-step-enter flex items-start gap-2 rc-ink-muted">
+          <ShieldCheck aria-hidden="true" className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-700" />
           {privacyNote}
         </p>
       </div>

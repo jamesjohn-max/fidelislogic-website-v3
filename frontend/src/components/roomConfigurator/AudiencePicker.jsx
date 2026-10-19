@@ -15,11 +15,15 @@ export function AudiencePicker({ audience, onChoose, stacked = false }) {
       className="rc-step-enter flex flex-col rounded-3xl border rc-border rc-fill shadow-sm lg:max-h-full lg:min-h-0 lg:self-start lg:overflow-y-auto"
     >
       <header className="px-5 pt-5">
-        <p className="section-label">Get started</p>
-        <h2 id="rc-start-title" className="mt-0.5 text-lg font-semibold leading-tight tracking-[-0.01em] rc-ink">
+        <p className="rc-label text-[color:var(--rc-accent-ink)]">Get started</p>
+        <h2 id="rc-start-title" className="rc-title mt-1.5 rc-ink">
           Who's planning this room?
         </h2>
-        <p className="mt-1 text-[13px] leading-snug rc-ink-muted">Pick the path that fits you — you can switch at any time.</p>
+        {/* Carries the "free, no sign-up" signal the deleted kicker used to hold. Here it
+            answers the question a visitor actually has at the moment they choose. */}
+        <p className="rc-body mt-1.5 rc-ink-muted">
+          Free, no sign-up. Pick the path that fits you — you can switch at any time.
+        </p>
       </header>
       <div
         role="radiogroup"
@@ -46,9 +50,9 @@ export function AudiencePicker({ audience, onChoose, stacked = false }) {
                 <Icon className="h-5 w-5" />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block text-xs font-semibold uppercase tracking-wide text-blue-600">{a.label}</span>
-                <span className="mt-0.5 block text-[15px] font-semibold leading-snug rc-ink">{a.title}</span>
-                <span className="mt-1 block text-[13px] leading-relaxed rc-ink-muted">{a.description}</span>
+                <span className="rc-label block text-[color:var(--rc-accent-ink)]">{a.label}</span>
+                <span className="rc-subtitle mt-1 block rc-ink">{a.title}</span>
+                <span className="rc-body mt-1.5 block rc-ink-muted">{a.description}</span>
               </span>
               <ArrowRight
                 aria-hidden="true"
