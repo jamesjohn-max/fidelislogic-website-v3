@@ -13,7 +13,8 @@
 ## Global Constraints
 
 - **No new dependency.**
-- **No `DRAFT_VERSION` bump.** `seatsPerDesk: null` and `desks: null` must reproduce today's layout exactly, so saved drafts and shared links keep resolving.
+- **No `DRAFT_VERSION` bump.** Both new fields are additive, so old drafts and shared links still load.
+- **Pixel-identical output is NOT required.** The user has accepted that a classroom room in an existing shared link may render slightly differently, so the new packing may distribute a row's seats differently from `balancedSplit`. What is still required: an old plan **loads and renders without throwing**, and a planner's own in-progress draft is never lost mid-session. A link showing a slightly different room is fine; one that errors is not.
 - **Classroom only.** Theater shares `rowSeatingLayout` and must keep `THEATER_LAYOUT.blockSeats`. No other layout changes behaviour.
 - **Desks flow; they are not absolutely positioned.** `dx`/`dy` displace a desk from the position row-flow gives it.
 - **A desk's seat count is capped by physics, not policy** — `rowCapacity(room, sp).seatsPerRow`, which is what actually fits across the room.
@@ -150,16 +151,17 @@ it("still lays out desks that no longer fit the room, without overlapping", () =
   // the walls, and no two desks in a row overlapping on x.
 });
 
-// Spec §11.1 — the test that protects every saved draft and shared link.
-it("reproduces today's classroom layout for a plan with both fields null", () => {
-  // Capture the PRE-change output of generateLayout("classroom", ...) with
-  // chairCount 12 and record it, exactly as the audio-coverage work did: run this
-  // against unmodified code FIRST and assert the recorded values. It must pass
-  // before any edit to classroomLayout.
+// Spec §11.1 — a shape guard, not a pixel guard. The user has accepted that an
+// existing shared link may render slightly differently, so this deliberately does
+// NOT assert coordinates: the new packing distributes a row's seats differently
+// from balancedSplit at the edges, and that is allowed. It still catches a rewrite
+// that produces an overlapping, empty or out-of-bounds room.
+it("still produces a sane classroom for a plan with both fields null", () => {
   const { chairs, tableShape } = generateLayout("classroom", room, table, 12, {}, "standard");
   expect(chairs).toHaveLength(12);
   expect(tableShape.type).toBe("desks");
-  // plus the recorded desk count and the first desk's x/y/w to 10 decimal places
+  expect(tableShape.desks.length).toBeGreaterThan(0);
+  // every desk within the walls, and no two desks in the same row overlapping on x
 });
 
 // Spec §11.8 — Theater shares rowSeatingLayout and must not move.
@@ -170,11 +172,13 @@ it("leaves theater seating unchanged by seatsPerDesk", () => {
 });
 ```
 
-- [ ] **Step 2: Capture the regression baseline before touching the generator**
+- [ ] **Step 2: Run the shape guard against the generator before touching it**
 
-Run the "reproduces today's classroom layout" test against **unmodified** code and record the values it prints into the assertions. It must PASS before any edit. If it passes only after your changes, it is not a guard — it is a description of whatever you happened to build.
+Run the "still produces a sane classroom" test against **unmodified** code. It must PASS before any edit — a guard that only passes after your changes is a description of whatever you happened to build, not a guard.
 
-Run: `cd frontend && npx craco test --watchAll=false src/lib/roomConfiguratorEngine.test.js -t "reproduces today"`
+It asserts shape, not coordinates: the user has accepted that an existing shared link may render slightly differently, so the new packing is allowed to distribute a row's seats differently from `balancedSplit`. Do **not** tighten this into a coordinate snapshot — that would fail on a legitimate change and tell you nothing about correctness.
+
+Run: `cd frontend && npx craco test --watchAll=false src/lib/roomConfiguratorEngine.test.js -t "sane classroom"`
 Expected: PASS, before any edit to `classroomLayout`.
 
 - [ ] **Step 3: Run the rest of the tests to verify they fail**

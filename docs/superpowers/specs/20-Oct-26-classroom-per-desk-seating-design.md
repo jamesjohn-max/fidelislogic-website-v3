@@ -105,7 +105,8 @@ splices the list, add pushes onto it, and each desk carries its own seat count a
 offset. `id` is a stable generated string so React keys and canvas selection survive a
 reorder.
 
-`null` for either field means "derive", which reproduces today's layout exactly (§9).
+`null` for either field means "derive" — the behaviour a plan has today, though not
+guaranteed to the pixel (§9).
 
 ### 5.2 Position comes from flow, offsets are deviations
 
@@ -233,22 +234,31 @@ for Classroom and `chairCount` everywhere else.
 
 ## 9. Migration and compatibility
 
-A saved plan has neither `seatsPerDesk` nor `desks`. Both `null` must reproduce today's
-layout exactly:
+A saved plan has neither `seatsPerDesk` nor `desks`. Both `null` mean "derive":
 
 - `seatsPerDesk ?? CLASSROOM_LAYOUT.blockSeats` is the existing constant, 6.
-- `desks === null` derives the list from the setup headcount, which is what the
-  generator already does implicitly today.
+- `desks === null` derives the list from the setup headcount.
 
-So no `DRAFT_VERSION` bump, and existing drafts and shared links keep resolving. Proved
-by a regression test (§11), not by inspection.
+No `DRAFT_VERSION` bump — both fields are additive, so old drafts and shared links
+still load.
 
-**The list materialises on first edit, not on load.** A plan stays on `desks: null` —
-and so keeps following its headcount — until the planner adds, deletes, moves or
-re-seats a desk. At that moment the derived list is written to state and becomes the
-truth. This keeps the common case (set a headcount, never touch a desk) behaving exactly
-as it does now, and means the setup headcount is not quietly demoted for people who
-never use the feature.
+**Pixel-identical output is explicitly not required.** The user has accepted that a
+classroom layout in an existing shared link may render slightly differently after this
+change. That matters because the new row packing distributes seats differently from the
+old one at the edges: today `balancedSplit` spreads a row's seats evenly with the front
+rows taking any remainder, while packing desks until one will not fit produces a
+different tail. Reproducing the old distribution exactly would have been real work for
+no benefit anyone wanted.
+
+What is still required: an old plan must **load and render** without error, and a
+planner's own in-progress draft must not be lost mid-session. A link that renders a
+slightly different room is acceptable; one that throws is not.
+
+**The list materialises on first edit, not on load** — and this is a UX requirement, not
+a migration one. A plan stays on `desks: null`, and so keeps following its headcount,
+until the planner adds, deletes, moves or re-seats a desk. If the list materialised the
+moment Classroom was chosen, the headcount box would stop driving the layout before the
+planner had used it once.
 
 `desks` is **cleared when the layout type changes**, like the seating hand-edits the plan
 already clears (`seatEditsCleared`). A desk list is meaningless once the room is a
@@ -277,8 +287,11 @@ resetting a planner's hand-set desks — would lose work.
 
 New tests in `roomConfiguratorEngine.test.js`, matching the suite's existing idiom:
 
-1. **Regression guard** — a classroom plan with `seatsPerDesk: null` and `desks: null`
-   produces exactly today's desks and chairs. The test that protects every saved draft.
+1. **Shape guard** — a classroom plan with `seatsPerDesk: null` and `desks: null` still
+   produces a sane classroom: the requested number of chairs, `tableShape.type ===
+   "desks"`, every desk inside the walls, and no two desks in a row overlapping. It
+   deliberately does **not** assert exact coordinates — §9 released that — so it catches
+   a broken rewrite without failing on a legitimately different seat distribution.
 2. `seatsPerDesk: 3` with a 12-person target produces 4 desks of 3.
 3. A per-desk `seats` change affects only that desk, and the room total rises by the
    difference.
