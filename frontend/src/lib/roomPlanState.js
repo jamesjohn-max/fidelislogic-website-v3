@@ -285,7 +285,9 @@ const COALESCE_MS = 1200;
 // A plan (a restored draft, say) with more seats than its room's permitted occupancy
 // allows, brought down to that limit.
 export function fitOccupancy(plan) {
-  if (!plan.layout) return plan;
+  // A classroom's total is the sum of its desks' own seat counts, so there's nothing
+  // here to clamp — bringing chairCount down would only fight planSeatTotal.
+  if (!plan.layout || plan.layout === "classroom") return plan;
   const max = getChairLimits(plan.layout, plan.room, plan.table, plan.seatingDensity, plan.seatsPerDesk)[1];
   return plan.chairCount > max ? settle(plan, { ...plan, chairCount: max }) : plan;
 }

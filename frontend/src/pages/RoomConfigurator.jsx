@@ -80,6 +80,7 @@ import {
   defaultSpeakerMount,
   followMountedCameras,
   refLabel,
+  planSeatTotal,
 } from "../lib/roomConfiguratorEngine";
 
 // A customer's plan shows the room, its furniture, its doors and its screen, no other
@@ -755,7 +756,13 @@ export const RoomConfigurator = ({ with3d = false }) => {
     additionalNotes,
     seatingDensity,
     seats,
+    // The classroom's desk list and desk size: without them planSeatTotal can't see the
+    // per-desk seats and would quote the setup headcount instead.
+    desks,
+    seatsPerDesk,
   };
+  // What the advice and the device counts quote: the seats the plan actually carries.
+  const seatTotal = planSeatTotal(state);
 
   const handleExport = async ({ roomName, customerName, createdBy }) => {
     const customer = audience === "customer";
@@ -938,7 +945,7 @@ export const RoomConfigurator = ({ with3d = false }) => {
   // "add N microphones" count and the discs drawn on the plan come from one number.
   const micCover = { seats, seatArea: spreadContext.seats, table, tableOffset, micRange: audio.micRange, builtIn: builtInPickupsIn(state) };
   const suggestedMore = (category) =>
-    clamp(recommendedDeviceCount(category, layout, room, effectiveChairCount, camCoverage, audioPreference, category === "microphone" ? micCover : null) - devices[category].length, 1, 24);
+    clamp(recommendedDeviceCount(category, layout, room, seatTotal, camCoverage, audioPreference, category === "microphone" ? micCover : null) - devices[category].length, 1, 24);
   const deviceListProps = {
     devices,
     onAddDevice: handleAddDevice,

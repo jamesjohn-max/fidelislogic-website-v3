@@ -37,8 +37,9 @@ import {
   effectiveSeatsPerDesk,
   CLASSROOM_BLOCK_SEATS,
   maxSeatsPerDesk,
+  planSeatTotal,
 } from "./roomConfiguratorEngine";
-import { applyTemplate, initialPlan, settle } from "./roomPlanState";
+import { applyTemplate, fitOccupancy, initialPlan, settle } from "./roomPlanState";
 
 const EMPTY_DEVICES = {
   display: [{ id: "d1", x: 0, y: 2, sizeInches: 98 }],
@@ -994,5 +995,60 @@ describe("classroom rows packed from the desk list", () => {
     const a = generateLayout("theater", room, table, 20, {}, "standard");
     const b = generateLayout("theater", room, table, 20, {}, "standard", { seatsPerDesk: 2 });
     expect(b.chairs).toEqual(a.chairs);
+  });
+});
+
+// Spec §8.1 — the recommendation engine quotes the seats the desks actually carry, not
+// the headcount the room was set up with, and a classroom's total isn't clamped on load.
+describe("the derived classroom seat total", () => {
+  const room = { length: 12, width: 8, height: 2.8 };
+  const desksOf = (...seats) => seats.map((n, i) => ({ id: `desk-${i}`, seats: n, dx: 0, dy: 0, seatsSetByHand: true }));
+  const gridSeats = (n) => Array.from({ length: n }, (_, i) => ({ x: 1 + (i % 6), y: 1 + Math.floor(i / 6), angle: 0 }));
+  const classroomSoundbar = (headcount, desks) => ({
+    ...makeState({ seats: gridSeats(headcount), room }),
+    layout: "classroom",
+    audioPreference: SOUNDBAR_AUDIO,
+    desks,
+    seatsPerDesk: 6,
+  });
+
+  it("quotes the derived total in the advice, not the setup headcount", () => {
+    // 14 seats on the desks while chairCount still reads the old headcount of 8.
+    const recs = buildRecommendations(classroomSoundbar(8, desksOf(6, 6, 2)));
+    const speakers = recs.find((r) => r.id === "soundbar-speakers");
+    const mics = recs.find((r) => r.id === "soundbar-microphones");
+    expect(speakers.text).toContain("all 14 can hear");
+    expect(mics.text).toContain("all 14 are heard");
+    expect(speakers.text).not.toMatch(/\b8\b/);
+  });
+
+  it("reports the derived total for a materialised classroom plan", () => {
+    expect(planSeatTotal({ layout: "classroom", chairCount: 12, desks: desksOf(6, 6, 2) })).toBe(14);
+  });
+
+  it("reports chairCount for every other layout", () => {
+    expect(planSeatTotal({ layout: "rectangular", chairCount: 8, desks: desksOf(6, 6, 2) })).toBe(8);
+  });
+
+  // A plan saved before per-desk seating, or one hand-edited into nonsense, must still
+  // give a number: no desk list means "not materialised", and a bad desk is worth 0.
+  it("falls back to chairCount when the desk list isn't materialised", () => {
+    expect(planSeatTotal({ layout: "classroom", chairCount: 12, desks: null })).toBe(12);
+    expect(planSeatTotal({ layout: "classroom", chairCount: 12, desks: [] })).toBe(12);
+    expect(planSeatTotal({ layout: "classroom", chairCount: 12 })).toBe(12);
+    expect(planSeatTotal({ layout: "classroom", chairCount: 12, desks: [{ seats: 6 }, null, { seats: "x" }] })).toBe(6);
+  });
+
+  it("does not clamp a classroom plan's total, and still clamps a rectangular one", () => {
+    const base = initialPlan();
+    const small = { length: 4, width: 3, height: 2.8 };
+    const over = (layout) => {
+      const max = getChairLimits(layout, small, base.table, base.seatingDensity, base.seatsPerDesk)[1];
+      return { plan: { ...base, room: small, layout, chairCount: max + 6 }, max };
+    };
+    const classroom = over("classroom");
+    expect(fitOccupancy(classroom.plan).chairCount).toBe(classroom.max + 6);
+    const rectangular = over("rectangular");
+    expect(fitOccupancy(rectangular.plan).chairCount).toBe(rectangular.max);
   });
 });

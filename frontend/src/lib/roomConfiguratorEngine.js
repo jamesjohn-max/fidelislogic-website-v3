@@ -644,6 +644,16 @@ export function deriveDesks(headcount, seatsPerDesk) {
   }));
 }
 
+// The seats a plan actually carries: for a materialised classroom plan the sum of its
+// desks' own counts, otherwise the headcount the room was set up with. A null or empty
+// desk list means "derive from the headcount" (see deriveDesks), not an empty room, and
+// a desk hand-edited into nonsense by way of a saved plan counts as no seats.
+export function planSeatTotal(state) {
+  const desks = state.layout === "classroom" && Array.isArray(state.desks) ? state.desks : null;
+  if (!desks?.length) return state.chairCount;
+  return desks.reduce((n, d) => n + (Number.isFinite(d?.seats) ? d.seats : 0), 0);
+}
+
 // Theater: no more than 6 chairs side by side before an aisle, so people can move
 // around the room easily (blocks are split evenly — see rowBlocks), and a
 // cross-aisle every 10 rows.
@@ -2044,7 +2054,10 @@ export const CONFIGURATION_COMPLETE_NOTE = "Configuration looks complete — con
 // and "suggestion" for improvements; `addCategories` lists the devices whose "+"
 // would resolve it, so the panel can offer a one-click add.
 export function buildRecommendations(state) {
-  const { room, chairCount, layout, devices } = state;
+  const { room, layout, devices } = state;
+  // Every seat figure below is the plan's real total, resolved once: a classroom's desks
+  // each carry their own count, so the setup headcount can be out of date.
+  const chairCount = planSeatTotal(state);
   const recs = [];
   const add = (id, level, text, addCategories = []) => recs.push({ id, level, text, addCategories });
   // An all-in-one display is a screen, a camera, microphones and speakers in one.
