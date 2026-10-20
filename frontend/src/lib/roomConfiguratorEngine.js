@@ -843,6 +843,10 @@ function rowSeatingLayout(room, count, spacing) {
   return { chairs };
 }
 
+// The most seats one desk can carry: a single row's worth across the room. It takes no
+// table because the width terms of rowSpacing do not depend on the desk's depth.
+export const maxSeatsPerDesk = (room, density) => rowCapacity(room, rowSpacing("classroom", density)).seatsPerRow;
+
 // Packs the desk list into rows: desks are taken in order, each added to the row being
 // filled until the next one's width (its seats at the seat pitch, plus an aisle between
 // desks) would overrun the usable width, which starts a new row. A desk is never split,
@@ -850,13 +854,19 @@ function rowSeatingLayout(room, count, spacing) {
 // than the room still gets laid out — on a row of its own — rather than disappearing.
 // Rows sit on the same lines as before (firstRowLine / rowBandY), each centred on the
 // room's midline, so unequal desks read as one centred block.
+//
+// Each desk's seats are clamped to 1..maxSeatsPerDesk (a clamp, not a filter: a desk
+// must stay on the canvas to stay selectable), and its dx/dy offset from the flowed
+// position is clamped so the desk and its chairs stay inside the walls.
 export function classroomLayout(room, deskDepth, deskList, density) {
   const sp = rowSpacing("classroom", density, deskDepth);
   const usableW = Math.max(0, room.length - sp.marginX * 2);
+  const maxSeats = maxSeatsPerDesk(room, density);
   const deskW = (d) => d.seats * sp.seatPitch;
   const rows = [];
-  (deskList || []).forEach((d) => {
-    if (!(d.seats > 0)) return;
+  (deskList || []).forEach((src) => {
+    const seats = clamp(Number.isFinite(src.seats) ? Math.floor(src.seats) : 1, 1, maxSeats);
+    const d = { ...src, seats };
     const row = rows[rows.length - 1];
     const span = row ? row.span + sp.aisle + deskW(d) : 0;
     if (row && span <= usableW + 1e-6) {
@@ -873,10 +883,16 @@ export function classroomLayout(room, deskDepth, deskList, density) {
     const rowY = firstRowY + rowBandY(r, sp);
     let x = room.length / 2 - row.span / 2;
     row.desks.forEach((d) => {
-      const deskLocal = toLocal(x, rowY - DESK_GAP - deskDepth, room);
+      // The desk and its chairs move as one block. A flowed position already outside the
+      // room (desks that no longer fit) is left alone: the clamp only limits the offset.
+      const top = rowY - DESK_GAP - deskDepth, bottom = rowY + DESK_CHAIR_SETBACK + CHAIR_REACH;
+      const finite = (v) => (Number.isFinite(v) ? v : 0);
+      const ox = clamp(finite(d.dx), Math.min(0, -x), Math.max(0, room.length - (x + deskW(d))));
+      const oy = clamp(finite(d.dy), Math.min(0, -top), Math.max(0, room.width - bottom));
+      const deskLocal = toLocal(x + ox, top + oy, room);
       desks.push({ deskId: d.id, x: deskLocal.x, y: deskLocal.y, w: deskW(d), h: deskDepth });
       for (let s = 0; s < d.seats; s++) {
-        chairs.push({ ...toLocal(x + (s + 0.5) * sp.seatPitch, rowY + DESK_CHAIR_SETBACK, room), angle: 0, deskId: d.id });
+        chairs.push({ ...toLocal(x + ox + (s + 0.5) * sp.seatPitch, rowY + DESK_CHAIR_SETBACK + oy, room), angle: 0, deskId: d.id });
       }
       x += deskW(d) + sp.aisle;
     });

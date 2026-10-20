@@ -36,6 +36,7 @@ import {
   classroomLayout,
   effectiveSeatsPerDesk,
   CLASSROOM_BLOCK_SEATS,
+  maxSeatsPerDesk,
 } from "./roomConfiguratorEngine";
 import { applyTemplate, initialPlan, settle } from "./roomPlanState";
 
@@ -845,6 +846,75 @@ describe("classroom rows packed from the desk list", () => {
     const r = generateLayout("classroom", room, table, 12, {}, "standard", { desks: list, seatsPerDesk: 3 });
     expect(r.tableShape.desks.map((d) => d.deskId)).toEqual(["a", "b"]);
     expect(r.chairs).toHaveLength(6); // the list wins over the headcount
+  });
+
+  describe("per-desk seats and offsets", () => {
+    // 9 x 7 m, standard density: wide enough for several desks, deep enough that a
+    // single centred desk has slack to be moved in every direction.
+    it("changes only the desk whose seat count changed", () => {
+      const list = deriveDesks(12, 3);
+      const edited = list.map((d, i) => (i === 1 ? { ...d, seats: 5 } : d));
+      const { chairs } = classroomLayout(room, 0.5, edited, "standard");
+      expect(chairs).toHaveLength(14);
+      expect(chairs.filter((c) => c.deskId === edited[1].id)).toHaveLength(5);
+      expect(chairs.filter((c) => c.deskId === edited[0].id)).toHaveLength(3);
+    });
+
+    it("clamps a desk's seats to what fits across the room", () => {
+      const max = maxSeatsPerDesk(room, "standard");
+      const [d] = deriveDesks(3, 3);
+      const { chairs } = classroomLayout(room, 0.5, [{ ...d, seats: max + 5 }], "standard");
+      expect(chairs).toHaveLength(max);
+    });
+
+    // Review Focus 1 — a clamp, not a filter: the desk must stay on the canvas to be selectable.
+    it("clamps a desk to at least one seat", () => {
+      const [d] = deriveDesks(3, 3);
+      const { chairs, desks } = classroomLayout(room, 0.5, [{ ...d, seats: 0 }], "standard");
+      expect(chairs).toHaveLength(1);
+      expect(desks.map((x) => x.deskId)).toEqual([d.id]);
+    });
+
+    it("moves a desk and all of its chairs by the same vector", () => {
+      const [d] = deriveDesks(3, 3);
+      const base = classroomLayout(room, 0.5, [d], "standard");
+      const moved = classroomLayout(room, 0.5, [{ ...d, dx: 0.4, dy: 0.3 }], "standard");
+      expect(moved.desks[0].x - base.desks[0].x).toBeCloseTo(0.4, 6);
+      expect(moved.desks[0].y - base.desks[0].y).toBeCloseTo(0.3, 6);
+      expect(moved.chairs).toHaveLength(base.chairs.length);
+      moved.chairs.forEach((c, i) => {
+        expect(c.deskId).toBe(d.id);
+        expect(c.x - base.chairs[i].x).toBeCloseTo(0.4, 6);
+        expect(c.y - base.chairs[i].y).toBeCloseTo(0.3, 6);
+      });
+    });
+
+    // Review Focus 5 — all four walls, for the desk and its chairs.
+    it.each([[99, 99], [-99, -99], [99, -99], [-99, 99]])("clamps a desk displaced by (%s, %s) back inside the room", (dx, dy) => {
+      const [d] = deriveDesks(3, 3);
+      const { desks, chairs } = classroomLayout(room, 0.5, [{ ...d, dx, dy }], "standard");
+      const [desk] = desks;
+      const e = 1e-6;
+      expect(desk.x + room.length / 2).toBeGreaterThanOrEqual(-e);
+      expect(desk.x + desk.w + room.length / 2).toBeLessThanOrEqual(room.length + e);
+      expect(desk.y + room.width / 2).toBeGreaterThanOrEqual(-e);
+      expect(desk.y + desk.h + room.width / 2).toBeLessThanOrEqual(room.width + e);
+      expect(chairs).toHaveLength(3);
+      chairs.forEach((c) => {
+        expect(c.x).toBeGreaterThanOrEqual(desk.x - e);
+        expect(c.x).toBeLessThanOrEqual(desk.x + desk.w + e);
+        expect(c.y - 0.3 + room.width / 2).toBeGreaterThanOrEqual(-e);
+        expect(c.y + 0.3 + room.width / 2).toBeLessThanOrEqual(room.width + e);
+      });
+    });
+
+    it("treats a non-finite offset as no offset", () => {
+      const [d] = deriveDesks(3, 3);
+      const base = classroomLayout(room, 0.5, [d], "standard");
+      const bad = classroomLayout(room, 0.5, [{ ...d, dx: NaN, dy: Infinity }], "standard");
+      expect(bad.desks[0].x).toBeCloseTo(base.desks[0].x, 6);
+      expect(bad.desks[0].y).toBeCloseTo(base.desks[0].y, 6);
+    });
   });
 
   // Spec §11.1 — a shape guard, not a pixel guard. The user has accepted that an
