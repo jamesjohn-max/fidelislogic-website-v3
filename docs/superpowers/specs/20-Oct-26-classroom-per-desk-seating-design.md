@@ -29,10 +29,10 @@ reflect it.
 - Changing the seat count on a selected desk.
 - The room's seat total derived from the desks rather than driving them.
 
+- Adding and deleting individual desks.
+
 **Out of scope (deliberate)**
 
-- Adding or deleting desks. Desk count comes from setup; the request asked for
-  select, move and adjust, and nothing more.
 - Rotating a desk. Pods rotate, desks face the front by definition; no one asked.
 - Any change to Theater, Open Collaboration or the table-sized layouts.
 - Per-desk overrides surviving a change of layout type.
@@ -84,33 +84,57 @@ Decided without spending a question, both following the pod precedent:
 
 ## 5. Data model
 
-### 5.1 Plan state
+### 5.1 A desk list, not an override bag
+
+The obvious design — `deskOverrides[index] = { seats, dx, dy }`, mirroring
+`podOverrides` — **does not survive deletion**. An index means "the Nth desk in the
+generated order", so removing desk 1 silently shifts every override above it onto the
+wrong desk. Pods get away with index keys precisely because a pod cannot be added or
+deleted: `podCount` is always `ceil(count / SEATS_PER_POD)`.
+
+Once desks are user-managed, the state has to travel *with* the desk:
 
 ```js
-state.seatsPerDesk = null          // null = CLASSROOM_LAYOUT.blockSeats (today's 6)
-state.deskOverrides = {}           // index -> { seats?, dx?, dy?, angle? }
+state.seatsPerDesk = null   // null = CLASSROOM_LAYOUT.blockSeats (today's 6)
+state.desks = null          // null = derive from setup; otherwise an ordered list
+                            // [{ id, seats, dx, dy }, ...]
 ```
 
-`seatsPerDesk` of `null` is meaningful and is the initial value: it means "use the
-engine's default", which reproduces today's layout exactly (§9).
+This is simpler than the override bag, not harder. There is no key to go stale: delete
+splices the list, add pushes onto it, and each desk carries its own seat count and
+offset. `id` is a stable generated string so React keys and canvas selection survive a
+reorder.
 
-`deskOverrides` mirrors `podOverrides` in both shape and name so the two read as the
-same idea. `angle` is reserved but unused — desks do not rotate (§2); it is in the shape
-only so a later rotation feature does not need a migration.
+`null` for either field means "derive", which reproduces today's layout exactly (§9).
 
-### 5.2 Why not reuse `podOverrides`
+### 5.2 Position comes from flow, offsets are deviations
 
-They key by index into different arrays and are consumed by different generators. Sharing
-one bag would mean a classroom override silently applying to a pod when the layout
-changes. Two bags, cleared per layout (§9).
+Desks are **not** absolutely positioned. The generator lays the list out in rows exactly
+as it does now — same row pitch, same aisles, same centring — and `dx`/`dy` offset a
+desk from the position that flow gives it. So deleting a desk reflows the rest, and a
+desk a planner dragged keeps its displacement relative to its new flowed home.
+
+This is what keeps a classroom looking like a classroom after edits. Absolute positions
+would let the grid dissolve into scattered desks after a few deletions.
+
+### 5.3 Why not reuse `podOverrides`
+
+Different arrays, different generators. Sharing one bag would mean a classroom edit
+silently applying to a pod when the layout changes. `state.desks` is cleared on layout
+change (§9).
 
 ## 6. Layout generation
 
-`classroomLayout` gains two parameters and threads them to `rowSeatingLayout`:
+`classroomLayout` takes the desk list instead of a headcount:
 
 ```js
-classroomLayout(room, deskDepth, count, density, seatsPerDesk, deskOverrides)
+classroomLayout(room, deskDepth, desks, density, seatsPerDesk)
 ```
+
+`desks` is `state.desks`, or — when that is `null` — the list derived from the setup
+headcount: `ceil(headcount / seatsPerDesk)` desks each carrying `seatsPerDesk` seats.
+Deriving it in one place means the rest of the generator never has to care which case it
+is in.
 
 Inside `rowSeatingLayout`, three changes:
 
@@ -119,13 +143,17 @@ Inside `rowSeatingLayout`, three changes:
    `CLASSROOM_LAYOUT.blockSeats`. Theater keeps passing its own constant, so
    `THEATER_LAYOUT` is untouched — the two share this code path and must not move
    together.
-2. **Each emitted desk gets an index, and each chair is tagged with it.**
-   `desks.push({ ..., deskIndex })` and `chairs.push({ ..., deskIndex })`, exactly as
-   `collaborationLayout` tags `podIndex`.
-3. **Per-desk overrides apply after placement.** A desk's seat count comes from
-   `deskOverrides[i].seats ?? seatsPerDesk`, and its position from
-   `(x + dx, y + dy)` clamped to the room. Its chairs are laid out against that count
-   and offset with it.
+2. **Each emitted desk carries its id, and each chair is tagged with it.**
+   `desks.push({ ..., deskId })` and `chairs.push({ ..., deskId })` — the same idea as
+   `collaborationLayout` tagging `podIndex`, but keyed by the stable id rather than a
+   position, so a delete cannot re-point a chair at a different desk.
+3. **Each desk's own state applies after placement.** A desk carries its `seats`, and
+   its position is the flowed `(x, y)` plus `(dx, dy)`, clamped to the room. Its chairs
+   are laid out against its seat count and offset with it.
+4. **Rows are packed from the list, not from a headcount.** Today `rowBlocks` splits a
+   row's seats into desks. With an explicit list the direction reverses: desks are taken
+   in order and packed into a row until the next one will not fit the usable width, then
+   a new row starts. This is the one piece of genuinely new layout logic in the work.
 
 ### 6.1 The seat-count ceiling is physical, not policy
 
@@ -147,10 +175,20 @@ Reuse, do not rebuild. The canvas already hit-tests a pod group, drags table-plu
 and commits via `commitPodMove`. Desks take the same path:
 
 - A desk is selectable as a unit (`rc-table-group`, as pods are).
-- Dragging moves the desk and every chair tagged with its `deskIndex`.
-- The drag commits to `deskOverrides[i] = { dx, dy }`, clamped to the room.
-- A selected desk shows a seat-count control in the existing selection bar — the same
-  bar that holds a device's range control, so the pattern is already on screen.
+- Dragging moves the desk and every chair tagged with its `deskId`.
+- The drag commits `dx`/`dy` onto that desk in `state.desks`, clamped to the room.
+- A selected desk shows a seat-count stepper and a delete control in the existing
+  selection bar — the same bar that holds a device's range control and its Delete, so
+  both patterns are already on screen and already keyboard-reachable.
+- Adding a desk is a control on the Seating step, not on the canvas: a new desk has no
+  meaningful position until it flows, so there is nothing to click on to create it.
+  It appends to the list and the layout reflows.
+
+### 7.1 Deleting the last desk
+
+A classroom with no desks is not a classroom. Deleting the final desk is refused with
+the reason given, rather than silently ignored or allowed to produce an empty room —
+the same shape as the planner's existing minimum-chair handling.
 
 ## 8. The derived total, and what reads it
 
@@ -195,40 +233,60 @@ for Classroom and `chairCount` everywhere else.
 
 ## 9. Migration and compatibility
 
-A saved plan has no `seatsPerDesk` and no `deskOverrides`. Both absent must reproduce
-today's layout exactly:
+A saved plan has neither `seatsPerDesk` nor `desks`. Both `null` must reproduce today's
+layout exactly:
 
 - `seatsPerDesk ?? CLASSROOM_LAYOUT.blockSeats` is the existing constant, 6.
-- An empty `deskOverrides` applies nothing.
+- `desks === null` derives the list from the setup headcount, which is what the
+  generator already does implicitly today.
 
-So no `DRAFT_VERSION` bump, and existing drafts and shared links keep resolving. This is
-proved by a regression test (§11), not by inspection.
+So no `DRAFT_VERSION` bump, and existing drafts and shared links keep resolving. Proved
+by a regression test (§11), not by inspection.
 
-`deskOverrides` is **cleared when the layout type changes**, like the seating hand-edits
-the plan already clears (`seatEditsCleared`). An override keyed to desk 3 is meaningless
-once the room is a U-shape.
+**The list materialises on first edit, not on load.** A plan stays on `desks: null` —
+and so keeps following its headcount — until the planner adds, deletes, moves or
+re-seats a desk. At that moment the derived list is written to state and becomes the
+truth. This keeps the common case (set a headcount, never touch a desk) behaving exactly
+as it does now, and means the setup headcount is not quietly demoted for people who
+never use the feature.
+
+`desks` is **cleared when the layout type changes**, like the seating hand-edits the plan
+already clears (`seatEditsCleared`). A desk list is meaningless once the room is a
+U-shape.
 
 ## 10. Setup control
 
 The seats-per-desk choice joins headcount and density on the Seating step, shown only
 for Classroom. It is a small stepper with the physical ceiling from §6.1 as its maximum,
 and a default that reads "6 (standard)" so the current behaviour is visibly the default
-rather than an unlabelled starting number.
+rather than an unlabelled starting number. An "Add desk" control sits beside it.
+
+### 10.1 What happens to the headcount once desks are edited
+
+Once `state.desks` materialises, the setup headcount stops driving the layout — the desk
+list does. The headcount field must say so rather than sitting there looking live while
+being ignored: it becomes a read-out of the derived total, with the per-desk controls as
+the way to change it.
+
+Changing seats-per-desk after the list has materialised is a **re-seat of every desk
+that has not been individually changed**, leaving hand-set desks alone. That is the only
+reading consistent with the per-desk edits being the truth; the alternative — silently
+resetting a planner's hand-set desks — would lose work.
 
 ## 11. Testing
 
 New tests in `roomConfiguratorEngine.test.js`, matching the suite's existing idiom:
 
-1. **Regression guard** — a classroom plan with no `seatsPerDesk` and no `deskOverrides`
+1. **Regression guard** — a classroom plan with `seatsPerDesk: null` and `desks: null`
    produces exactly today's desks and chairs. The test that protects every saved draft.
 2. `seatsPerDesk: 3` with a 12-person target produces 4 desks of 3.
-3. A per-desk `seats` override changes only that desk, and the room total rises by the
+3. A per-desk `seats` change affects only that desk, and the room total rises by the
    difference.
 4. A per-desk `seats` value above the physical fit clamps to `rowCapacity`'s ceiling.
-5. Every chair carries the `deskIndex` of the desk it belongs to, and the counts per
-   index match the desks.
-6. A `dx`/`dy` override moves the desk and all of its chairs by the same vector, and
-   clamps at the room edge.
+5. Every chair carries the `deskId` of the desk it belongs to, and the counts per id
+   match the desks.
+6. A `dx`/`dy` moves the desk and all of its chairs by the same vector, and clamps at
+   the room edge.
 7. **Mixed-width rows** — a row holding a 2-seat and a 5-seat desk stays centred on the
    room midline (§6.2).
 8. Theater is unaffected by `seatsPerDesk` — it keeps `THEATER_LAYOUT.blockSeats`.
@@ -237,23 +295,34 @@ New tests in `roomConfiguratorEngine.test.js`, matching the suite's existing idi
     total past `SOUNDBAR_SPEAKER_CAPACITY` produces advice quoting the *derived* total,
     not the setup headcount. The guard against the same contradiction the audio work
     was merged to remove.
+11. **Deleting a desk does not move another desk's state** — the test that earns the
+    move from index keys to ids. Set distinct seat counts and offsets on three desks,
+    delete the first, and assert the remaining two keep *their own* values. Under the
+    rejected `deskOverrides[index]` design this fails.
+12. Adding a desk appends it with `seatsPerDesk` seats and reflows the rows.
+13. Deleting the last remaining desk is refused and leaves the plan unchanged (§7.1).
+14. **Materialise-on-first-edit** (§9) — a plan with `desks: null` still follows its
+    headcount; the first desk edit writes the list, and the headcount stops driving.
+15. Changing `seatsPerDesk` after materialisation re-seats untouched desks and leaves a
+    hand-set desk alone (§10.1).
 
 ## 12. Known ceilings and follow-ups
 
 | Simplification | Ceiling | Revisit when |
 |---|---|---|
-| No add/delete desk | Desk count is fixed by setup; a planner wanting 7 desks for 20 people must pick a headcount that yields 7 | Someone asks |
-| No desk rotation | A desk cannot be angled; the `angle` key exists in the shape but is unused | A room needs angled training pods |
+| No desk rotation | A desk cannot be angled | A room needs angled training pods |
 | Capacity is advisory for Classroom | A planner can exceed the room's fire-safe occupancy and only sees a warning | If the warning proves too easy to ignore |
-| Overrides cleared on layout change | Switching to U-shape and back loses desk edits | If planners switch layouts to compare and expect edits to survive |
+| Desk list cleared on layout change | Switching to U-shape and back loses desk edits | If planners switch layouts to compare and expect edits to survive |
+| Desks flow; they are not freely placed | `dx`/`dy` displace a desk from its flowed position, so deleting an earlier desk shifts it. A desk cannot be pinned to an absolute spot | If planners want a fixed trainer's desk that never reflows |
+| New desks append | A desk is always added at the end of the list, then flows. There is no "insert before this one" | If ordering turns out to matter to planners |
 
 ## 13. Files touched
 
 | File | Change |
 |---|---|
-| `lib/roomConfiguratorEngine.js` | `blockSeats` as a parameter; `classroomLayout` signature; `deskIndex` tagging; per-desk overrides; `fitOccupancy` exemption |
-| `lib/roomPlanState.js` | `seatsPerDesk` and `deskOverrides` in `initialPlan`; clear overrides on layout change |
+| `lib/roomConfiguratorEngine.js` | `blockSeats` as a parameter; `classroomLayout` takes a desk list; row packing from the list (§6.4); `deskId` tagging; `fitOccupancy` exemption; the single derived-total accessor (§8.1) |
+| `lib/roomPlanState.js` | `seatsPerDesk` and `desks` in `initialPlan`; materialise on first edit; clear `desks` on layout change |
 | `lib/roomConfiguratorEngine.test.js` | §11 |
-| `components/roomConfigurator/RoomCanvas.jsx` | Desk selection and drag, reusing the pod path |
-| `components/roomConfigurator/SectionControls.jsx` | Seats-per-desk stepper on the Seating step; per-desk seat control in the selection bar |
+| `components/roomConfigurator/RoomCanvas.jsx` | Desk selection and drag, reusing the pod path; delete in the selection bar |
+| `components/roomConfigurator/SectionControls.jsx` | Seats-per-desk stepper and Add desk on the Seating step; per-desk seat stepper in the selection bar; headcount becomes a read-out once materialised |
 | `pages/RoomConfigurator.jsx` | Thread the new state; capacity warning for Classroom |
