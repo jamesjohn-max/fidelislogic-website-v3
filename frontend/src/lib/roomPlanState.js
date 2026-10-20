@@ -133,6 +133,10 @@ export function settle(prev, next) {
   return reseated === p ? p : syncCustomerDisplay(settleFurnitureAndDevices(p, reseated));
 }
 
+// The per-desk classroom state generateLayout reads. Pulled out so every call site
+// passes the same thing; `null` on either field means "derive from the headcount".
+export const classroomOf = (p) => ({ desks: p.desks, seatsPerDesk: p.seatsPerDesk });
+
 function settleFurnitureAndDevices(prev, next) {
   let p = next;
   const furnitureChanged =
@@ -154,8 +158,8 @@ function settleFurnitureAndDevices(prev, next) {
     // Hand edits refer to the generated seats by index, so they only stay while those
     // seats are unchanged. A bigger room around the same table keeps them.
     if (hasSeatEdits(p)) {
-      const before = generateLayout(prev.layout, prev.room, prev.table, prev.chairCount, {}, prev.seatingDensity).chairs;
-      const after = generateLayout(p.layout, p.room, p.table, p.chairCount, {}, p.seatingDensity).chairs;
+      const before = generateLayout(prev.layout, prev.room, prev.table, prev.chairCount, {}, prev.seatingDensity, classroomOf(prev)).chairs;
+      const after = generateLayout(p.layout, p.room, p.table, p.chairCount, {}, p.seatingDensity, classroomOf(p)).chairs;
       if (!sameChairs(before, after)) {
         p = { ...p, removedChairs: [], chairOffsets: {}, podOverrides: {}, seatEditsCleared: p.seatEditsCleared + 1 };
       }
@@ -167,8 +171,9 @@ function settleFurnitureAndDevices(prev, next) {
     }
   }
 
-  const layoutChanged = furnitureChanged || prev.podOverrides !== p.podOverrides;
-  const layoutResult = generateLayout(p.layout, p.room, p.table, p.chairCount, p.podOverrides, p.seatingDensity);
+  const layoutChanged =
+    furnitureChanged || prev.podOverrides !== p.podOverrides || prev.desks !== p.desks || prev.seatsPerDesk !== p.seatsPerDesk;
+  const layoutResult = generateLayout(p.layout, p.room, p.table, p.chairCount, p.podOverrides, p.seatingDensity, classroomOf(p));
   if (layoutChanged || prev.tableOffset !== p.tableOffset) {
     const tableOffset = clampTableOffset(p.tableOffset, p.room, layoutResult.groupBounds);
     if (tableOffset.x !== p.tableOffset.x || tableOffset.y !== p.tableOffset.y) p = { ...p, tableOffset };

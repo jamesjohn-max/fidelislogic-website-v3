@@ -188,10 +188,13 @@ export const TEMPLATE_IDS = ["small", "medium", "large"];
 // A template's device kit laid out in the room as it is now: its size, table, seats
 // (less any removed or moved), and where the table has been dragged. Rebuilt whenever
 // those change, for as long as nobody has moved or changed a device by hand.
-export function buildTemplateDevices(templateId, { room, layout, table, chairCount, seatingDensity = DEFAULT_SEATING_DENSITY, tableOffset = { x: 0, y: 0 }, podOverrides = {}, removedChairIndices = new Set(), chairOffsets = {} }) {
+export function buildTemplateDevices(templateId, { room, layout, table, chairCount, seatingDensity = DEFAULT_SEATING_DENSITY, tableOffset = { x: 0, y: 0 }, podOverrides = {}, removedChairIndices = new Set(), chairOffsets = {}, desks = null, seatsPerDesk = null }) {
   const template = ROOM_TEMPLATES[templateId];
   if (!template) return emptyDevices();
-  const { chairs } = generateLayout(layout, room, table, chairCount, podOverrides, seatingDensity);
+  // A template carries no desk list of its own (applying one clears the plan's), but
+  // its devices are placed against the seats actually on the plan, so the plan's own
+  // desks have to reach the generator here too.
+  const { chairs } = generateLayout(layout, room, table, chairCount, podOverrides, seatingDensity, { desks, seatsPerDesk });
   const seats = placedSeats(chairs, room, tableOffset, removedChairIndices, chairOffsets);
   const spreadCtx = { layout, room, table, tableOffset, seats: seatingArea(chairs.filter((_, i) => !removedChairIndices.has(i)), room, tableOffset) };
   const count = seats.length;

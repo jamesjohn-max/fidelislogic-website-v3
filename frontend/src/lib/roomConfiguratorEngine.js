@@ -782,7 +782,10 @@ export function getChairLimits(layout, room, table, density = DEFAULT_SEATING_DE
   return [Math.min(MIN_CHAIRS, max), max];
 }
 
-function rowSeatingLayout(room, count, spacing, { withDesks, deskDepth } = {}) {
+// Rows laid out from a headcount alone, splitting each row into blocks (see rowBlocks).
+// Theater's only; the classroom lays out an explicit desk list instead — see
+// classroomLayout.
+function rowSeatingLayout(room, count, spacing) {
   const { seatsPerRow, maxRows } = rowCapacity(room, spacing);
   const fewestRows = Math.min(maxRows, Math.max(1, Math.ceil(count / seatsPerRow)));
   // If the fewest rows would need an aisle splitting a row, but one more row (when the
@@ -793,7 +796,7 @@ function rowSeatingLayout(room, count, spacing, { withDesks, deskDepth } = {}) {
   // Seats spread as evenly as the rows allow (front rows take any extra), so the last
   // row isn't a short stub behind full ones.
   const perRow = balancedSplit(Math.min(count, seatsPerRow * rows), rows).sort((a, b) => b - a);
-  const chairs = [], desks = [];
+  const chairs = [];
   const firstRowY = firstRowLine(room, rows, spacing);
   perRow.forEach((seatsInRow, r) => {
     if (seatsInRow <= 0) return;
@@ -807,27 +810,58 @@ function rowSeatingLayout(room, count, spacing, { withDesks, deskDepth } = {}) {
     // ends up directly behind another (see seatsBlockedFromDisplay).
     let x = room.length / 2 - rowSpan / 2;
     blocks.forEach((seatsInBlock) => {
-      // One desk strip per block of seats, so a desk never spans an aisle.
-      if (withDesks) {
-        const deskLocal = toLocal(x, rowY - DESK_GAP - deskDepth, room);
-        desks.push({ x: deskLocal.x, y: deskLocal.y, w: seatsInBlock * spacing.seatPitch, h: deskDepth });
-      }
       for (let s = 0; s < seatsInBlock; s++) {
-        const abs = { x: x + (s + 0.5) * spacing.seatPitch, y: withDesks ? rowY + DESK_CHAIR_SETBACK : rowY };
-        chairs.push({ ...toLocal(abs.x, abs.y, room), angle: 0 });
+        chairs.push({ ...toLocal(x + (s + 0.5) * spacing.seatPitch, rowY, room), angle: 0 });
       }
       x += seatsInBlock * spacing.seatPitch + spacing.aisle;
+    });
+  });
+  return { chairs };
+}
+
+// Packs the desk list into rows: desks are taken in order, each added to the row being
+// filled until the next one's width (its seats at the seat pitch, plus an aisle between
+// desks) would overrun the usable width, which starts a new row. A desk is never split,
+// so a row can carry fewer seats than the bare seat pitch would allow, and a desk wider
+// than the room still gets laid out — on a row of its own — rather than disappearing.
+// Rows sit on the same lines as before (firstRowLine / rowBandY), each centred on the
+// room's midline, so unequal desks read as one centred block.
+export function classroomLayout(room, deskDepth, deskList, density) {
+  const sp = rowSpacing("classroom", density, deskDepth);
+  const usableW = Math.max(0, room.length - sp.marginX * 2);
+  const deskW = (d) => d.seats * sp.seatPitch;
+  const rows = [];
+  (deskList || []).forEach((d) => {
+    if (!(d.seats > 0)) return;
+    const row = rows[rows.length - 1];
+    const span = row ? row.span + sp.aisle + deskW(d) : 0;
+    if (row && span <= usableW + 1e-6) {
+      row.desks.push(d);
+      row.span = span;
+    } else {
+      rows.push({ desks: [d], span: deskW(d) });
+    }
+  });
+
+  const chairs = [], desks = [];
+  const firstRowY = firstRowLine(room, rows.length, sp);
+  rows.forEach((row, r) => {
+    const rowY = firstRowY + rowBandY(r, sp);
+    let x = room.length / 2 - row.span / 2;
+    row.desks.forEach((d) => {
+      const deskLocal = toLocal(x, rowY - DESK_GAP - deskDepth, room);
+      desks.push({ deskId: d.id, x: deskLocal.x, y: deskLocal.y, w: deskW(d), h: deskDepth });
+      for (let s = 0; s < d.seats; s++) {
+        chairs.push({ ...toLocal(x + (s + 0.5) * sp.seatPitch, rowY + DESK_CHAIR_SETBACK, room), angle: 0, deskId: d.id });
+      }
+      x += deskW(d) + sp.aisle;
     });
   });
   return { chairs, desks };
 }
 
-function classroomLayout(room, deskDepth, count, density) {
-  return rowSeatingLayout(room, count, rowSpacing("classroom", density, deskDepth), { withDesks: true, deskDepth });
-}
-
 function theaterLayout(room, count, density) {
-  return rowSeatingLayout(room, count, rowSpacing("theater", density), { withDesks: false });
+  return rowSeatingLayout(room, count, rowSpacing("theater", density));
 }
 
 // Absolute floor/ceiling a pod can be resized to. The real per-arrangement ceiling
@@ -1108,7 +1142,9 @@ function contentBounds(chairs, rects = [], circles = []) {
   return Number.isFinite(minX) ? { minX, maxX, minY, maxY } : symmetricBounds(0, 0);
 }
 
-export function generateLayout(layoutType, room, table, chairCount, podOverrides = {}, density = DEFAULT_SEATING_DENSITY) {
+// `classroom` is the plan's per-desk state, `{ desks, seatsPerDesk }` — only the
+// classroom layout reads it, and it defaults to deriving the desks from the headcount.
+export function generateLayout(layoutType, room, table, chairCount, podOverrides = {}, density = DEFAULT_SEATING_DENSITY, classroom = {}) {
   // Nothing chosen yet: an empty room, no table or chairs.
   if (!layoutType) return { tableShape: { type: "none" }, chairs: [], groupBounds: symmetricBounds(0, 0) };
   const boxW = table.orientation === 0 ? table.length : table.width;
@@ -1133,7 +1169,10 @@ export function generateLayout(layoutType, room, table, chairCount, podOverrides
       return { tableShape: { type: "polygon", points: outline }, chairs, groupBounds: contentBounds(chairs, [polygonBox(outline)]) };
     }
     case "classroom": {
-      const { chairs, desks } = classroomLayout(room, classroomDeskDepth(table), chairCount, density);
+      // No list, or an empty one from a hand-edited link, means "derive from the
+      // headcount" — an empty array is never an empty classroom.
+      const deskList = classroom.desks?.length ? classroom.desks : deriveDesks(chairCount, effectiveSeatsPerDesk(classroom.seatsPerDesk));
+      const { chairs, desks } = classroomLayout(room, classroomDeskDepth(table), deskList, density);
       return { tableShape: { type: "desks", desks }, chairs, groupBounds: contentBounds(chairs, desks) };
     }
     case "theater": {

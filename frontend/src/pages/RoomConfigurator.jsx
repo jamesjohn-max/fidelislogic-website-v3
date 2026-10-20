@@ -289,6 +289,9 @@ export const RoomConfigurator = ({ with3d = false }) => {
     devices,
     chairOffsets,
     podOverrides,
+    // Classroom per-desk seating: both null until the planner edits the desks.
+    desks,
+    seatsPerDesk,
   } = plan;
   const removedChairIndices = useMemo(() => new Set(plan.removedChairs), [plan.removedChairs]);
   // Every change to the plan: `patch` is an object or (plan) => object.
@@ -478,8 +481,8 @@ export const RoomConfigurator = ({ with3d = false }) => {
   }, [history, undo]);
 
   const layoutResult = useMemo(
-    () => generateLayout(layout, room, table, chairCount, podOverrides, seatingDensity),
-    [layout, room, table, chairCount, podOverrides, seatingDensity]
+    () => generateLayout(layout, room, table, chairCount, podOverrides, seatingDensity, { desks, seatsPerDesk }),
+    [layout, room, table, chairCount, podOverrides, seatingDensity, desks, seatsPerDesk]
   );
 
   // A regenerated seating plan's chairs and pods aren't the ones that were selected.
