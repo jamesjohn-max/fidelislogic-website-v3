@@ -338,11 +338,8 @@ describe("classroom rows and desks", () => {
     // 6.5 x 3 m: two rows of desks fit once the front zone and back walkway give up
     // their extra space, and neither goes below its minimum.
     const room = { length: 6.5, width: 3, height: 2.8 };
-    // The most the planner can pick: the furniture's own fit, capped by occupancy.
-    // (Whole desks can't be split, so the furniture's seat-pitch capacity is only
-    // advisory for the classroom — more desks than fit is a state the planner is
-    // allowed to reach by hand.)
-    const max = getChairLimits("classroom", room, table)[1];
+    // What the furniture fits (occupancy caps the planner's count separately).
+    const max = getMaxChairsForLayout("classroom", room, table);
     const r = generateLayout("classroom", room, table, max);
     expect(rowsOf(r)).toHaveLength(2);
     const deskFront = room.width / 2 + Math.min(...r.tableShape.desks.map((d) => d.y));
@@ -861,6 +858,51 @@ describe("classroom rows packed from the desk list", () => {
     expect(tableShape.type).toBe("desks");
     expect(tableShape.desks.length).toBeGreaterThan(0);
     expectSaneDesks(room, tableShape.desks);
+  });
+
+  // A whole desk can be neither split across rows nor hung over a wall, so the seat
+  // count the planner is offered has to be counted in desks.
+  describe("the seat count the room is offered never overflows it", () => {
+    // 9 x 3 m held 2 rows but was offered 18 seats, which derive as desks of 6, 6, 6 —
+    // two of those need 8.2 m against 7.8 m usable, so they packed into 3 rows and the
+    // back row's desks landed outside the back wall.
+    const shallow = { length: 9, width: 3, height: 2.8 };
+
+    it("offers only the seats whole desks fit, and lays them out inside the walls", () => {
+      const max = getMaxChairsForLayout("classroom", shallow, table);
+      expect(max).toBe(17); // 2 rows x one 6-seat desk, plus the 5-seat remainder desk
+      const r = generateLayout("classroom", shallow, table, max);
+      expect(r.chairs).toHaveLength(17);
+      expect(rowsOfDesks(r.tableShape.desks)).toHaveLength(2);
+      expectSaneDesks(shallow, r.tableShape.desks);
+    });
+
+    it("holds for every seat count up to that limit", () => {
+      const max = getMaxChairsForLayout("classroom", shallow, table);
+      for (let n = 2; n <= max; n++) {
+        const r = generateLayout("classroom", shallow, table, n);
+        expect(r.chairs).toHaveLength(n);
+        expectSaneDesks(shallow, r.tableShape.desks);
+      }
+    });
+
+    it("counts a single short desk when the room is too narrow for a full one", () => {
+      // 3 m long: 1.8 m usable fits 3 seats, and a 6-seat desk can't be split to use
+      // the depth, so no number of rows helps.
+      const narrow = { length: 3, width: 9, height: 2.8 };
+      const max = getMaxChairsForLayout("classroom", narrow, table);
+      expect(max).toBe(3);
+      expectSaneDesks(narrow, generateLayout("classroom", narrow, table, max).tableShape.desks);
+    });
+
+    it("still renders a hand-edited list that overflows, rather than dropping desks", () => {
+      // The one case that can still look wrong: a shared link carrying more desks than
+      // the room holds. Losing seats silently would be worse, so they all render.
+      const list = deriveDesks(30, 6);
+      const r = generateLayout("classroom", shallow, table, 30, {}, "standard", { desks: list });
+      expect(r.tableShape.desks).toHaveLength(list.length);
+      expect(r.chairs).toHaveLength(30);
+    });
   });
 
   it("loads a plan saved before per-desk seating, which has neither field", () => {

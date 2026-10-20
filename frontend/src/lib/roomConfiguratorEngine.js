@@ -733,6 +733,25 @@ function rowCapacity(room, sp) {
   return { seatsPerRow, maxRows };
 }
 
+// How many seats the classroom fits. Counting bare seats the way `rowCapacity` does
+// overstates it, because a desk can be neither split across rows nor hung over a wall:
+// a row with space for 7 seats may only have space for one 6-seat desk. So capacity is
+// counted in desks — as many full desks as fit across a row, over as many rows as the
+// room's depth allows, plus the remainder desk, which is narrower than a full one and
+// so can share the last row with it (see deriveDesks, which puts the remainder last).
+function classroomCapacity(room, sp, perDesk) {
+  const usableW = Math.max(0, room.length - sp.marginX * 2);
+  const seatsAcross = Math.floor(usableW / sp.seatPitch + 1e-9);
+  // Too narrow even for one full desk: a desk can't be split, so a single short desk
+  // is all that fits, however deep the room is.
+  if (seatsAcross < perDesk) return seatsAcross;
+  const deskPitch = perDesk * sp.seatPitch + sp.aisle;
+  const desksPerRow = Math.floor((usableW + sp.aisle) / deskPitch + 1e-9);
+  const spare = usableW - desksPerRow * deskPitch;
+  const remainder = Math.min(perDesk - 1, Math.max(0, Math.floor(spare / sp.seatPitch + 1e-9)));
+  return rowCapacity(room, sp).maxRows * desksPerRow * perDesk + remainder;
+}
+
 // Where the first row's line sits, from the front wall: the front zone gets its
 // preferred size if the rows leave room for it, otherwise whatever is spare over the
 // minimums; anything beyond that is left behind the last row.
@@ -741,9 +760,14 @@ function firstRowLine(room, rows, sp) {
   return sp.front.min + Math.min(spare, sp.front.preferred - sp.front.min) + sp.rowFront;
 }
 
-export function getMaxChairsForLayout(layout, room, table, density = DEFAULT_SEATING_DENSITY) {
-  if (layout === "classroom" || layout === "theater") {
-    const { seatsPerRow, maxRows } = rowCapacity(room, rowSpacing(layout, density, classroomDeskDepth(table)));
+export function getMaxChairsForLayout(layout, room, table, density = DEFAULT_SEATING_DENSITY, seatsPerDesk = null) {
+  // The classroom counts its seats in whole desks (classroomCapacity); theater seats
+  // are loose chairs, so it counts bare seats across a row as it always has.
+  if (layout === "classroom") {
+    return classroomCapacity(room, rowSpacing("classroom", density, classroomDeskDepth(table)), effectiveSeatsPerDesk(seatsPerDesk));
+  }
+  if (layout === "theater") {
+    const { seatsPerRow, maxRows } = rowCapacity(room, rowSpacing("theater", density));
     return seatsPerRow * maxRows;
   }
   // Rectangular/oval/U-shape seat chairs around the table's own perimeter — cap the
@@ -776,8 +800,8 @@ export function getMaxChairsForLayout(layout, room, table, density = DEFAULT_SEA
 
 // The range a layout's chair count can be set to: up to as many as fit, but never more
 // people than the room's permitted occupancy (see occupancyLimit).
-export function getChairLimits(layout, room, table, density = DEFAULT_SEATING_DENSITY) {
-  const fits = Math.max(MIN_CHAIRS, getMaxChairsForLayout(layout, room, table, density));
+export function getChairLimits(layout, room, table, density = DEFAULT_SEATING_DENSITY, seatsPerDesk = null) {
+  const fits = Math.max(MIN_CHAIRS, getMaxChairsForLayout(layout, room, table, density, seatsPerDesk));
   const max = Math.min(fits, occupancyLimit(room));
   return [Math.min(MIN_CHAIRS, max), max];
 }

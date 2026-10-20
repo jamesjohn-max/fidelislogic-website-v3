@@ -151,7 +151,7 @@ function settleFurnitureAndDevices(prev, next) {
     if (length !== p.table.length || width !== p.table.width) p = { ...p, table: { ...p.table, length, width } };
     // No more seats than the layout fits at this spacing.
     if (p.layout) {
-      const [min, max] = getChairLimits(p.layout, p.room, p.table, p.seatingDensity);
+      const [min, max] = getChairLimits(p.layout, p.room, p.table, p.seatingDensity, p.seatsPerDesk);
       const chairCount = clamp(p.chairCount, min, max);
       if (chairCount !== p.chairCount) p = { ...p, chairCount };
     }
@@ -264,7 +264,7 @@ const COALESCE_MS = 1200;
 // allows, brought down to that limit.
 export function fitOccupancy(plan) {
   if (!plan.layout) return plan;
-  const max = getChairLimits(plan.layout, plan.room, plan.table, plan.seatingDensity)[1];
+  const max = getChairLimits(plan.layout, plan.room, plan.table, plan.seatingDensity, plan.seatsPerDesk)[1];
   return plan.chairCount > max ? settle(plan, { ...plan, chairCount: max }) : plan;
 }
 
