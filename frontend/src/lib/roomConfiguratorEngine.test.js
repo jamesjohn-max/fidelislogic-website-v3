@@ -36,7 +36,7 @@ import {
   effectiveSeatsPerDesk,
   CLASSROOM_BLOCK_SEATS,
 } from "./roomConfiguratorEngine";
-import { initialPlan, settle } from "./roomPlanState";
+import { applyTemplate, initialPlan, settle } from "./roomPlanState";
 
 const EMPTY_DEVICES = {
   display: [{ id: "d1", x: 0, y: 2, sizeInches: 98 }],
@@ -704,6 +704,10 @@ describe("classroom desk list", () => {
     expect(deriveDesks(11, 3).map((d) => d.seats)).toEqual([3, 3, 3, 2]);
   });
 
+  it.each([NaN, Infinity, -Infinity, undefined, null])("derives no desks from a non-finite headcount (%p)", (bad) => {
+    expect(deriveDesks(bad, 3)).toEqual([]);
+  });
+
   it.each([0, -3, NaN, undefined, null])("falls back to the default for a bad seatsPerDesk (%p)", (bad) => {
     expect(effectiveSeatsPerDesk(bad)).toBe(CLASSROOM_BLOCK_SEATS);
   });
@@ -714,16 +718,30 @@ describe("classroom desk list", () => {
     expect(p.desks).toBeNull();
   });
 
-  it("clears the desk list when the layout type changes", () => {
+  describe("through settle", () => {
     const entered = { length: true, width: true, height: true };
     const base = initialPlan();
     const classroom = { ...base, room: { length: 9, width: 7, height: 2.8 }, roomEntered: entered, layout: "classroom", chairCount: 12 };
     // Desks are edited on a plan whose layout is already settled, as the editor will.
     const settled = settle(base, classroom);
     const prev = settle(settled, { ...settled, desks: deriveDesks(12, 3) });
-    expect(prev.desks).not.toBeNull();
-    const next = settle(prev, { ...prev, layout: "ushape" });
-    expect(next.desks).toBeNull();
-    expect(next.seatEditsCleared).toBe(prev.seatEditsCleared + 1);
+
+    it("clears the desk list when the layout type changes", () => {
+      expect(prev.desks).not.toBeNull();
+      const next = settle(prev, { ...prev, layout: "ushape" });
+      expect(next.desks).toBeNull();
+      expect(next.seatEditsCleared).toBe(prev.seatEditsCleared + 1);
+    });
+
+    it("keeps the desk list when the room is resized", () => {
+      const next = settle(prev, { ...prev, room: { ...prev.room, length: 11, width: 8 } });
+      expect(next.desks).toBe(prev.desks);
+      expect(next.seatEditsCleared).toBe(prev.seatEditsCleared);
+    });
+
+    it("clears the desk list when a template is applied", () => {
+      expect(applyTemplate(prev, "small").desks).toBeNull();
+      expect(applyTemplate({ ...prev, template: "small" }, "custom").desks).toBeNull();
+    });
   });
 });

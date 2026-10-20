@@ -632,6 +632,7 @@ export const effectiveSeatsPerDesk = (seatsPerDesk) =>
 // The classroom's desk list from a headcount: full desks, the remainder on the last one.
 // Wherever plan.desks is read, null or [] means "derive", not an empty classroom.
 export function deriveDesks(headcount, seatsPerDesk) {
+  if (!Number.isFinite(headcount)) return [];
   const perDesk = effectiveSeatsPerDesk(seatsPerDesk);
   const count = Math.ceil(Math.max(0, headcount) / perDesk);
   return Array.from({ length: count }, (_, i) => ({

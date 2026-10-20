@@ -79,7 +79,7 @@ export const initialPlan = () => ({
   seatEditsCleared: 0,
 });
 
-const hasSeatEdits = (p) => p.removedChairs.length > 0 || Object.keys(p.chairOffsets).length > 0 || Object.keys(p.podOverrides).length > 0 || p.desks != null;
+const hasSeatEdits = (p) => p.removedChairs.length > 0 || Object.keys(p.chairOffsets).length > 0 || Object.keys(p.podOverrides).length > 0;
 
 const EPS = 1e-6;
 const sameChairs = (a, b) =>
@@ -157,8 +157,13 @@ function settleFurnitureAndDevices(prev, next) {
       const before = generateLayout(prev.layout, prev.room, prev.table, prev.chairCount, {}, prev.seatingDensity).chairs;
       const after = generateLayout(p.layout, p.room, p.table, p.chairCount, {}, p.seatingDensity).chairs;
       if (!sameChairs(before, after)) {
-        p = { ...p, removedChairs: [], chairOffsets: {}, podOverrides: {}, desks: null, seatEditsCleared: p.seatEditsCleared + 1 };
+        p = { ...p, removedChairs: [], chairOffsets: {}, podOverrides: {}, seatEditsCleared: p.seatEditsCleared + 1 };
       }
+    }
+    // Desks are offsets from the flowed position, so they survive a resize or a change
+    // of seats; only a different layout type makes them meaningless.
+    if (p.desks != null && prev.layout !== p.layout) {
+      p = { ...p, desks: null, seatEditsCleared: p.seatEditsCleared === prev.seatEditsCleared ? p.seatEditsCleared + 1 : p.seatEditsCleared };
     }
   }
 
