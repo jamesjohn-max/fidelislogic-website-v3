@@ -307,5 +307,17 @@ describe("adding and deleting classroom desks", () => {
       expect(canAddDesk(deriveDesks(9, 3), room, table, "standard", 3)).toBe(true);
       expect(canAddDesk(deriveDesks(12, 3), room, table, "standard", 3)).toBe(false);
     });
+
+    // Capacity is "as many as fit, but never more people than the room's permitted
+    // occupancy" (see getChairLimits). A desk sum only grows by hand, and planSeatTotal
+    // prints it, so an add past the fire-safe occupancy must be refused even when the
+    // desks would physically fit.
+    it("refuses an add past the room's permitted occupancy, even with physical room for it", () => {
+      const room = { length: 6.5, width: 5.5, height: 2.8 };
+      expect(cap(room)).toBe(24); // 24 seats fit...
+      expect(occupancyLimit(room)).toBe(23); // ...but only 23 people are permitted
+      expect(canAddDesk(deriveDesks(18, 3), room, table, "standard", 3)).toBe(true);
+      expect(canAddDesk(deriveDesks(21, 3), room, table, "standard", 3)).toBe(false);
+    });
   });
 });

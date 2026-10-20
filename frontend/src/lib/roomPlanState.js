@@ -8,7 +8,6 @@ import {
   effectiveSeatsPerDesk,
   generateLayout,
   getChairLimits,
-  getMaxChairsForLayout,
   getTableLimits,
   mainScreen,
   refreshAutoDevices,
@@ -153,10 +152,13 @@ export const addDesk = (desks, seatsPerDesk) => [
 export const removeDesk = (desks, id) =>
   canRemoveDesk(desks) && desks.some((d) => d?.id === id) ? desks.filter((d) => d?.id !== id) : desks;
 
-// Whether one more desk of the default size still fits the room's whole-desk capacity.
+// Whether one more desk of the default size still fits the room's whole-desk capacity —
+// which is as many seats as fit, but never more people than the room's permitted
+// occupancy (getChairLimits). The desk sum only grows by hand and planSeatTotal prints
+// it, so this is the one place that keeps a quote inside the fire-safe headcount.
 export function canAddDesk(desks, room, table, density, seatsPerDesk) {
   const seated = (Array.isArray(desks) ? desks : []).reduce((n, d) => n + (Number.isFinite(d?.seats) ? d.seats : 0), 0);
-  return seated + effectiveSeatsPerDesk(seatsPerDesk) <= getMaxChairsForLayout("classroom", room, table, density, seatsPerDesk);
+  return seated + effectiveSeatsPerDesk(seatsPerDesk) <= getChairLimits("classroom", room, table, density, seatsPerDesk)[1];
 }
 
 function settleFurnitureAndDevices(prev, next) {
