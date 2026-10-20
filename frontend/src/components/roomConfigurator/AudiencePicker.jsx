@@ -8,23 +8,37 @@ const ICONS = { customer: Building2, reseller: Briefcase };
 // by side where there's room.
 // `stacked` keeps the two paths one above the other: the intro hero puts this in a
 // narrow right-hand rail, where the side-by-side grid would squeeze both cards.
-export function AudiencePicker({ audience, onChoose, stacked = false }) {
+//
+// `footer` renders inside this panel rather than below it. In the hero this panel is
+// the right half of a two-panel composition and has to match the stage opposite it, so
+// anything that belongs to it lives within its border — a second floating element below
+// would break that symmetry, and wrapping this in an outer panel would nest one card in
+// another.
+export function AudiencePicker({ audience, onChoose, stacked = false, footer = null }) {
   return (
     <section
       aria-labelledby="rc-start-title"
-      className="rc-step-enter flex flex-col rounded-3xl border rc-border rc-fill shadow-sm lg:max-h-full lg:min-h-0 lg:self-start lg:overflow-y-auto"
+      className="rc-step-enter flex flex-col rounded-3xl border rc-border rc-fill shadow-sm lg:h-full lg:min-h-0"
     >
       <header className="px-5 pt-5">
-        <p className="section-label">Get started</p>
-        <h2 id="rc-start-title" className="mt-0.5 text-lg font-semibold leading-tight tracking-[-0.01em] rc-ink">
+        <p className="rc-label text-[color:var(--rc-accent-ink)]">Get started</p>
+        <h2 id="rc-start-title" className="rc-title mt-1.5 rc-ink">
           Who's planning this room?
         </h2>
-        <p className="mt-1 text-[13px] leading-snug rc-ink-muted">Pick the path that fits you — you can switch at any time.</p>
+        {/* Carries the "free, no sign-up" signal the deleted kicker used to hold. Here it
+            answers the question a visitor actually has at the moment they choose. */}
+        <p className="rc-body mt-1.5 rc-ink-muted">
+          Free, no sign-up. Pick the path that fits you — you can switch at any time.
+        </p>
       </header>
+      {/* The options take the panel's slack and centre in it, so a taller panel grows
+          the breathing room around the choice instead of leaving a gap beneath it. */}
       <div
         role="radiogroup"
         aria-labelledby="rc-start-title"
-        className={`flex flex-col gap-2.5 px-5 pb-5 pt-4 ${stacked ? "" : "md:grid md:grid-cols-2"}`}
+        className={`flex flex-col gap-2.5 px-5 pb-5 pt-4 lg:min-h-0 lg:flex-1 lg:justify-center lg:overflow-y-auto ${
+          stacked ? "" : "md:grid md:grid-cols-2"
+        }`}
       >
         {Object.entries(AUDIENCES).map(([id, a]) => {
           const Icon = ICONS[id];
@@ -46,9 +60,9 @@ export function AudiencePicker({ audience, onChoose, stacked = false }) {
                 <Icon className="h-5 w-5" />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block text-xs font-semibold uppercase tracking-wide text-blue-600">{a.label}</span>
-                <span className="mt-0.5 block text-[15px] font-semibold leading-snug rc-ink">{a.title}</span>
-                <span className="mt-1 block text-[13px] leading-relaxed rc-ink-muted">{a.description}</span>
+                <span className="rc-label block text-[color:var(--rc-accent-ink)]">{a.label}</span>
+                <span className="rc-subtitle mt-1 block rc-ink">{a.title}</span>
+                <span className="rc-body mt-1.5 block rc-ink-muted">{a.description}</span>
               </span>
               <ArrowRight
                 aria-hidden="true"
@@ -58,6 +72,7 @@ export function AudiencePicker({ audience, onChoose, stacked = false }) {
           );
         })}
       </div>
+      {footer && <div className="border-t rc-border px-5 py-4">{footer}</div>}
     </section>
   );
 }
