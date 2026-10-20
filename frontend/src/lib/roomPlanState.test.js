@@ -1,6 +1,6 @@
-import { initialHistory, initialPlan, planReducer, settle } from "./roomPlanState";
+import { addDesk, canAddDesk, canRemoveDesk, initialHistory, initialPlan, planReducer, removeDesk, settle } from "./roomPlanState";
 import { ROOM_TEMPLATES, TEMPLATE_IDS, buildTemplatePlan, templateSeats } from "./roomTemplates";
-import { buildRecommendations, classifyRoomType, generateLayout, getChairLimits, micCoverage, occupancyLimit, placedSeats } from "./roomConfiguratorEngine";
+import { buildRecommendations, classifyRoomType, deriveDesks, generateLayout, getChairLimits, getMaxChairsForLayout, micCoverage, occupancyLimit, placedSeats } from "./roomConfiguratorEngine";
 
 const update = (state, patch, extra = {}) => planReducer(state, { type: "update", patch, ...extra });
 const template = (state, id) => planReducer(state, { type: "template", id });
@@ -219,5 +219,93 @@ describe("the screen's side of the table", () => {
     expect(onEdge(moved.present, "left")).toBeGreaterThan(0);
     // No seats are lost on the way — the count only drops if that side can't hold them.
     expect(moved.present.chairCount).toBe(state.present.chairCount);
+  });
+});
+
+describe("adding and deleting classroom desks", () => {
+  // The other desks' own state is keyed by id, so deleting one cannot shift it onto a neighbour.
+  it("leaves the other desks' own state untouched when one is deleted", () => {
+    const [a, b, c] = deriveDesks(9, 3);
+    const list = [{ ...a, seats: 2, dx: 0.1 }, { ...b, seats: 5, dx: 0.2 }, { ...c, seats: 4, dx: 0.3 }];
+    const after = removeDesk(list, a.id);
+    expect(after).toHaveLength(2);
+    expect(after[0]).toMatchObject({ id: b.id, seats: 5, dx: 0.2 });
+    expect(after[1]).toMatchObject({ id: c.id, seats: 4, dx: 0.3 });
+  });
+
+  it("appends a new desk carrying the default seat count", () => {
+    const list = deriveDesks(6, 3);
+    const after = addDesk(list, 3);
+    expect(after).toHaveLength(3);
+    expect(after[2].seats).toBe(3);
+    expect(new Set(after.map((d) => d.id)).size).toBe(3);
+  });
+
+  it("gives a new desk the full desk shape, with no offset and no hand-set seats", () => {
+    const [, added] = addDesk(deriveDesks(3, 3), 3);
+    expect(added).toEqual({ id: expect.any(String), seats: 3, dx: 0, dy: 0, seatsSetByHand: false });
+  });
+
+  it("falls back to the default seats per desk when the setting is unusable", () => {
+    expect(addDesk(deriveDesks(3, 3), null)[1].seats).toBe(6);
+    expect(addDesk(deriveDesks(3, 3), 4.7)[1].seats).toBe(4);
+  });
+
+  it("returns a new array on a change and never touches the list it was given", () => {
+    const list = deriveDesks(9, 3);
+    const copy = JSON.parse(JSON.stringify(list));
+    const added = addDesk(list, 3);
+    const removed = removeDesk(list, list[0].id);
+    expect(added).not.toBe(list);
+    expect(removed).not.toBe(list);
+    expect(list).toEqual(copy);
+    // The surviving desks are the very same objects, so nothing downstream re-lays-them-out.
+    expect(removed[0]).toBe(list[1]);
+  });
+
+  it("refuses to remove the last desk", () => {
+    const list = deriveDesks(3, 3);
+    expect(canRemoveDesk(list)).toBe(false);
+    expect(removeDesk(list, list[0].id)).toEqual(list);
+    expect(removeDesk(list, list[0].id)).toBe(list);
+    expect(canRemoveDesk(deriveDesks(6, 3))).toBe(true);
+  });
+
+  it("hands back the same list when the id is not in it", () => {
+    const list = deriveDesks(6, 3);
+    expect(removeDesk(list, "desk-nope")).toBe(list);
+  });
+
+  it("copes with a saved plan whose desk list is missing, empty or malformed", () => {
+    const room = { length: 6.5, width: 4.5, height: 2.8 };
+    const table = { length: 3, width: 1.2, orientation: 0 };
+    for (const bad of [null, undefined, [], [null, {}, { id: "x" }]]) {
+      expect(() => canRemoveDesk(bad)).not.toThrow();
+      expect(() => removeDesk(bad, "x")).not.toThrow();
+      expect(() => addDesk(bad, 3)).not.toThrow();
+      expect(() => canAddDesk(bad, room, table, "standard", 3)).not.toThrow();
+    }
+    expect(canRemoveDesk(null)).toBe(false);
+    expect(removeDesk(null, "x")).toBeNull();
+    expect(addDesk(null, 3)).toHaveLength(1);
+  });
+
+  // 3 seats per desk, standard spacing, 3 x 1.2 m desk depth table.
+  describe("canAddDesk", () => {
+    const table = { length: 3, width: 1.2, orientation: 0 };
+    const cap = (room) => getMaxChairsForLayout("classroom", room, table, "standard", 3);
+
+    it("allows an add in a room with room to spare", () => {
+      const room = { length: 6.5, width: 4.5, height: 2.8 };
+      expect(cap(room)).toBe(18);
+      expect(canAddDesk(deriveDesks(6, 3), room, table, "standard", 3)).toBe(true);
+    });
+
+    it("refuses an add that would pass the room's capacity, and allows one that exactly fills it", () => {
+      const room = { length: 6.5, width: 3, height: 2.8 };
+      expect(cap(room)).toBe(12);
+      expect(canAddDesk(deriveDesks(9, 3), room, table, "standard", 3)).toBe(true);
+      expect(canAddDesk(deriveDesks(12, 3), room, table, "standard", 3)).toBe(false);
+    });
   });
 });

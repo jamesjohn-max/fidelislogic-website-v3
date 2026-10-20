@@ -5,8 +5,10 @@ import {
   clamp,
   clampTableOffset,
   createDefaultDoor,
+  effectiveSeatsPerDesk,
   generateLayout,
   getChairLimits,
+  getMaxChairsForLayout,
   getTableLimits,
   mainScreen,
   refreshAutoDevices,
@@ -14,6 +16,7 @@ import {
   seatingArea,
   tableCenterPoint,
   tableEdgeNearest,
+  uid,
 } from "./roomConfiguratorEngine";
 import { ROOM_TEMPLATES, buildTemplateDevices, buildTemplatePlan, emptyDevices } from "./roomTemplates";
 
@@ -136,6 +139,25 @@ export function settle(prev, next) {
 // The per-desk classroom state generateLayout reads. Pulled out so every call site
 // passes the same thing; `null` on either field means "derive from the headcount".
 export const classroomOf = (p) => ({ desks: p.desks, seatsPerDesk: p.seatsPerDesk });
+
+// Desk list operations. `desks` is compared by reference downstream, so a real change
+// returns a new array and a no-op returns the list it was given. A saved plan's list may
+// be null, empty or hold a malformed desk; none of these throw on that.
+export const canRemoveDesk = (desks) => Array.isArray(desks) && desks.length > 1;
+
+export const addDesk = (desks, seatsPerDesk) => [
+  ...(Array.isArray(desks) ? desks : []),
+  { id: uid("desk"), seats: effectiveSeatsPerDesk(seatsPerDesk), dx: 0, dy: 0, seatsSetByHand: false },
+];
+
+export const removeDesk = (desks, id) =>
+  canRemoveDesk(desks) && desks.some((d) => d?.id === id) ? desks.filter((d) => d?.id !== id) : desks;
+
+// Whether one more desk of the default size still fits the room's whole-desk capacity.
+export function canAddDesk(desks, room, table, density, seatsPerDesk) {
+  const seated = (Array.isArray(desks) ? desks : []).reduce((n, d) => n + (Number.isFinite(d?.seats) ? d.seats : 0), 0);
+  return seated + effectiveSeatsPerDesk(seatsPerDesk) <= getMaxChairsForLayout("classroom", room, table, density, seatsPerDesk);
+}
 
 function settleFurnitureAndDevices(prev, next) {
   let p = next;
