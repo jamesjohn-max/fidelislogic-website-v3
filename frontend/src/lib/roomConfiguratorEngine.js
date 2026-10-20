@@ -623,6 +623,26 @@ function uShapeCenterlinePoints(table, count) {
 // aisles and clearances below are the same at every setting.
 // Classroom: an aisle every 6 seats (two 3-seat tables), a cross-aisle every 6 rows.
 const CLASSROOM_LAYOUT = { blockSeats: 6, blockRows: 6, aisle: 1.0, marginX: 0.6, front: { min: 0.6, preferred: 0.9 }, back: { min: 0.2, preferred: 0.6 } };
+export const CLASSROOM_BLOCK_SEATS = CLASSROOM_LAYOUT.blockSeats;
+
+// Seats on one desk; anything non-finite or below 1 falls back to the layout default.
+export const effectiveSeatsPerDesk = (seatsPerDesk) =>
+  Number.isFinite(seatsPerDesk) && seatsPerDesk >= 1 ? Math.floor(seatsPerDesk) : CLASSROOM_BLOCK_SEATS;
+
+// The classroom's desk list from a headcount: full desks, the remainder on the last one.
+// Wherever plan.desks is read, null or [] means "derive", not an empty classroom.
+export function deriveDesks(headcount, seatsPerDesk) {
+  const perDesk = effectiveSeatsPerDesk(seatsPerDesk);
+  const count = Math.ceil(Math.max(0, headcount) / perDesk);
+  return Array.from({ length: count }, (_, i) => ({
+    id: uid("desk"),
+    seats: i < count - 1 ? perDesk : headcount - perDesk * (count - 1),
+    dx: 0,
+    dy: 0,
+    seatsSetByHand: false,
+  }));
+}
+
 // Theater: no more than 6 chairs side by side before an aisle, so people can move
 // around the room easily (blocks are split evenly — see rowBlocks), and a
 // cross-aisle every 10 rows.

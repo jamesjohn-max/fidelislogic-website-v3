@@ -32,7 +32,11 @@ import {
   getMaxChairsForLayout,
   occupancyLimit,
   seatsBlockedFromDisplay,
+  deriveDesks,
+  effectiveSeatsPerDesk,
+  CLASSROOM_BLOCK_SEATS,
 } from "./roomConfiguratorEngine";
+import { initialPlan, settle } from "./roomPlanState";
 
 const EMPTY_DEVICES = {
   display: [{ id: "d1", x: 0, y: 2, sizeInches: 98 }],
@@ -684,5 +688,42 @@ describe("seeing the main display", () => {
     const rec = buildRecommendations(state).find((r) => r.id === "seats-block-display");
     expect(rec).toMatchObject({ level: "suggestion" });
     expect(rec.text).toMatch(/D1/);
+  });
+});
+
+describe("classroom desk list", () => {
+  it("derives one desk per full seat group from the headcount", () => {
+    const desks = deriveDesks(12, 3);
+    expect(desks).toHaveLength(4);
+    expect(desks.map((d) => d.seats)).toEqual([3, 3, 3, 3]);
+    expect(new Set(desks.map((d) => d.id)).size).toBe(4); // ids are unique
+    expect(desks[0]).toMatchObject({ dx: 0, dy: 0, seatsSetByHand: false });
+  });
+
+  it("puts the remainder on the last desk rather than dropping it", () => {
+    expect(deriveDesks(11, 3).map((d) => d.seats)).toEqual([3, 3, 3, 2]);
+  });
+
+  it.each([0, -3, NaN, undefined, null])("falls back to the default for a bad seatsPerDesk (%p)", (bad) => {
+    expect(effectiveSeatsPerDesk(bad)).toBe(CLASSROOM_BLOCK_SEATS);
+  });
+
+  it("starts a plan with both fields null", () => {
+    const p = initialPlan();
+    expect(p.seatsPerDesk).toBeNull();
+    expect(p.desks).toBeNull();
+  });
+
+  it("clears the desk list when the layout type changes", () => {
+    const entered = { length: true, width: true, height: true };
+    const base = initialPlan();
+    const classroom = { ...base, room: { length: 9, width: 7, height: 2.8 }, roomEntered: entered, layout: "classroom", chairCount: 12 };
+    // Desks are edited on a plan whose layout is already settled, as the editor will.
+    const settled = settle(base, classroom);
+    const prev = settle(settled, { ...settled, desks: deriveDesks(12, 3) });
+    expect(prev.desks).not.toBeNull();
+    const next = settle(prev, { ...prev, layout: "ushape" });
+    expect(next.desks).toBeNull();
+    expect(next.seatEditsCleared).toBe(prev.seatEditsCleared + 1);
   });
 });

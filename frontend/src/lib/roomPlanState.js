@@ -58,6 +58,10 @@ export const initialPlan = () => ({
   removedChairs: [],
   chairOffsets: {},
   podOverrides: {},
+  // Classroom only: seats per desk, and the desk list (null = derive from the headcount;
+  // an empty array reads the same). Hand edits to the list clear with the other seat edits.
+  seatsPerDesk: null,
+  desks: null,
   // Every room starts with a door on the back wall, to be moved where it really is.
   devices: { ...emptyDevices(), door: [createDefaultDoor(PLACEHOLDER_ROOM)] },
   platform: null,
@@ -75,7 +79,7 @@ export const initialPlan = () => ({
   seatEditsCleared: 0,
 });
 
-const hasSeatEdits = (p) => p.removedChairs.length > 0 || Object.keys(p.chairOffsets).length > 0 || Object.keys(p.podOverrides).length > 0;
+const hasSeatEdits = (p) => p.removedChairs.length > 0 || Object.keys(p.chairOffsets).length > 0 || Object.keys(p.podOverrides).length > 0 || p.desks != null;
 
 const EPS = 1e-6;
 const sameChairs = (a, b) =>
@@ -153,7 +157,7 @@ function settleFurnitureAndDevices(prev, next) {
       const before = generateLayout(prev.layout, prev.room, prev.table, prev.chairCount, {}, prev.seatingDensity).chairs;
       const after = generateLayout(p.layout, p.room, p.table, p.chairCount, {}, p.seatingDensity).chairs;
       if (!sameChairs(before, after)) {
-        p = { ...p, removedChairs: [], chairOffsets: {}, podOverrides: {}, seatEditsCleared: p.seatEditsCleared + 1 };
+        p = { ...p, removedChairs: [], chairOffsets: {}, podOverrides: {}, desks: null, seatEditsCleared: p.seatEditsCleared + 1 };
       }
     }
   }
@@ -220,6 +224,7 @@ export function applyTemplate(plan, templateId) {
         removedChairs: [],
         chairOffsets: {},
         podOverrides: {},
+        desks: null,
         devices: blank.devices,
         audioPreference: null,
       }),
@@ -235,6 +240,7 @@ export function applyTemplate(plan, templateId) {
     removedChairs: [],
     chairOffsets: {},
     podOverrides: {},
+    desks: null,
   };
 }
 
