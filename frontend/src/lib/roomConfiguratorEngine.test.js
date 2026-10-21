@@ -909,6 +909,26 @@ describe("classroom rows packed from the desk list", () => {
       });
     });
 
+    // What the planner's next drag is added to. A desk pressed into a wall has had its
+    // offset clipped, and the offset it reports is that clipped one — a fixed point of
+    // the clamp — so moving it again starts from where the desk is. Adding to the asked-
+    // for offset instead would bank up travel past the wall to be undone first.
+    it("reports the offset it applied, not the one it was given", () => {
+      const [d] = deriveDesks(3, 3);
+      const free = classroomLayout(room, 0.5, [{ ...d, dx: 0.4, dy: 0.3 }], "standard").desks[0];
+      expect(free.dx).toBeCloseTo(0.4, 6);
+      expect(free.dy).toBeCloseTo(0.3, 6);
+
+      const asked = classroomLayout(room, 0.5, [{ ...d, dx: -99, dy: -99 }], "standard").desks[0];
+      expect(asked.dx).toBeGreaterThan(-99);
+      expect(asked.dy).toBeGreaterThan(-99);
+      const again = classroomLayout(room, 0.5, [{ ...d, dx: asked.dx, dy: asked.dy }], "standard").desks[0];
+      expect(again.dx).toBeCloseTo(asked.dx, 6);
+      expect(again.dy).toBeCloseTo(asked.dy, 6);
+      expect(again.x).toBeCloseTo(asked.x, 6);
+      expect(again.y).toBeCloseTo(asked.y, 6);
+    });
+
     it("treats a non-finite offset as no offset", () => {
       const [d] = deriveDesks(3, 3);
       const base = classroomLayout(room, 0.5, [d], "standard");

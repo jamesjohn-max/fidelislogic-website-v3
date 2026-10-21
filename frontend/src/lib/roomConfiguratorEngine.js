@@ -944,7 +944,11 @@ export function classroomLayout(room, deskDepth, deskList, density) {
       const ox = clamp(finite(d.dx), Math.min(0, -x), Math.max(0, room.length - (x + deskW(d))));
       const oy = clamp(finite(d.dy), Math.min(0, -top), Math.max(0, room.width - bottom));
       const deskLocal = toLocal(x + ox, top + oy, room);
-      desks.push({ deskId: d.id, x: deskLocal.x, y: deskLocal.y, w: deskW(d), h: deskDepth });
+      // dx/dy are the offset actually applied, which is the one the planner can see. A
+      // desk held against a wall has had its own clipped, and whoever moves it next has
+      // to carry on from here — adding to the stored offset instead would pile up travel
+      // past the wall that has to be undone before the desk moves again.
+      desks.push({ deskId: d.id, x: deskLocal.x, y: deskLocal.y, w: deskW(d), h: deskDepth, dx: ox, dy: oy });
       for (let s = 0; s < d.seats; s++) {
         chairs.push({ ...toLocal(x + ox + (s + 0.5) * sp.seatPitch, rowY + DESK_CHAIR_SETBACK + oy, room), angle: 0, deskId: d.id });
       }

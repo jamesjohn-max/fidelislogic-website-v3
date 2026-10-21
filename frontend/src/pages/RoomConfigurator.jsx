@@ -487,9 +487,22 @@ export const RoomConfigurator = ({ with3d = false }) => {
   );
 
   // A regenerated seating plan's chairs and pods aren't the ones that were selected.
+  // seatsPerDesk belongs here too: a classroom whose list is still derived names its
+  // desks by position, so a different desk size derives a different list under the same
+  // names and would leave a selection pointing at another desk.
   useEffect(() => {
     setSelection((s) => (s?.category === "chair" || s?.category === "tablePod" || s?.category === "desk" ? null : s));
-  }, [layout, chairCount, table, room, seatingDensity]);
+  }, [layout, chairCount, table, room, seatingDensity, seatsPerDesk]);
+
+  // And a selected desk that is no longer on the plan — deleted from another step, or
+  // gone from a list that was reloaded or shortened — stops being selected. Held by id,
+  // so moving a desk (which does change the list) keeps it selected and keeps the arrow
+  // keys working on it.
+  useEffect(() => {
+    setSelection((s) =>
+      s?.category === "desk" && !layoutResult.tableShape.desks?.some((d) => d.deskId === s.id) ? null : s
+    );
+  }, [layoutResult]);
 
   // Where microphones/speakers get spread: the room, the table, and the area the
   // (remaining) chairs actually cover.
@@ -661,17 +674,32 @@ export const RoomConfigurator = ({ with3d = false }) => {
 
   // Classroom: moving a desk carries its chairs with it (they are generated from the
   // desk's position), so only the desk's own offset is stored — added to what it has,
-  // like a pod's. The raw offset goes in: classroomLayout clamps it so the desk and its
-  // chairs stay inside the walls. Every desk edit goes through materialiseDesks first,
-  // because until the first one the list is null, meaning "derive from the headcount" —
-  // writing to it without materialising would leave a derived room with one desk. The
-  // list and the desk are replaced, never mutated: generateLayout compares desks by
-  // reference, so an in-place change would not redraw.
+  // like a pod's. What it is added to is the offset the engine actually applied (the
+  // desk's own dx/dy on the layout), not the one on the plan: classroomLayout keeps a
+  // desk and its chairs inside the walls by clipping the offset, and a desk pressed into
+  // a wall would otherwise bank the travel past it and sit there through the next few
+  // drags back. The stored offset stays raw wherever it fits, which is what lets a desk
+  // return to where it was put when the room grows again.
+  //
+  // Every desk edit goes through materialiseDesks first, because until the first one the
+  // list is null, meaning "derive from the headcount" — writing to it without
+  // materialising would leave a derived room with one desk. The list and the desk are
+  // replaced, never mutated: generateLayout compares desks by reference, so an in-place
+  // change would not redraw. An id-less desk on a hand-edited list is left alone rather
+  // than matched by a missing id.
   const handleDeskDragCommit = (id, dx, dy) => {
+    if (id == null) return;
+    const applied = layoutResult.tableShape.desks?.find((d) => d.deskId === id);
     update((p) => {
       const list = materialiseDesks(p).desks;
       if (!list) return null;
-      return { desks: list.map((d) => (d?.id === id ? { ...d, dx: (d.dx || 0) + dx, dy: (d.dy || 0) + dy } : d)) };
+      return {
+        desks: list.map((d) =>
+          d?.id != null && d.id === id
+            ? { ...d, dx: (applied ? applied.dx : d.dx || 0) + dx, dy: (applied ? applied.dy : d.dy || 0) + dy }
+            : d
+        ),
+      };
     });
   };
 
@@ -685,6 +713,9 @@ export const RoomConfigurator = ({ with3d = false }) => {
   // the shift is exactly the number of this desk's chairs before them. Both records are
   // rewritten here, or the nudge a planner gave one chair would reappear on another.
   const handleRemoveDesk = (id) => {
+    // An id-less desk on a hand-edited list can't be singled out, so it isn't removed:
+    // a missing id would otherwise match every other id-less desk at once.
+    if (id == null) return;
     const gone = layoutResult.chairs.flatMap((c, i) => (c.deskId === id ? [i] : []));
     const below = (i) => gone.filter((g) => g < i).length;
     update((p) => {
