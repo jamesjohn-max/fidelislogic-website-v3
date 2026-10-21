@@ -37,7 +37,7 @@ import { toast } from "../components/ui/sonner";
 import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
 import { api } from "../lib/api";
 import { micSources, speakerSources, derivedMicRange, derivedSpeakerRange } from "../lib/roomAudioCoverage";
-import { initialHistory, planReducer } from "../lib/roomPlanState";
+import { initialHistory, planReducer, materialiseDesks, removeDesk, addDesk, canAddDesk } from "../lib/roomPlanState";
 import { ROOM_TEMPLATES, emptyDevices } from "../lib/roomTemplates";
 import { loadDraft, saveDraft, clearDraft, loadPhotos, savePhotos, hasPlanLink, readPlanLink, planLink } from "../lib/roomPlannerDraft";
 // three.js only loads when someone opens the 3D view.
@@ -80,6 +80,9 @@ import {
   defaultSpeakerMount,
   followMountedCameras,
   refLabel,
+  planSeatTotal,
+  maxSeatsPerDesk,
+  seatsPerDerivedDesk,
 } from "../lib/roomConfiguratorEngine";
 
 // A customer's plan shows the room, its furniture, its doors and its screen, no other
@@ -286,6 +289,9 @@ export const RoomConfigurator = ({ with3d = false }) => {
     devices,
     chairOffsets,
     podOverrides,
+    // Classroom per-desk seating: both null until the planner edits the desks.
+    desks,
+    seatsPerDesk,
   } = plan;
   const removedChairIndices = useMemo(() => new Set(plan.removedChairs), [plan.removedChairs]);
   // Every change to the plan: `patch` is an object or (plan) => object.
@@ -475,14 +481,27 @@ export const RoomConfigurator = ({ with3d = false }) => {
   }, [history, undo]);
 
   const layoutResult = useMemo(
-    () => generateLayout(layout, room, table, chairCount, podOverrides, seatingDensity),
-    [layout, room, table, chairCount, podOverrides, seatingDensity]
+    () => generateLayout(layout, room, table, chairCount, podOverrides, seatingDensity, { desks, seatsPerDesk }),
+    [layout, room, table, chairCount, podOverrides, seatingDensity, desks, seatsPerDesk]
   );
 
   // A regenerated seating plan's chairs and pods aren't the ones that were selected.
+  // seatsPerDesk belongs here too: a classroom whose list is still derived names its
+  // desks by position, so a different desk size derives a different list under the same
+  // names and would leave a selection pointing at another desk.
   useEffect(() => {
-    setSelection((s) => (s?.category === "chair" || s?.category === "tablePod" ? null : s));
-  }, [layout, chairCount, table, room, seatingDensity]);
+    setSelection((s) => (s?.category === "chair" || s?.category === "tablePod" || s?.category === "desk" ? null : s));
+  }, [layout, chairCount, table, room, seatingDensity, seatsPerDesk]);
+
+  // And a selected desk that is no longer on the plan — deleted from another step, or
+  // gone from a list that was reloaded or shortened — stops being selected. Held by id,
+  // so moving a desk (which does change the list) keeps it selected and keeps the arrow
+  // keys working on it.
+  useEffect(() => {
+    setSelection((s) =>
+      s?.category === "desk" && !layoutResult.tableShape.desks?.some((d) => d.deskId === s.id) ? null : s
+    );
+  }, [layoutResult]);
 
   // Where microphones/speakers get spread: the room, the table, and the area the
   // (remaining) chairs actually cover.
@@ -504,7 +523,14 @@ export const RoomConfigurator = ({ with3d = false }) => {
     if (next === layout) return;
     update((p) => {
       const nextTable = TABLE_SIZED_LAYOUTS.includes(next) ? { ...p.table, ...defaultTableSize(next, p.room, p.table.orientation) } : p.table;
-      return { layout: next, table: nextTable, chairCount: getChairLimits(next, p.room, nextTable, p.seatingDensity)[1], tableOffset: { x: 0, y: 0 } };
+      // Read at the desk size in force, or a classroom started while seats-per-desk is
+      // set to something other than the standard six would open at the wrong headcount.
+      return {
+        layout: next,
+        table: nextTable,
+        chairCount: getChairLimits(next, p.room, nextTable, p.seatingDensity, p.seatsPerDesk)[1],
+        tableOffset: { x: 0, y: 0 },
+      };
     });
     // The new layout's table and seats start afresh, so they need looking at again.
     setCheckedSections((prev) => new Set([...prev].filter((key) => !LAYOUT_SECTIONS.includes(key))));
@@ -652,6 +678,133 @@ export const RoomConfigurator = ({ with3d = false }) => {
     });
   };
 
+  // Classroom: moving a desk carries its chairs with it (they are generated from the
+  // desk's position), so only the desk's own offset is stored — added to what it has,
+  // like a pod's. What it is added to is the offset the engine actually applied (the
+  // desk's own dx/dy on the layout), not the one on the plan: classroomLayout keeps a
+  // desk and its chairs inside the walls by clipping the offset, and a desk pressed into
+  // a wall would otherwise bank the travel past it and sit there through the next few
+  // drags back. The stored offset stays raw wherever it fits, which is what lets a desk
+  // return to where it was put when the room grows again.
+  //
+  // Every desk edit goes through materialiseDesks first, because until the first one the
+  // list is null, meaning "derive from the headcount" — writing to it without
+  // materialising would leave a derived room with one desk. The list and the desk are
+  // replaced, never mutated: generateLayout compares desks by reference, so an in-place
+  // change would not redraw. An id-less desk on a hand-edited list is left alone rather
+  // than matched by a missing id.
+  const handleDeskDragCommit = (id, dx, dy) => {
+    if (id == null) return;
+    const applied = layoutResult.tableShape.desks?.find((d) => d.deskId === id);
+    update((p) => {
+      const list = materialiseDesks(p).desks;
+      if (!list) return null;
+      const desks = list.map((d) =>
+        d?.id != null && d.id === id
+          ? { ...d, dx: (applied ? applied.dx : d.dx || 0) + dx, dy: (applied ? applied.dy : d.dy || 0) + dy }
+          : d
+      );
+      // A no-op (a desk already against its wall, an id that matches nothing) is no
+      // state change and no undo step, as with every other desk handler.
+      return desks.some((d, i) => (d.dx || 0) !== (list[i].dx || 0) || (d.dy || 0) !== (list[i].dy || 0)) ? { desks } : null;
+    });
+  };
+
+  // Removing a desk takes its chairs with it. removeDesk keeps the last desk and
+  // returns the list it was given when it changes nothing.
+  //
+  // What a planner has done to a single chair — nudged it, turned it, taken it away — is
+  // held by that chair's place in the generated list, so losing a desk's chairs shifts
+  // every later chair down by however many it carried. The classroom generates its
+  // chairs desk by desk in list order, so the chairs that remain keep their order and
+  // the shift is exactly the number of this desk's chairs before them. Both records are
+  // rewritten here, or the nudge a planner gave one chair would reappear on another.
+  const handleRemoveDesk = (id) => {
+    // An id-less desk on a hand-edited list can't be singled out, so it isn't removed:
+    // a missing id would otherwise match every other id-less desk at once.
+    if (id == null) return;
+    const gone = layoutResult.chairs.flatMap((c, i) => (c.deskId === id ? [i] : []));
+    const below = (i) => gone.filter((g) => g < i).length;
+    update((p) => {
+      const list = materialiseDesks(p).desks;
+      const desks = removeDesk(list, id);
+      if (desks === list) return null;
+      return {
+        desks,
+        chairOffsets: Object.fromEntries(
+          Object.entries(p.chairOffsets)
+            .filter(([i]) => !gone.includes(Number(i)))
+            .map(([i, off]) => [Number(i) - below(Number(i)), off])
+        ),
+        removedChairs: p.removedChairs.filter((i) => !gone.includes(i)).map((i) => i - below(i)),
+      };
+    });
+    setSelection(null);
+  };
+
+  // One more desk, at the current default size. materialiseDesks first for the reason
+  // above all others: until the first desk edit the list is null, meaning "derive from
+  // the headcount", and addDesk reads that as an empty classroom — so adding to a
+  // derived room without materialising would throw its desks away and leave one.
+  //
+  // The size stored is the derived one, not the raw default: materialiseDesks writes the
+  // desks beside it at seatsPerDerivedDesk, so passing the raw default would store 6 on
+  // the new desk where its siblings hold the 3 a narrow room allows. Nothing would read
+  // wrong today — seatsOnDesk caps every read — but widen the room later and that one
+  // desk jumps to 6 on its own while the rest stay put.
+  const handleAddDesk = () => {
+    update((p) => {
+      const list = materialiseDesks(p).desks;
+      return { desks: addDesk(list, seatsPerDerivedDesk(p.room, p.seatingDensity, p.seatsPerDesk)) };
+    });
+  };
+
+  // The default desk size. Desks nobody has sized by hand follow it (reseatDesks); the
+  // list itself is left alone, so a classroom still deriving its desks keeps deriving
+  // them — at the new size.
+  const handleSeatsPerDeskChange = (seats) => update({ seatsPerDesk: seats });
+
+  // One desk's own seats, which marks it hand-set so a later change to the default
+  // leaves it where the planner put it. materialiseDesks first, as with every desk edit,
+  // and the list and the desk are replaced rather than changed in place: desks are
+  // compared by reference downstream, so a mutation would not redraw.
+  //
+  // A desk's chairs are a contiguous run in the generated list, in list order, so a desk
+  // seating fewer or more shifts every chair after it — and the nudges, turns and
+  // removals a planner left on individual chairs are held by index. They are moved with
+  // the chairs here, exactly as removing a desk does.
+  // A desk always carries at least one seat (seatsOnDesk draws one whatever it is told),
+  // so a count below that is refused here rather than stored: the remap below would read
+  // it as the desk losing every chair while the plan still draws one, and shift the
+  // chairs after it by one too many.
+  const handleSetDeskSeats = (id, requested) => {
+    if (id == null || !Number.isFinite(requested) || requested < 1) return;
+    // Never more than a row holds: the remap below counts the chairs the desk will draw.
+    const seats = Math.min(requested, maxSeatsPerDesk(room, seatingDensity));
+    const block = layoutResult.chairs.flatMap((c, i) => (c.deskId === id ? [i] : []));
+    update((p) => {
+      const list = materialiseDesks(p).desks;
+      if (!list) return null;
+      const desks = list.map((d) => (d?.id != null && d.id === id ? { ...d, seats, seatsSetByHand: true } : d));
+      if (desks.every((d, i) => d === list[i])) return null;
+      // The chairs this desk loses, and where the rest start shifting from.
+      const gone = block.slice(Math.max(0, seats));
+      const end = block.length ? block[block.length - 1] + 1 : 0;
+      const delta = seats - block.length;
+      const below = (i) => gone.filter((g) => g < i).length;
+      const moved = (i) => (i >= end ? i + delta : i - below(i));
+      return {
+        desks,
+        chairOffsets: Object.fromEntries(
+          Object.entries(p.chairOffsets)
+            .filter(([i]) => !gone.includes(Number(i)))
+            .map(([i, off]) => [moved(Number(i)), off])
+        ),
+        removedChairs: p.removedChairs.filter((i) => !gone.includes(i)).map(moved),
+      };
+    });
+  };
+
   // Turning a pod turns its chair ring with it. Chairs of that pod that were
   // individually nudged or turned keep that adjustment relative to their table, so
   // their stored offset/angle turns by the same amount.
@@ -749,7 +902,26 @@ export const RoomConfigurator = ({ with3d = false }) => {
     additionalNotes,
     seatingDensity,
     seats,
+    // The classroom's desk list and desk size: without them planSeatTotal can't see the
+    // per-desk seats and would quote the setup headcount instead. The chairs taken off
+    // the plan by hand come too: chairCount above is already net of them, so without
+    // this the desk sum would be the one figure here that still counts them.
+    desks,
+    seatsPerDesk,
+    removedChairs: plan.removedChairs,
   };
+  // What the advice and the device counts quote: the seats the plan actually carries.
+  const seatTotal = planSeatTotal(state);
+
+  // The classroom's desks as the controls see them: the list it would be edited into, so
+  // a room still deriving its desks is counted and judged on the desks it actually draws
+  // rather than on the empty list it holds. canAddDesk reads the room and table through
+  // getMaxChairsForLayout, so it is only asked once a layout — and with it a room — is
+  // there to measure.
+  const deskList = layout === "classroom" ? materialiseDesks(plan).desks : null;
+  const canAddAnotherDesk = layout === "classroom" && canAddDesk(deskList, room, table, seatingDensity, seatsPerDesk);
+  // Once the list is real the desks set the seats, not the setup headcount.
+  const desksSet = layout === "classroom" && Array.isArray(desks) && desks.length > 0;
 
   const handleExport = async ({ roomName, customerName, createdBy }) => {
     const customer = audience === "customer";
@@ -932,7 +1104,7 @@ export const RoomConfigurator = ({ with3d = false }) => {
   // "add N microphones" count and the discs drawn on the plan come from one number.
   const micCover = { seats, seatArea: spreadContext.seats, table, tableOffset, micRange: audio.micRange, builtIn: builtInPickupsIn(state) };
   const suggestedMore = (category) =>
-    clamp(recommendedDeviceCount(category, layout, room, effectiveChairCount, camCoverage, audioPreference, category === "microphone" ? micCover : null) - devices[category].length, 1, 24);
+    clamp(recommendedDeviceCount(category, layout, room, seatTotal, camCoverage, audioPreference, category === "microphone" ? micCover : null) - devices[category].length, 1, 24);
   const deviceListProps = {
     devices,
     onAddDevice: handleAddDevice,
@@ -1151,7 +1323,13 @@ export const RoomConfigurator = ({ with3d = false }) => {
           <StepGroup
             title="Seats"
             description={isCustomer ? "Starts at the most that fit. Set it to how many people use the room." : undefined}
-            summary={`${chairCount} ${isCustomer ? "seats" : "chairs"} · ${seatingDensityLabel(seatingDensity)} spacing`}
+            // Once the desks set the seats, the summary quotes what they come to rather
+            // than the setup headcount they have taken over from. It switches on the same
+            // thing the field does, not on the layout: a classroom still deriving its
+            // desks has an editable headcount, and planSeatTotal is net of chairs taken
+            // off the plan by hand, so switching earlier would print a figure one short
+            // of the field right beside it.
+            summary={`${desksSet ? seatTotal : chairCount} ${isCustomer ? "seats" : "chairs"} · ${seatingDensityLabel(seatingDensity)} spacing`}
             alerts={essentials(seatingRecs)}
             {...group(ids.seats)}
           >
@@ -1163,6 +1341,13 @@ export const RoomConfigurator = ({ with3d = false }) => {
               onChairCountChange={(v) => update({ chairCount: v })}
               seatingDensity={seatingDensity}
               onSeatingDensityChange={(v) => update({ seatingDensity: v })}
+              seatsPerDesk={seatsPerDesk}
+              onSeatsPerDeskChange={handleSeatsPerDeskChange}
+              onAddDesk={handleAddDesk}
+              canAddDesk={canAddAnotherDesk}
+              deskCount={deskList?.length || 0}
+              desksSet={desksSet}
+              seatTotal={seatTotal}
             />
             {!isCustomer && <RecommendationList recommendations={seatingRecs} onAddDevice={handleAddDevice} />}
           </StepGroup>
@@ -1372,7 +1557,7 @@ export const RoomConfigurator = ({ with3d = false }) => {
   const planStatusBarProps = {
     room,
     layout,
-    capacity: effectiveChairCount,
+    capacity: seatTotal,
     onReset: handleReset,
     canUndo: history.past.length > 0,
     canRedo: history.future.length > 0,
@@ -1541,6 +1726,10 @@ export const RoomConfigurator = ({ with3d = false }) => {
                   onSetChairAngle={handleSetChairAngle}
                   onPodDragCommit={handlePodDragCommit}
                   onSetPodAngle={handleSetPodAngle}
+                  onDeskDragCommit={handleDeskDragCommit}
+                  onRemoveDesk={handleRemoveDesk}
+                  onSetDeskSeats={handleSetDeskSeats}
+                  deskSeatMax={layout === "classroom" ? Math.max(1, maxSeatsPerDesk(room, seatingDensity)) : 1}
                   hint={!layout && (step.id === "seating" || step.id === "table") ? "Pick a layout to add its furniture to the plan." : step.planHint}
                 />
               )}

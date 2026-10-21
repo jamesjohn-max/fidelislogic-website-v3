@@ -1,5 +1,5 @@
 import { CircleDashed, Pencil } from "lucide-react";
-import { LAYOUTS, DEVICE_LABELS, CAMERA_FEATURES, TABLE_SIZED_LAYOUTS, TABLE_KIND_LABELS, CLASSROOM_DESK_DEPTH, displaySpec, allInOneSpec, refCode, seatingDensityLabel } from "../../lib/roomConfiguratorEngine";
+import { LAYOUTS, DEVICE_LABELS, CAMERA_FEATURES, TABLE_SIZED_LAYOUTS, TABLE_KIND_LABELS, CLASSROOM_DESK_DEPTH, planSeatTotal, displaySpec, allInOneSpec, refCode, seatingDensityLabel } from "../../lib/roomConfiguratorEngine";
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
@@ -33,12 +33,12 @@ function SummaryRow({ title, facts, onEdit }) {
 // where each value was set. Every detail is still in its step and in the PDF.
 export function ReviewSummary({ state, audience, details, photoCount, onEditStep }) {
   const layoutLabel = LAYOUTS.find((l) => l.id === state.layout)?.label || state.layout;
-  const { room, table, chairCount, devices } = state;
+  const { room, table, devices } = state;
   const notes = state.additionalNotes?.trim();
   const controls = ["touchPanel", "contentSharing", "bookingPanel"].filter((c) => devices[c].length).map((c) => DEVICE_LABELS[c]);
   const features = (state.cameraFeatures || []).map((id) => CAMERA_FEATURES.find((f) => f.id === id)?.label || id);
   const tableSize = `${table.length.toFixed(1)} × ${table.width.toFixed(1)} m ${table.orientation === 0 ? "landscape" : "portrait"}`;
-  const seats = `${plural(chairCount, "seat")}, ${seatingDensityLabel(state.seatingDensity).toLowerCase()} spacing`;
+  const seats = `${plural(planSeatTotal(state), "seat")}, ${seatingDensityLabel(state.seatingDensity).toLowerCase()} spacing`;
   const tables = TABLE_SIZED_LAYOUTS.includes(state.layout)
     ? `${tableSize} table`
     : state.layout === "classroom"

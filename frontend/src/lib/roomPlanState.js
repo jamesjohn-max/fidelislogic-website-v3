@@ -5,8 +5,12 @@ import {
   clamp,
   clampTableOffset,
   createDefaultDoor,
+  deriveDesks,
+  effectiveSeatsPerDesk,
   generateLayout,
   getChairLimits,
+  seatsOnDesk,
+  seatsPerDerivedDesk,
   getTableLimits,
   mainScreen,
   refreshAutoDevices,
@@ -14,6 +18,7 @@ import {
   seatingArea,
   tableCenterPoint,
   tableEdgeNearest,
+  uid,
 } from "./roomConfiguratorEngine";
 import { ROOM_TEMPLATES, buildTemplateDevices, buildTemplatePlan, emptyDevices } from "./roomTemplates";
 
@@ -58,6 +63,10 @@ export const initialPlan = () => ({
   removedChairs: [],
   chairOffsets: {},
   podOverrides: {},
+  // Classroom only: seats per desk, and the desk list (null = derive from the headcount;
+  // an empty array reads the same). Hand edits to the list clear with the other seat edits.
+  seatsPerDesk: null,
+  desks: null,
   // Every room starts with a door on the back wall, to be moved where it really is.
   devices: { ...emptyDevices(), door: [createDefaultDoor(PLACEHOLDER_ROOM)] },
   platform: null,
@@ -129,10 +138,76 @@ export function settle(prev, next) {
   return reseated === p ? p : syncCustomerDisplay(settleFurnitureAndDevices(p, reseated));
 }
 
+// The per-desk classroom state generateLayout reads. Pulled out so every call site
+// passes the same thing; `null` on either field means "derive from the headcount".
+export const classroomOf = (p) => ({ desks: p.desks, seatsPerDesk: p.seatsPerDesk });
+
+// Desk list operations. `desks` is compared by reference downstream, so a real change
+// returns a new array and a no-op returns the list it was given. A saved plan's list may
+// be null, empty or hold a malformed desk; none of these throw on that.
+export const canRemoveDesk = (desks) => Array.isArray(desks) && desks.length > 1;
+
+export const addDesk = (desks, seatsPerDesk) => [
+  ...(Array.isArray(desks) ? desks : []),
+  { id: uid("desk"), seats: effectiveSeatsPerDesk(seatsPerDesk), dx: 0, dy: 0, seatsSetByHand: false },
+];
+
+export const removeDesk = (desks, id) =>
+  canRemoveDesk(desks) && desks.some((d) => d?.id === id) ? desks.filter((d) => d?.id !== id) : desks;
+
+// Whether one more desk of the default size still fits the room's whole-desk capacity —
+// which is as many seats as fit, but never more people than the room's permitted
+// occupancy (getChairLimits). The desk sum only grows by hand and planSeatTotal prints
+// it, so this is the one place that keeps a quote inside the fire-safe headcount.
+// Every desk here — those already placed and the one being added — is counted through
+// seatsOnDesk, so the button decides on the same seats the classroom will draw.
+export function canAddDesk(desks, room, table, density, seatsPerDesk) {
+  const seated = (Array.isArray(desks) ? desks : []).reduce((n, d) => n + seatsOnDesk(d, room, density), 0);
+  // The desk about to be added is measured the same way — it will be drawn with the
+  // seats it can carry, which in a narrow room is fewer than the default asks for.
+  const adding = seatsOnDesk({ seats: effectiveSeatsPerDesk(seatsPerDesk) }, room, density);
+  return seated + adding <= getChairLimits("classroom", room, table, density, seatsPerDesk)[1];
+}
+
+// The first desk edit turns "derive from the headcount" into a real list. addDesk and
+// removeDesk read a null or empty list as an empty classroom, so every desk edit must
+// pass the plan through here first or an Add on a derived room would leave one desk.
+// The list is derived exactly as generateLayout derives it (seatsPerDerivedDesk). Returns
+// a new plan when it writes a list and the same plan when there is nothing to write: a
+// non-classroom plan, one that already has a list, or a classroom with no headcount.
+export function materialiseDesks(plan) {
+  if (plan.layout !== "classroom" || (Array.isArray(plan.desks) && plan.desks.length)) return plan;
+  const desks = deriveDesks(plan.chairCount, seatsPerDerivedDesk(plan.room, plan.seatingDensity, plan.seatsPerDesk));
+  return desks.length ? { ...plan, desks } : plan;
+}
+
+// When the default desk size changes, desks the user has not sized by hand follow it;
+// a hand-set one (seatsSetByHand — a flag, never a comparison with the default) keeps
+// its seats. Returns the same list when no desk changes.
+function reseatDesks(prev, p) {
+  const was = effectiveSeatsPerDesk(prev.seatsPerDesk);
+  const seats = effectiveSeatsPerDesk(p.seatsPerDesk);
+  if (p.layout !== "classroom" || !Array.isArray(p.desks) || was === seats) return p;
+  const moves = (d) => d && typeof d === "object" && !d.seatsSetByHand && d.seats !== seats;
+  return p.desks.some(moves) ? { ...p, desks: p.desks.map((d) => (moves(d) ? { ...d, seats } : d)) } : p;
+}
+
 function settleFurnitureAndDevices(prev, next) {
-  let p = next;
+  let p = reseatDesks(prev, next);
+  // seatsPerDesk belongs here with the rest: it re-seats the classroom's desks
+  // (reseatDesks, above) and so re-partitions its rows, which both moves the chairs the
+  // hand edits below are indexed against and changes how many seats the room fits. The
+  // invariant is kept here rather than at the one caller that writes the field, so the
+  // next writer of it cannot miss it. The desk list is deliberately not in this test:
+  // a desk moved or re-seated on its own has a stable mapping for those edits and the
+  // page remaps them, where a whole re-partition has none and clears them instead.
   const furnitureChanged =
-    prev.room !== p.room || prev.layout !== p.layout || prev.table !== p.table || prev.chairCount !== p.chairCount || prev.seatingDensity !== p.seatingDensity;
+    prev.room !== p.room ||
+    prev.layout !== p.layout ||
+    prev.table !== p.table ||
+    prev.chairCount !== p.chairCount ||
+    prev.seatingDensity !== p.seatingDensity ||
+    prev.seatsPerDesk !== p.seatsPerDesk;
 
   if (furnitureChanged) {
     // The table stays in proportion to the room: capped so there's always space for
@@ -143,23 +218,29 @@ function settleFurnitureAndDevices(prev, next) {
     if (length !== p.table.length || width !== p.table.width) p = { ...p, table: { ...p.table, length, width } };
     // No more seats than the layout fits at this spacing.
     if (p.layout) {
-      const [min, max] = getChairLimits(p.layout, p.room, p.table, p.seatingDensity);
+      const [min, max] = getChairLimits(p.layout, p.room, p.table, p.seatingDensity, p.seatsPerDesk);
       const chairCount = clamp(p.chairCount, min, max);
       if (chairCount !== p.chairCount) p = { ...p, chairCount };
     }
     // Hand edits refer to the generated seats by index, so they only stay while those
     // seats are unchanged. A bigger room around the same table keeps them.
     if (hasSeatEdits(p)) {
-      const before = generateLayout(prev.layout, prev.room, prev.table, prev.chairCount, {}, prev.seatingDensity).chairs;
-      const after = generateLayout(p.layout, p.room, p.table, p.chairCount, {}, p.seatingDensity).chairs;
+      const before = generateLayout(prev.layout, prev.room, prev.table, prev.chairCount, {}, prev.seatingDensity, classroomOf(prev)).chairs;
+      const after = generateLayout(p.layout, p.room, p.table, p.chairCount, {}, p.seatingDensity, classroomOf(p)).chairs;
       if (!sameChairs(before, after)) {
         p = { ...p, removedChairs: [], chairOffsets: {}, podOverrides: {}, seatEditsCleared: p.seatEditsCleared + 1 };
       }
     }
+    // Desks are offsets from the flowed position, so they survive a resize or a change
+    // of seats; only a different layout type makes them meaningless.
+    if (p.desks != null && prev.layout !== p.layout) {
+      p = { ...p, desks: null, seatEditsCleared: p.seatEditsCleared === prev.seatEditsCleared ? p.seatEditsCleared + 1 : p.seatEditsCleared };
+    }
   }
 
-  const layoutChanged = furnitureChanged || prev.podOverrides !== p.podOverrides;
-  const layoutResult = generateLayout(p.layout, p.room, p.table, p.chairCount, p.podOverrides, p.seatingDensity);
+  const layoutChanged =
+    furnitureChanged || prev.podOverrides !== p.podOverrides || prev.desks !== p.desks || prev.seatsPerDesk !== p.seatsPerDesk;
+  const layoutResult = generateLayout(p.layout, p.room, p.table, p.chairCount, p.podOverrides, p.seatingDensity, classroomOf(p));
   if (layoutChanged || prev.tableOffset !== p.tableOffset) {
     const tableOffset = clampTableOffset(p.tableOffset, p.room, layoutResult.groupBounds);
     if (tableOffset.x !== p.tableOffset.x || tableOffset.y !== p.tableOffset.y) p = { ...p, tableOffset };
@@ -220,6 +301,7 @@ export function applyTemplate(plan, templateId) {
         removedChairs: [],
         chairOffsets: {},
         podOverrides: {},
+        desks: null,
         devices: blank.devices,
         audioPreference: null,
       }),
@@ -235,6 +317,7 @@ export function applyTemplate(plan, templateId) {
     removedChairs: [],
     chairOffsets: {},
     podOverrides: {},
+    desks: null,
   };
 }
 
@@ -247,8 +330,11 @@ const COALESCE_MS = 1200;
 // A plan (a restored draft, say) with more seats than its room's permitted occupancy
 // allows, brought down to that limit.
 export function fitOccupancy(plan) {
-  if (!plan.layout) return plan;
-  const max = getChairLimits(plan.layout, plan.room, plan.table, plan.seatingDensity)[1];
+  // A classroom with a desk list totals the sum of its desks' own seat counts, so there's
+  // nothing here to clamp — bringing chairCount down would only fight planSeatTotal. One
+  // without a list still derives from chairCount, where the clamp applies as ever.
+  if (!plan.layout || (plan.layout === "classroom" && Array.isArray(plan.desks) && plan.desks.length)) return plan;
+  const max = getChairLimits(plan.layout, plan.room, plan.table, plan.seatingDensity, plan.seatsPerDesk)[1];
   return plan.chairCount > max ? settle(plan, { ...plan, chairCount: max }) : plan;
 }
 

@@ -8,7 +8,9 @@ const { TextEncoder, TextDecoder } = require("util");
 global.TextEncoder = global.TextEncoder || TextEncoder;
 global.TextDecoder = global.TextDecoder || TextDecoder;
 
-const { rangeOrigin, coverageGapText } = require("./exportRoomConfigPdf");
+const { rangeOrigin, coverageGapText, layoutSummaryGrid } = require("./exportRoomConfigPdf");
+const { jsPDF } = require("jspdf");
+const { initialPlan } = require("./roomPlanState");
 
 describe("where a drawn range came from", () => {
   const source = (kind, isCustom) => ({ kind, isCustom });
@@ -50,5 +52,35 @@ describe("the two gap lists", () => {
 
   test("nor is a plan with no seats", () => {
     expect(coverageGapText({ sources: [{}], seats: 0, covered: 0, uncovered: [] }, [], "microphone")).toBe("no seats in this plan.");
+  });
+});
+
+// Spec §8.1 — the summary rows quote the seats the desks actually carry. The stat card
+// and these rows used to read the setup headcount while the Recommendations section read
+// the desk sum, so one report could contradict itself.
+describe("the seat figures in the summary grid", () => {
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  // 14 seats on the desks, against a headcount of 8 left over from the setup step.
+  const classroom = {
+    ...initialPlan(),
+    layout: "classroom",
+    chairCount: 8,
+    seatsPerDesk: 6,
+    desks: [6, 6, 2].map((seats, i) => ({ id: `desk-${i}`, seats, dx: 0, dy: 0, seatsSetByHand: true })),
+  };
+  const rowsOf = (state, audience) => layoutSummaryGrid(doc, state, audience).columns.flatMap(([, rows]) => rows);
+
+  test("the customer's Seats row counts the desks, not the headcount", () => {
+    expect(rowsOf(classroom, "customer")).toContainEqual(["Seats", "14"]);
+  });
+
+  test("the internal Seating row counts the desks, not the headcount", () => {
+    expect(rowsOf(classroom, "reseller")).toContainEqual(["Seating", "14 chairs"]);
+  });
+
+  test("every other layout still reads the headcount", () => {
+    const boardroom = { ...classroom, layout: "rectangular" };
+    expect(rowsOf(boardroom, "customer")).toContainEqual(["Seats", "8"]);
+    expect(rowsOf(boardroom, "reseller")).toContainEqual(["Seating", "8 chairs"]);
   });
 });

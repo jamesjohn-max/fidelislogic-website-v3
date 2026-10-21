@@ -32,7 +32,14 @@ import {
   getMaxChairsForLayout,
   occupancyLimit,
   seatsBlockedFromDisplay,
+  deriveDesks,
+  classroomLayout,
+  effectiveSeatsPerDesk,
+  CLASSROOM_BLOCK_SEATS,
+  maxSeatsPerDesk,
+  planSeatTotal,
 } from "./roomConfiguratorEngine";
+import { applyTemplate, fitOccupancy, initialPlan, settle } from "./roomPlanState";
 
 const EMPTY_DEVICES = {
   display: [{ id: "d1", x: 0, y: 2, sizeInches: 98 }],
@@ -305,18 +312,28 @@ describe("classroom rows and desks", () => {
     return Object.keys(byY).sort((a, b) => a - b).map((k) => byY[k]);
   };
 
-  test("when the room has space for another row, every row gets one centered desk", () => {
+  // Theater still spreads a headcount across rows and splits each row into blocks.
+  // The classroom packs an explicit desk list instead, so this now guards theater —
+  // see "classroom rows packed from the desk list" for the classroom's own rule.
+  test("when the room has space for another row, every row keeps its seats in one block", () => {
     // 7 m long room: up to 8 seats a row at standard spacing, with an aisle after 6.
-    const r = generateLayout("classroom", { length: 7, width: 6, height: 2.8 }, table, 13);
+    const r = generateLayout("theater", { length: 7, width: 6, height: 2.8 }, table, 13);
     expect(rowsOf(r)).toEqual([5, 4, 4]);
-    expect(deskWidths(r)).toEqual([5, 4, 4]);
+    // No row needed an aisle: every row's seats sit one seat pitch apart.
+    const rows = {};
+    r.chairs.forEach((c) => { (rows[c.y.toFixed(2)] ||= []).push(c.x); });
+    Object.values(rows).forEach((xs) => {
+      xs.sort((a, b) => a - b);
+      xs.slice(1).forEach((x, i) => expect(x - xs[i]).toBeLessThan(0.8));
+    });
   });
 
-  test("a row that has to split does so evenly, never leaving a lone seat", () => {
-    // Room only deep enough for one row, so 7 seats share it across an aisle.
+  test("a row takes the next desk whenever it still fits across the room", () => {
+    // Room only deep enough for one row: a 6-seat desk and the 1-seat remainder
+    // share it across an aisle (3.6 + 1.0 + 0.6 m, inside the 5.8 m usable width).
     const r = generateLayout("classroom", { length: 7, width: 2.6, height: 2.8 }, table, 7);
     expect(rowsOf(r)).toEqual([7]);
-    expect(deskWidths(r)).toEqual([4, 3]);
+    expect(deskWidths(r)).toEqual([6, 1]);
   });
 
   test("a shallow room still fits the rows its depth allows", () => {
@@ -684,5 +701,544 @@ describe("seeing the main display", () => {
     const rec = buildRecommendations(state).find((r) => r.id === "seats-block-display");
     expect(rec).toMatchObject({ level: "suggestion" });
     expect(rec.text).toMatch(/D1/);
+  });
+});
+
+describe("classroom desk list", () => {
+  it("derives one desk per full seat group from the headcount", () => {
+    const desks = deriveDesks(12, 3);
+    expect(desks).toHaveLength(4);
+    expect(desks.map((d) => d.seats)).toEqual([3, 3, 3, 3]);
+    expect(new Set(desks.map((d) => d.id)).size).toBe(4); // ids are unique
+    expect(desks[0]).toMatchObject({ dx: 0, dy: 0, seatsSetByHand: false });
+  });
+
+  it("puts the remainder on the last desk rather than dropping it", () => {
+    expect(deriveDesks(11, 3).map((d) => d.seats)).toEqual([3, 3, 3, 2]);
+  });
+
+  it.each([NaN, Infinity, -Infinity, undefined, null])("derives no desks from a non-finite headcount (%p)", (bad) => {
+    expect(deriveDesks(bad, 3)).toEqual([]);
+  });
+
+  it.each([0, -3, NaN, undefined, null])("falls back to the default for a bad seatsPerDesk (%p)", (bad) => {
+    expect(effectiveSeatsPerDesk(bad)).toBe(CLASSROOM_BLOCK_SEATS);
+  });
+
+  it("starts a plan with both fields null", () => {
+    const p = initialPlan();
+    expect(p.seatsPerDesk).toBeNull();
+    expect(p.desks).toBeNull();
+  });
+
+  describe("through settle", () => {
+    const entered = { length: true, width: true, height: true };
+    const base = initialPlan();
+    const classroom = { ...base, room: { length: 9, width: 7, height: 2.8 }, roomEntered: entered, layout: "classroom", chairCount: 12 };
+    // Desks are edited on a plan whose layout is already settled, as the editor will.
+    const settled = settle(base, classroom);
+    const prev = settle(settled, { ...settled, desks: deriveDesks(12, 3) });
+
+    it("clears the desk list when the layout type changes", () => {
+      expect(prev.desks).not.toBeNull();
+      const next = settle(prev, { ...prev, layout: "ushape" });
+      expect(next.desks).toBeNull();
+      expect(next.seatEditsCleared).toBe(prev.seatEditsCleared + 1);
+    });
+
+    it("keeps the desk list when the room is resized", () => {
+      const next = settle(prev, { ...prev, room: { ...prev.room, length: 11, width: 8 } });
+      expect(next.desks).toBe(prev.desks);
+      expect(next.seatEditsCleared).toBe(prev.seatEditsCleared);
+    });
+
+    it("clears the desk list when a template is applied", () => {
+      expect(applyTemplate(prev, "small").desks).toBeNull();
+      expect(applyTemplate({ ...prev, template: "small" }, "custom").desks).toBeNull();
+    });
+  });
+});
+
+describe("classroom rows packed from the desk list", () => {
+  const room = { length: 9, width: 7, height: 2.8 };
+  const table = { length: 3, width: 1.2, orientation: 0 };
+  // Desks are laid out in rows; two desks share a row when their x spans overlap.
+  const rowsOfDesks = (desks) => {
+    const byY = {};
+    desks.forEach((d) => { (byY[d.y.toFixed(4)] ||= []).push(d); });
+    return Object.keys(byY).sort((a, b) => a - b).map((k) => byY[k].slice().sort((a, b) => a.x - b.x));
+  };
+  const expectSaneDesks = (r, desks) => {
+    desks.forEach((d) => {
+      expect(d.x + r.length / 2).toBeGreaterThanOrEqual(-1e-6);
+      expect(d.x + d.w + r.length / 2).toBeLessThanOrEqual(r.length + 1e-6);
+      expect(d.y + r.width / 2).toBeGreaterThanOrEqual(-1e-6);
+      expect(d.y + d.h + r.width / 2).toBeLessThanOrEqual(r.width + 1e-6);
+    });
+    rowsOfDesks(desks).forEach((rowDesks) => {
+      rowDesks.slice(1).forEach((d, i) => expect(d.x).toBeGreaterThanOrEqual(rowDesks[i].x + rowDesks[i].w - 1e-6));
+    });
+  };
+
+  it("lays out one desk per group with the seats it carries", () => {
+    const { desks, chairs } = classroomLayout(room, 0.5, deriveDesks(12, 3), "standard");
+    expect(desks).toHaveLength(4);
+    expect(chairs).toHaveLength(12);
+  });
+
+  it("tags every chair with the id of its desk", () => {
+    const list = deriveDesks(12, 3);
+    const { chairs } = classroomLayout(room, 0.5, list, "standard");
+    list.forEach((d) => expect(chairs.filter((c) => c.deskId === d.id)).toHaveLength(d.seats));
+    expect(chairs.every((c) => c.deskId)).toBe(true);
+  });
+
+  it("gives every desk the id of the desk it was laid out from", () => {
+    const list = deriveDesks(12, 3);
+    const { desks } = classroomLayout(room, 0.5, list, "standard");
+    expect(desks.map((d) => d.deskId)).toEqual(list.map((d) => d.id));
+  });
+
+  it("centres a row of unequal desks on the room midline", () => {
+    // A 2-seat and a 5-seat desk: 4.2 m of seats plus a 1 m aisle fits one row of a
+    // 9 m room (7.8 m usable), so the pair is centred as a unit — spec §6.2.
+    const list = [
+      { id: "a", seats: 2, dx: 0, dy: 0, seatsSetByHand: true },
+      { id: "b", seats: 5, dx: 0, dy: 0, seatsSetByHand: true },
+    ];
+    const { desks } = classroomLayout(room, 0.4, list, "standard");
+    expect(rowsOfDesks(desks)).toHaveLength(1);
+    const left = Math.min(...desks.map((d) => d.x)) + room.length / 2;
+    const right = room.length / 2 - Math.max(...desks.map((d) => d.x + d.w));
+    expect(left).toBeCloseTo(right, 6);
+  });
+
+  it("starts a new row rather than squeezing a desk that will not fit", () => {
+    // 6.5 m long (5.3 m usable) fits two 3-seat desks and an aisle (4.6 m), not three.
+    const narrow = { length: 6.5, width: 8, height: 2.8 };
+    const { desks } = classroomLayout(narrow, 0.4, deriveDesks(30, 3), "standard");
+    expect(rowsOfDesks(desks).map((r) => r.length)).toEqual([2, 2, 2, 2, 2]);
+  });
+
+  // Review Focus 3
+  it("still lays out desks that no longer fit the room, without overlapping", () => {
+    const narrow = { length: 6.5, width: 8, height: 2.8 };
+    const { desks, chairs } = classroomLayout(narrow, 0.4, deriveDesks(30, 3), "standard");
+    expect(desks).toHaveLength(10);
+    expect(chairs).toHaveLength(30);
+    expect(rowsOfDesks(desks)).toHaveLength(5);
+    expectSaneDesks(narrow, desks);
+  });
+
+  it("derives the desk list from the headcount when the plan has none", () => {
+    const fromNull = generateLayout("classroom", room, table, 12, {}, "standard", { desks: null, seatsPerDesk: 3 });
+    const fromEmpty = generateLayout("classroom", room, table, 12, {}, "standard", { desks: [], seatsPerDesk: 3 });
+    // An empty array from a hand-edited shared link is not an empty classroom.
+    expect(fromNull.tableShape.desks).toHaveLength(4);
+    expect(fromEmpty.tableShape.desks).toHaveLength(4);
+    expect(fromNull.chairs).toHaveLength(12);
+  });
+
+  it("lays out the plan's own desk list when it has one", () => {
+    const list = [
+      { id: "a", seats: 2, dx: 0, dy: 0, seatsSetByHand: true },
+      { id: "b", seats: 4, dx: 0, dy: 0, seatsSetByHand: true },
+    ];
+    const r = generateLayout("classroom", room, table, 12, {}, "standard", { desks: list, seatsPerDesk: 3 });
+    expect(r.tableShape.desks.map((d) => d.deskId)).toEqual(["a", "b"]);
+    expect(r.chairs).toHaveLength(6); // the list wins over the headcount
+  });
+
+  describe("per-desk seats and offsets", () => {
+    // 9 x 7 m, standard density: wide enough for several desks, deep enough that a
+    // single centred desk has slack to be moved in every direction.
+    it("changes only the desk whose seat count changed", () => {
+      const list = deriveDesks(12, 3);
+      const edited = list.map((d, i) => (i === 1 ? { ...d, seats: 5 } : d));
+      const { chairs } = classroomLayout(room, 0.5, edited, "standard");
+      expect(chairs).toHaveLength(14);
+      expect(chairs.filter((c) => c.deskId === edited[1].id)).toHaveLength(5);
+      expect(chairs.filter((c) => c.deskId === edited[0].id)).toHaveLength(3);
+    });
+
+    it("clamps a desk's seats to what fits across the room", () => {
+      const max = maxSeatsPerDesk(room, "standard");
+      const [d] = deriveDesks(3, 3);
+      const { chairs } = classroomLayout(room, 0.5, [{ ...d, seats: max + 5 }], "standard");
+      expect(chairs).toHaveLength(max);
+    });
+
+    // Review Focus 1 — a clamp, not a filter: the desk must stay on the canvas to be selectable.
+    it("clamps a desk to at least one seat", () => {
+      const [d] = deriveDesks(3, 3);
+      const { chairs, desks } = classroomLayout(room, 0.5, [{ ...d, seats: 0 }], "standard");
+      expect(chairs).toHaveLength(1);
+      expect(desks.map((x) => x.deskId)).toEqual([d.id]);
+    });
+
+    it("moves a desk and all of its chairs by the same vector", () => {
+      const [d] = deriveDesks(3, 3);
+      const base = classroomLayout(room, 0.5, [d], "standard");
+      const moved = classroomLayout(room, 0.5, [{ ...d, dx: 0.4, dy: 0.3 }], "standard");
+      expect(moved.desks[0].x - base.desks[0].x).toBeCloseTo(0.4, 6);
+      expect(moved.desks[0].y - base.desks[0].y).toBeCloseTo(0.3, 6);
+      expect(moved.chairs).toHaveLength(base.chairs.length);
+      moved.chairs.forEach((c, i) => {
+        expect(c.deskId).toBe(d.id);
+        expect(c.x - base.chairs[i].x).toBeCloseTo(0.4, 6);
+        expect(c.y - base.chairs[i].y).toBeCloseTo(0.3, 6);
+      });
+    });
+
+    // Review Focus 5 — all four walls, for the desk and its chairs.
+    it.each([[99, 99], [-99, -99], [99, -99], [-99, 99]])("clamps a desk displaced by (%s, %s) back inside the room", (dx, dy) => {
+      const [d] = deriveDesks(3, 3);
+      const { desks, chairs } = classroomLayout(room, 0.5, [{ ...d, dx, dy }], "standard");
+      const [desk] = desks;
+      const e = 1e-6;
+      expect(desk.x + room.length / 2).toBeGreaterThanOrEqual(-e);
+      expect(desk.x + desk.w + room.length / 2).toBeLessThanOrEqual(room.length + e);
+      expect(desk.y + room.width / 2).toBeGreaterThanOrEqual(-e);
+      expect(desk.y + desk.h + room.width / 2).toBeLessThanOrEqual(room.width + e);
+      expect(chairs).toHaveLength(3);
+      chairs.forEach((c) => {
+        expect(c.x).toBeGreaterThanOrEqual(desk.x - e);
+        expect(c.x).toBeLessThanOrEqual(desk.x + desk.w + e);
+        expect(c.y - 0.3 + room.width / 2).toBeGreaterThanOrEqual(-e);
+        expect(c.y + 0.3 + room.width / 2).toBeLessThanOrEqual(room.width + e);
+      });
+    });
+
+    // What the planner's next drag is added to. A desk pressed into a wall has had its
+    // offset clipped, and the offset it reports is that clipped one — a fixed point of
+    // the clamp — so moving it again starts from where the desk is. Adding to the asked-
+    // for offset instead would bank up travel past the wall to be undone first.
+    it("reports the offset it applied, not the one it was given", () => {
+      const [d] = deriveDesks(3, 3);
+      const free = classroomLayout(room, 0.5, [{ ...d, dx: 0.4, dy: 0.3 }], "standard").desks[0];
+      expect(free.dx).toBeCloseTo(0.4, 6);
+      expect(free.dy).toBeCloseTo(0.3, 6);
+
+      const asked = classroomLayout(room, 0.5, [{ ...d, dx: -99, dy: -99 }], "standard").desks[0];
+      expect(asked.dx).toBeGreaterThan(-99);
+      expect(asked.dy).toBeGreaterThan(-99);
+      const again = classroomLayout(room, 0.5, [{ ...d, dx: asked.dx, dy: asked.dy }], "standard").desks[0];
+      expect(again.dx).toBeCloseTo(asked.dx, 6);
+      expect(again.dy).toBeCloseTo(asked.dy, 6);
+      expect(again.x).toBeCloseTo(asked.x, 6);
+      expect(again.y).toBeCloseTo(asked.y, 6);
+    });
+
+    it("treats a non-finite offset as no offset", () => {
+      const [d] = deriveDesks(3, 3);
+      const base = classroomLayout(room, 0.5, [d], "standard");
+      const bad = classroomLayout(room, 0.5, [{ ...d, dx: NaN, dy: Infinity }], "standard");
+      expect(bad.desks[0].x).toBeCloseTo(base.desks[0].x, 6);
+      expect(bad.desks[0].y).toBeCloseTo(base.desks[0].y, 6);
+    });
+  });
+
+  // Spec §11.1 — a shape guard, not a pixel guard. The user has accepted that an
+  // existing shared link may render slightly differently, so this deliberately does
+  // NOT assert coordinates: the new packing distributes a row's seats differently
+  // from balancedSplit at the edges, and that is allowed. It still catches a rewrite
+  // that produces an overlapping, empty or out-of-bounds room.
+  it("still produces a sane classroom for a plan with both fields null", () => {
+    const { chairs, tableShape } = generateLayout("classroom", room, table, 12, {}, "standard");
+    expect(chairs).toHaveLength(12);
+    expect(tableShape.type).toBe("desks");
+    expect(tableShape.desks.length).toBeGreaterThan(0);
+    expectSaneDesks(room, tableShape.desks);
+  });
+
+  // A whole desk can be neither split across rows nor hung over a wall, so the seat
+  // count the planner is offered has to be counted in desks.
+  describe("the seat count the room is offered never overflows it", () => {
+    // 9 x 3 m held 2 rows but was offered 18 seats, which derive as desks of 6, 6, 6 —
+    // two of those need 8.2 m against 7.8 m usable, so they packed into 3 rows and the
+    // back row's desks landed outside the back wall.
+    const shallow = { length: 9, width: 3, height: 2.8 };
+
+    it("offers only the seats whole desks fit, and lays them out inside the walls", () => {
+      const max = getMaxChairsForLayout("classroom", shallow, table);
+      expect(max).toBe(17); // 2 rows x one 6-seat desk, plus the 5-seat remainder desk
+      const r = generateLayout("classroom", shallow, table, max);
+      expect(r.chairs).toHaveLength(17);
+      expect(rowsOfDesks(r.tableShape.desks)).toHaveLength(2);
+      expectSaneDesks(shallow, r.tableShape.desks);
+    });
+
+    it("holds for every seat count up to that limit", () => {
+      const max = getMaxChairsForLayout("classroom", shallow, table);
+      for (let n = 2; n <= max; n++) {
+        const r = generateLayout("classroom", shallow, table, n);
+        expect(r.chairs).toHaveLength(n);
+        expectSaneDesks(shallow, r.tableShape.desks);
+      }
+    });
+
+    // The property that matters: the figure offered is the figure drawn. The planner sets a
+    // headcount up to the offered maximum and the desks are derived from it, so what comes
+    // out has to be exactly that many chairs, inside the walls. Hand-built desk lists cannot
+    // show this: they pass whether or not the derived ones agree with the capacity.
+    describe("the offered maximum is what a derived desk list draws", () => {
+      it.each([
+        ["4.5 x 6 m", 4.5, 6, 20],
+        ["3 x 9 m", 3, 9, 18],
+        ["4.5 x 9 m", 4.5, 9, 30],
+        ["6 x 6 m", 6, 6, 24],
+        ["9 x 3 m", 9, 3, 17],
+      ])("%s: the offered maximum is drawn in full, inside the walls", (_, length, width, expected) => {
+        const r = { length, width, height: 2.8 };
+        const max = getMaxChairsForLayout("classroom", r, table);
+        expect(max).toBe(expected); // the room is still the case it was chosen to be
+        const { chairs, tableShape } = generateLayout("classroom", r, table, max);
+        expect(chairs).toHaveLength(max);
+        expectSaneDesks(r, tableShape.desks);
+        chairs.forEach((c) => {
+          expect(Math.abs(c.x)).toBeLessThanOrEqual(r.length / 2 + 1e-6);
+          expect(Math.abs(c.y)).toBeLessThanOrEqual(r.width / 2 + 1e-6);
+        });
+      });
+    });
+
+    // Too narrow for a full desk, an oversized desk is capped to the row's width and drawn,
+    // so depth buys rows. The figure is checked against the renderer, not a hand count:
+    // one capped desk per row, that many rows, all inside the four walls.
+    describe("in a room too narrow for a full desk", () => {
+      const rooms = [[3, 6], [3, 9], [4.5, 6], [4.5, 9], [2.5, 7], [4, 8]].map(([length, width]) => ({ length, width, height: 2.8 }));
+      const depth = CLASSROOM_DESK_DEPTH.default;
+      const drawnAt = (r, cap) => {
+        const across = maxSeatsPerDesk(r, "standard");
+        const list = Array.from({ length: Math.ceil(cap / across) }, (_, i) => ({ id: `d${i}`, seats: across }));
+        return classroomLayout(r, depth, list, "standard");
+      };
+
+      it.each(rooms.map((r) => [`${r.length} x ${r.width} m`, r]))("%s: every seat offered is drawn inside the walls", (_, r) => {
+        const max = getMaxChairsForLayout("classroom", r, table);
+        const { chairs, desks } = drawnAt(r, max);
+        expect(chairs).toHaveLength(max);
+        expectSaneDesks(r, desks);
+        chairs.forEach((c) => {
+          expect(Math.abs(c.x)).toBeLessThanOrEqual(r.length / 2 + 1e-6);
+          expect(Math.abs(c.y)).toBeLessThanOrEqual(r.width / 2 + 1e-6);
+        });
+      });
+
+      it("offers more seats the deeper the room, at the same width", () => {
+        const at = (width) => getMaxChairsForLayout("classroom", { length: 3, width, height: 2.8 }, table);
+        expect(at(9)).toBeGreaterThan(at(6));
+        expect(at(6)).toBeGreaterThan(at(3));
+      });
+
+      it("offers 18 in 3 x 9 m, and the renderer draws all 18", () => {
+        const r = { length: 3, width: 9, height: 2.8 };
+        expect(getMaxChairsForLayout("classroom", r, table)).toBe(18);
+        expect(drawnAt(r, 18).chairs).toHaveLength(18);
+      });
+    });
+
+    it("still renders a hand-edited list that overflows, rather than dropping desks", () => {
+      // The one case that can still look wrong: a shared link carrying more desks than
+      // the room holds. Losing seats silently would be worse, so they all render.
+      const list = deriveDesks(30, 6);
+      const r = generateLayout("classroom", shallow, table, 30, {}, "standard", { desks: list });
+      expect(r.tableShape.desks).toHaveLength(list.length);
+      expect(r.chairs).toHaveLength(30);
+    });
+  });
+
+  it("loads a plan saved before per-desk seating, which has neither field", () => {
+    const base = initialPlan();
+    const old = { ...base, room, roomEntered: { length: true, width: true, height: true }, layout: "classroom", chairCount: 12 };
+    delete old.desks;
+    delete old.seatsPerDesk;
+    const p = settle(base, old);
+    const r = generateLayout(p.layout, p.room, p.table, p.chairCount, p.podOverrides, p.seatingDensity, {
+      desks: p.desks,
+      seatsPerDesk: p.seatsPerDesk,
+    });
+    expect(r.chairs).toHaveLength(12);
+    expectSaneDesks(p.room, r.tableShape.desks);
+  });
+
+  // Spec §11.8 — Theater shares rowSeatingLayout and must not move.
+  it("leaves theater seating unchanged by seatsPerDesk", () => {
+    const a = generateLayout("theater", room, table, 20, {}, "standard");
+    const b = generateLayout("theater", room, table, 20, {}, "standard", { seatsPerDesk: 2 });
+    expect(b.chairs).toEqual(a.chairs);
+  });
+});
+
+// Spec §8.1 — the recommendation engine quotes the seats the desks actually carry, not
+// the headcount the room was set up with, and a classroom's total isn't clamped on load.
+describe("the derived classroom seat total", () => {
+  const room = { length: 12, width: 8, height: 2.8 };
+  const desksOf = (...seats) => seats.map((n, i) => ({ id: `desk-${i}`, seats: n, dx: 0, dy: 0, seatsSetByHand: true }));
+  const gridSeats = (n) => Array.from({ length: n }, (_, i) => ({ x: 1 + (i % 6), y: 1 + Math.floor(i / 6), angle: 0 }));
+  const classroomSoundbar = (headcount, desks) => ({
+    ...makeState({ seats: gridSeats(headcount), room }),
+    layout: "classroom",
+    audioPreference: SOUNDBAR_AUDIO,
+    desks,
+    seatsPerDesk: 6,
+  });
+
+  it("quotes the derived total in the advice, not the setup headcount", () => {
+    // 14 seats on the desks while chairCount still reads the old headcount of 8.
+    const recs = buildRecommendations(classroomSoundbar(8, desksOf(6, 6, 2)));
+    const speakers = recs.find((r) => r.id === "soundbar-speakers");
+    const mics = recs.find((r) => r.id === "soundbar-microphones");
+    expect(speakers.text).toContain("all 14 can hear");
+    expect(mics.text).toContain("all 14 are heard");
+    expect(speakers.text).not.toMatch(/\b8\b/);
+  });
+
+  it("reports the derived total for a materialised classroom plan", () => {
+    expect(planSeatTotal({ layout: "classroom", chairCount: 12, desks: desksOf(6, 6, 2) })).toBe(14);
+  });
+
+  it("reports chairCount for every other layout", () => {
+    expect(planSeatTotal({ layout: "rectangular", chairCount: 8, desks: desksOf(6, 6, 2) })).toBe(8);
+  });
+
+  // A plan saved before per-desk seating, or one hand-edited into nonsense, must still
+  // give a number: no desk list means "not materialised", and a bad desk is worth 0.
+  it("falls back to chairCount when the desk list isn't materialised", () => {
+    expect(planSeatTotal({ layout: "classroom", chairCount: 12, desks: null })).toBe(12);
+    expect(planSeatTotal({ layout: "classroom", chairCount: 12, desks: [] })).toBe(12);
+    expect(planSeatTotal({ layout: "classroom", chairCount: 12 })).toBe(12);
+    // A malformed desk is worth one seat, not none — see seatsOnDesk.
+    expect(planSeatTotal({ layout: "classroom", chairCount: 12, desks: [{ seats: 6 }, null, { seats: "x" }] })).toBe(8);
+  });
+
+  // A shared link's desk list is whatever it was hand-edited to, and it prints. What it
+  // prints has to be the number of chairs on the diagram beside it, so the quote is
+  // asserted against the layout rather than against a hand-computed figure: one rule,
+  // one place (seatsOnDesk), and this is what catches the two drifting apart again.
+  describe("agrees with the chairs the classroom draws, however the list was edited", () => {
+    const deskTable = { length: 3, width: 1.2, orientation: 0, deskDepth: CLASSROOM_DESK_DEPTH.default };
+    const quoted = (desks, r = room) => planSeatTotal({ layout: "classroom", chairCount: 12, desks, room: r, seatingDensity: "standard" });
+    const drawn = (desks, r = room) => classroomLayout(r, deskTable.deskDepth, desks, "standard").chairs.length;
+    const agree = (desks, r = room) => {
+      expect(quoted(desks, r)).toBe(drawn(desks, r));
+      return quoted(desks, r);
+    };
+
+    it("on a malformed desk among good ones — one seat, not none", () => {
+      expect(agree([{ id: "a", seats: 6 }, { id: "b", seats: "x" }])).toBe(7);
+    });
+
+    it("on a list where every desk is malformed — one seat each, no fallback", () => {
+      expect(agree([null, { seats: "x" }, {}])).toBe(3);
+      expect(agree(desksOf(-6, -2))).toBe(2);
+    });
+
+    it("on fractional seats — floored, not rounded", () => {
+      expect(agree(desksOf(6.5, 8.5))).toBe(14);
+    });
+
+    it("on an oversized desk — capped to what the room's rows hold", () => {
+      const narrow = { length: 6.5, width: 4.5, height: 2.8 };
+      const cap = maxSeatsPerDesk(narrow, "standard");
+      expect(cap).toBeLessThan(40); // the cap has to bite for this to test anything
+      expect(agree(desksOf(40), narrow)).toBe(cap);
+    });
+
+    // A chair taken off the plan by hand is not on the diagram, so it is not in the quote.
+    // The derived branch has always read that way — the headcount it quotes arrives net of
+    // them — and the desk sum counts seats the desks hold, so it has to take them off.
+    it("on chairs removed by hand — the quote is what is left drawn", () => {
+      const desks = desksOf(6, 6, 2);
+      const classroom = (extra) => ({ layout: "classroom", chairCount: 12, desks, room, seatingDensity: "standard", ...extra });
+      const removedChairs = [1, 4, 9];
+      expect(planSeatTotal(classroom({ removedChairs }))).toBe(drawn(desks) - removedChairs.length);
+      // A state that never carried the field quotes exactly as it did.
+      expect(planSeatTotal(classroom())).toBe(drawn(desks));
+      // And the derived branch is untouched: its headcount already has them taken off.
+      expect(planSeatTotal({ layout: "classroom", chairCount: 12, desks: null, removedChairs })).toBe(12);
+    });
+
+    it("on more chairs removed than the desks hold — nothing, never less", () => {
+      const desks = desksOf(6, 6, 2);
+      const removedChairs = Array.from({ length: drawn(desks) + 5 }, (_, i) => i);
+      expect(planSeatTotal({ layout: "classroom", chairCount: 12, desks, room, seatingDensity: "standard", removedChairs })).toBe(0);
+    });
+
+    // buildRecommendations is called with bare states all over these suites, and the
+    // report's own state can reach planSeatTotal before a room is entered.
+    it("skips the cap, rather than throwing, when the state carries no room", () => {
+      expect(planSeatTotal({ layout: "classroom", chairCount: 12, desks: desksOf(40) })).toBe(40);
+      expect(planSeatTotal({ layout: "classroom", chairCount: 12, desks: desksOf(6, 6), room })).toBe(12);
+    });
+  });
+
+  it("does not clamp a classroom plan's total, and still clamps a rectangular one", () => {
+    const base = initialPlan();
+    const small = { length: 4, width: 3, height: 2.8 };
+    const over = (layout) => {
+      const max = getChairLimits(layout, small, base.table, base.seatingDensity, base.seatsPerDesk)[1];
+      return { plan: { ...base, room: small, layout, chairCount: max + 6 }, max };
+    };
+    const classroom = over("classroom");
+    // Only a materialised desk list is exempt: its total is the sum of the desks, so the
+    // headcount is not the quote. Without one, the headcount is the quote and is clamped.
+    const withDesks = { ...classroom.plan, desks: [{ id: "d0", seats: 6, dx: 0, dy: 0, seatsSetByHand: true }] };
+    expect(fitOccupancy(withDesks).chairCount).toBe(classroom.max + 6);
+    const rectangular = over("rectangular");
+    expect(fitOccupancy(rectangular.plan).chairCount).toBe(rectangular.max);
+  });
+});
+
+// Final whole-branch review fixes.
+describe("final review fixes", () => {
+  const deskTable = { length: 3, width: 1.2, orientation: 0, deskDepth: CLASSROOM_DESK_DEPTH.default };
+
+  // Desks are derived and drawn at min(perDesk, maxSeatsPerDesk); the capacity must use the same width.
+  it("classroomCapacity is offered only in seats that are drawn inside the room, even for a desk wider than the row cap", () => {
+    const room = { length: 6.45, width: 2.5, height: 2.8 };
+    const max = getMaxChairsForLayout("classroom", room, deskTable, "comfortable", 7);
+    const { chairs } = generateLayout("classroom", room, deskTable, max, {}, "comfortable", { seatsPerDesk: 7 });
+    expect(chairs).toHaveLength(max);
+    chairs.forEach((c) => expect(Math.abs(c.y)).toBeLessThanOrEqual(room.width / 2 + 1e-6));
+    expect(max).toBe(getMaxChairsForLayout("classroom", room, deskTable, "comfortable", 6));
+  });
+
+  it("fitOccupancy clamps a classroom with no desk list, or an empty one, to the room's limit", () => {
+    const base = initialPlan();
+    const room = { length: 8, width: 6, height: 2.8 };
+    expect(occupancyLimit(room)).toBe(32);
+    const plan = (desks) => ({ ...base, room, layout: "classroom", chairCount: 200, desks });
+    const max = getChairLimits("classroom", room, base.table, base.seatingDensity, base.seatsPerDesk)[1];
+    expect(max).toBeLessThan(200);
+    expect(fitOccupancy(plan(null)).chairCount).toBe(max);
+    expect(fitOccupancy(plan([])).chairCount).toBe(max);
+    const noKey = { ...plan(undefined), chairCount: 200 };
+    delete noKey.desks;
+    expect(fitOccupancy(noKey).chairCount).toBe(max);
+  });
+
+  it("a non-array desks list from a hand-edited link derives from the headcount rather than throwing", () => {
+    const room = { length: 8, width: 6, height: 2.8 };
+    [ "ab", { length: 2 } ].forEach((desks) => {
+      const r = generateLayout("classroom", room, deskTable, 8, {}, "standard", { desks });
+      expect(r.chairs).toHaveLength(8);
+    });
+  });
+
+  describe("a plan past the room's permitted occupancy is flagged", () => {
+    const room = { length: 7.5, width: 4.5, height: 2.8 };
+    const desks = (n) => Array.from({ length: n }, (_, i) => ({ id: `d${i}`, seats: 6, dx: 0, dy: 0, seatsSetByHand: true }));
+    const state = (n) => ({ ...makeState({ room }), layout: "classroom", chairCount: 12, desks: desks(n), seatingDensity: "standard" });
+    it("as an essential recommendation that states both figures", () => {
+      expect(occupancyLimit(room)).toBe(22);
+      const rec = buildRecommendations(state(4)).find((r) => r.id === "over-occupancy");
+      expect(rec).toMatchObject({ level: "essential", addCategories: [] });
+      expect(rec.text).toContain("24");
+      expect(rec.text).toContain("22");
+    });
+    it("and not at or under the limit", () => {
+      expect(ids(state(3))).not.toContain("over-occupancy");
+    });
   });
 });

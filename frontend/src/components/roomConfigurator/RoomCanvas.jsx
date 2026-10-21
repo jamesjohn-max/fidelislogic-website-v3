@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { X, Trash2, Radar } from "lucide-react";
+import { X, Trash2, Radar, Minus, Plus } from "lucide-react";
 import {
   GRID_STEP,
   ROOM_MARGIN,
@@ -285,10 +285,8 @@ function TableShape({ tableShape, selected }) {
       return tableShape.segments.map((s, i) => (
         <rect key={i} x={s.x} y={s.y} width={s.w} height={s.h} rx={0.05} fill={fill} stroke={stroke} strokeWidth={strokeWidth} vectorEffect="non-scaling-stroke" />
       ));
-    case "desks":
-      return tableShape.desks.map((d, i) => (
-        <rect key={i} x={d.x} y={d.y} width={d.w} height={d.h} rx={0.05} fill={fill} stroke={stroke} strokeWidth={strokeWidth} vectorEffect="non-scaling-stroke" />
-      ));
+    // The classroom's desks are drawn one by one beside the chairs, so each can be
+    // selected and moved on its own (see the desk branch in the table group).
     // D-shape and curved front-row tables.
     case "polygon":
       return (
@@ -510,6 +508,11 @@ function RulerTicks({ marks, orientation, wallAt, sign }) {
 const KEY_MOVE = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
 const KEY_TURN_DEG = 15;
 
+// The −/+ either side of the selected desk's seat count, in the selection bar's own
+// idiom: the same height, tokens and disabled treatment as the Delete beside them.
+const DESK_SEAT_BUTTON =
+  "flex min-h-[36px] w-7 items-center justify-center rounded-md text-blue-700 transition-transform duration-100 hover:bg-blue-500/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:active:scale-100";
+
 export function RoomCanvas({
   room,
   table,
@@ -532,6 +535,14 @@ export function RoomCanvas({
   onSetChairAngle,
   onPodDragCommit,
   onSetPodAngle,
+  // Classroom only: a desk moved by (dx, dy) from where it is now, and the desk to
+  // remove — both by desk id, never by index, so a deletion can't re-point them.
+  onDeskDragCommit,
+  onRemoveDesk,
+  // And the selected desk's own seat count, bounded 1..deskSeatMax (the most one desk
+  // can seat in this room — fewer than the standard six in a narrow one).
+  onSetDeskSeats,
+  deskSeatMax = 1,
   diagramRef,
   // Every mic and speaker's reach (micSources + speakerSources). coverageMode picks which
   // are drawn: "selected" (the selected device's), "all" or "off".
@@ -727,6 +738,22 @@ export function RoomCanvas({
     };
   }, [clientToPoint, onSelect]);
 
+  // Classroom: pressing a desk (or one of its chairs) selects that desk and drags it
+  // with the chairs that carry its id. Like a pod, the drag is a delta from where the
+  // desk sits now, so the chairs can follow along live. Keyed by the desk's id — an
+  // index would re-point as soon as another desk is deleted.
+  const startDeskDrag = useCallback((e, id) => {
+    e.stopPropagation();
+    onSelect({ category: "desk", id });
+    dragRef.current = {
+      category: "desk", id,
+      pointerId: e.pointerId,
+      startPointM: clientToPoint(e.clientX, e.clientY),
+      startX: 0, startY: 0,
+      moved: false,
+    };
+  }, [clientToPoint, onSelect]);
+
   const startRotateDrag = useCallback((e, category, id, centerX, centerY) => {
     e.stopPropagation();
     e.preventDefault();
@@ -819,22 +846,32 @@ export function RoomCanvas({
       commitChairMove(d.id, d.startX + ddx, d.startY + ddy);
     } else if (d.category === "tablePod") {
       commitPodMove(d.id, ddx, ddy);
+    } else if (d.category === "desk") {
+      // The raw move: classroomLayout clamps the offset so the desk and its chairs
+      // stay inside the walls, so there is nothing to clamp here.
+      onDeskDragCommit(d.id, ddx, ddy);
     } else {
       onDeviceDragCommit(d.category, d.id, d.startX + ddx, d.startY + ddy);
     }
     setLiveTableOffset(null);
     setLiveDevicePos(null);
-  }, [clientToPoint, onTableDragCommit, onDeviceDragCommit, onSetItemAngle, onSetChairAngle, onSetPodAngle, commitChairMove, commitPodMove]);
+  }, [clientToPoint, onTableDragCommit, onDeviceDragCommit, onSetItemAngle, onSetChairAngle, onSetPodAngle, onDeskDragCommit, commitChairMove, commitPodMove]);
 
   const handleDeleteSelected = useCallback(() => {
     if (!selection || selection.category === "table" || selection.category === "tablePod") return;
     if (selection.category === "chair") {
       onRemoveChair(selection.index);
       onSelect(null);
+    } else if (selection.category === "desk") {
+      // A classroom keeps at least one desk, whether its list is a real one or still
+      // derived from the headcount — the drawn desks are that list either way.
+      if ((layoutResult.tableShape.desks?.length || 0) < 2) return;
+      onRemoveDesk(selection.id);
+      onSelect(null);
     } else {
       onRemoveSelected();
     }
-  }, [selection, onRemoveChair, onRemoveSelected, onSelect]);
+  }, [selection, onRemoveChair, onRemoveSelected, onRemoveDesk, onSelect, layoutResult.tableShape.desks]);
 
   const handleBackgroundPointerDown = useCallback(() => {
     if (selection) onSelect(null);
@@ -872,6 +909,8 @@ export function RoomCanvas({
           commitChairMove(selection.index, (off.dx || 0) + dx, (off.dy || 0) + dy);
         } else if (selection.category === "tablePod") {
           commitPodMove(selection.index, dx, dy);
+        } else if (selection.category === "desk") {
+          onDeskDragCommit(selection.id, dx, dy);
         } else {
           const item = devices[selection.category]?.find((d) => d.id === selection.id);
           if (item) onDeviceDragCommit(selection.category, item.id, item.x + dx, item.y + dy);
@@ -896,7 +935,7 @@ export function RoomCanvas({
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [interactive, selection, onSelect, handleDeleteSelected, onRotateSelected, layoutResult.chairs, layoutResult.tableShape.tables, chairOffsets, onSetChairAngle, onSetPodAngle, onTableDragCommit, tableOffset, commitChairMove, commitPodMove, devices, onDeviceDragCommit]);
+  }, [interactive, selection, onSelect, handleDeleteSelected, onRotateSelected, layoutResult.chairs, layoutResult.tableShape.tables, chairOffsets, onSetChairAngle, onSetPodAngle, onTableDragCommit, tableOffset, commitChairMove, commitPodMove, onDeskDragCommit, devices, onDeviceDragCommit]);
 
   // What makes an item on the plan reachable with Tab. Tabbing to it selects it; a click
   // focuses it too, but selection there is left to the pointer handlers (a click on a
@@ -950,6 +989,25 @@ export function RoomCanvas({
   const selectedPodIndex = isPods && selection?.category === "tablePod" ? selection.index : null;
   const selectedPod = selectedPodIndex != null ? pods[selectedPodIndex] : null;
 
+  // The classroom's desks, as drawn. A desk is held on to by its id, so it survives
+  // another desk being deleted; the number beside it is only what it reads as on screen.
+  const isDesks = layoutResult.tableShape.type === "desks";
+  const deskList = isDesks ? layoutResult.tableShape.desks : [];
+  const selectedDeskId = isDesks && selection?.category === "desk" ? selection.id : null;
+  const selectedDeskIndex = selectedDeskId != null ? deskList.findIndex((d) => d.deskId === selectedDeskId) : -1;
+  const selectedDesk = selectedDeskIndex >= 0 ? deskList[selectedDeskIndex] : null;
+  // Where the desk is being dragged to, while the drag is on.
+  const deskLiveOffset = (id) => {
+    const live = liveDevicePos && liveDevicePos.key === `desk:${id}` ? liveDevicePos : null;
+    return { x: live ? live.x : 0, y: live ? live.y : 0 };
+  };
+  // A classroom keeps at least one desk; the reason shows on the disabled Delete.
+  const deskDeleteBlocked = selection?.category === "desk" && deskList.length < 2 ? "A classroom keeps at least one desk" : null;
+  // The selected desk's seats, counted off the plan: a desk's chairs are generated one
+  // per seat, so this is the number the classroom actually draws (a desk asking for more
+  // than the room's row holds is capped — see seatsOnDesk), not the raw stored figure.
+  const selectedDeskSeats = selectedDesk ? layoutResult.chairs.reduce((n, c) => n + (c.deskId === selectedDeskId ? 1 : 0), 0) : 0;
+
   const selectionLabel = !selection
     ? null
     : selection.category === "table"
@@ -958,8 +1016,13 @@ export function RoomCanvas({
     ? `Table ${selection.index + 1}`
     : selection.category === "chair"
     ? `Chair ${selection.index + 1}`
+    : selection.category === "desk"
+    ? `Desk ${selectedDeskIndex >= 0 ? selectedDeskIndex + 1 : ""}`.trim()
     : DEVICE_LABELS[selection.category];
-  const selectionDeletable = selection && selection.category !== "table" && selection.category !== "tablePod";
+  // A desk selection that matches nothing drawn (the plan changed under it) has nothing
+  // to delete.
+  const selectionDeletable =
+    selection && selection.category !== "table" && selection.category !== "tablePod" && !(selection.category === "desk" && !selectedDesk);
   // The selected device's own pickup/throw, at most one of each kind (an all-in-one or a
   // video bar has both). `range` is already resolved, so it reads as the override when the
   // device has one and as the default it follows when it has not.
@@ -973,6 +1036,11 @@ export function RoomCanvas({
     if (selection.category === "tablePod") {
       const pod = pods[selection.index];
       return pod ? { x: tableCenter.x + pod.x, y: tableCenter.y + pod.y } : null;
+    }
+    if (selection.category === "desk") {
+      if (!selectedDesk) return null;
+      const off = deskLiveOffset(selectedDesk.deskId);
+      return { x: tableCenter.x + selectedDesk.x + selectedDesk.w / 2 + off.x, y: tableCenter.y + selectedDesk.y + selectedDesk.h / 2 + off.y };
     }
     if (selection.category === "chair") {
       const chair = layoutResult.chairs[selection.index];
@@ -998,6 +1066,10 @@ export function RoomCanvas({
     if (kind === "chair") {
       const c = layoutResult.chairs[Number(id)];
       return c ? { x: tableCenter.x + c.x + liveDevicePos.x, y: tableCenter.y + c.y + liveDevicePos.y } : null;
+    }
+    if (kind === "desk") {
+      const d = deskList.find((x) => x.deskId === id);
+      return d ? { x: tableCenter.x + d.x + d.w / 2 + liveDevicePos.x, y: tableCenter.y + d.y + d.h / 2 + liveDevicePos.y } : null;
     }
     return { x: liveDevicePos.x, y: liveDevicePos.y };
   })();
@@ -1077,6 +1149,28 @@ export function RoomCanvas({
                           focusProps={focusable(`Table ${i + 1}`, { category: "tablePod", index: i })}
                         />
                       ))
+                    : isDesks
+                    ? deskList.map((d, i) => {
+                        const deskSelected = selection?.category === "table" || d.deskId === selectedDeskId;
+                        const off = deskLiveOffset(d.deskId);
+                        return (
+                          <rect
+                            key={d.deskId ?? i}
+                            {...focusable(`Desk ${i + 1}`, { category: "desk", id: d.deskId })}
+                            x={d.x + off.x}
+                            y={d.y + off.y}
+                            width={d.w}
+                            height={d.h}
+                            rx={0.05}
+                            fill={deskSelected ? palette.tableFillSel : palette.tableFill}
+                            stroke={deskSelected ? palette.tableStrokeSel : palette.tableStroke}
+                            strokeWidth={deskSelected ? 2 : 1.25}
+                            vectorEffect="non-scaling-stroke"
+                            onPointerDown={(e) => startDeskDrag(e, d.deskId)}
+                            style={interactive ? { cursor: "pointer" } : undefined}
+                          />
+                        );
+                      })
                     : <TableShape tableShape={layoutResult.tableShape} selected={selection?.category === "table"} />}
                   {layoutResult.chairs.map((c, i) => {
                     if (removedChairIndices.has(i)) return null;
@@ -1098,8 +1192,17 @@ export function RoomCanvas({
                       chairY = pod.y + rel.y;
                       chairAngle = ownAngle + pod.dAngle;
                     }
+                    // A desk's chairs ride along while their desk is being dragged.
+                    if (c.deskId != null) {
+                      const deskOff = deskLiveOffset(c.deskId);
+                      chairX += deskOff.x;
+                      chairY += deskOff.y;
+                    }
                     const highlighted =
-                      selection?.category === "table" || isThisChairSelected || (c.podIndex != null && selectedPodIndex === c.podIndex);
+                      selection?.category === "table" ||
+                      isThisChairSelected ||
+                      (c.podIndex != null && selectedPodIndex === c.podIndex) ||
+                      (c.deskId != null && selectedDeskId === c.deskId);
                     return (
                       <g
                         key={i}
@@ -1116,6 +1219,7 @@ export function RoomCanvas({
                           // bubble up and drag the whole table group.
                           if (isThisChairSelected) startChairDrag(e, i, off.dx || 0, off.dy || 0);
                           else if (c.podIndex != null) startPodDrag(e, c.podIndex);
+                          else if (c.deskId != null) startDeskDrag(e, c.deskId);
                         }}
                         style={{ cursor: "pointer" }}
                       >
@@ -1216,6 +1320,8 @@ export function RoomCanvas({
                       {hint ||
                         (isPods
                           ? "Drag a table to move it with its chairs, or use its handle to turn it. Double-click (or double-tap on a phone or tablet) a chair to move just that one."
+                          : isDesks
+                          ? "Drag a desk to move it with its chairs, or select it to remove it. Double-click (or double-tap on a phone or tablet) a chair to move just that one."
                           : "Drag the table to move the whole layout. Double-click (or double-tap on a phone or tablet) a chair to move just that one.")}
                     </p>
                   )}
@@ -1227,15 +1333,48 @@ export function RoomCanvas({
                           {selectionLabel} selected
                           {selection.category === "table" ? ": drag or use the arrow keys to move it" : ""}
                           {selection.category === "tablePod" ? `: drag to move, ${turnHint}, resize under Seating` : ""}
+                          {selection.category === "desk" ? ": drag or use the arrow keys to move it with its chairs" : ""}
                           {selectedPosition && (
                             <span className="font-normal text-blue-700"> at {selectedPosition.x.toFixed(2)}m, {selectedPosition.y.toFixed(2)}m</span>
                           )}
                         </span>
                         <div className="flex items-center gap-1">
+                          {/* Classroom: how many seats this one desk carries. Changing it
+                              marks the desk hand-set, so it keeps these seats when the
+                              default desk size changes under Seating. */}
+                          {selection.category === "desk" && selectedDesk && onSetDeskSeats && (
+                            <div role="group" aria-label="Seats on this desk" className="flex items-center rounded-md border border-blue-400/30">
+                              <button
+                                type="button"
+                                aria-label="One seat fewer on this desk"
+                                onClick={() => onSetDeskSeats(selectedDeskId, selectedDeskSeats - 1)}
+                                disabled={selectedDeskSeats <= 1}
+                                title={selectedDeskSeats <= 1 ? "A desk keeps at least one seat" : undefined}
+                                className={DESK_SEAT_BUTTON}
+                              >
+                                <Minus aria-hidden="true" className="h-3.5 w-3.5" />
+                              </button>
+                              <span aria-live="polite" className="min-w-[3.75rem] text-center text-xs font-semibold tabular-nums text-blue-700">
+                                {selectedDeskSeats} {selectedDeskSeats === 1 ? "seat" : "seats"}
+                              </span>
+                              <button
+                                type="button"
+                                aria-label="One seat more on this desk"
+                                onClick={() => onSetDeskSeats(selectedDeskId, selectedDeskSeats + 1)}
+                                disabled={selectedDeskSeats >= deskSeatMax}
+                                title={selectedDeskSeats >= deskSeatMax ? `A desk seats at most ${deskSeatMax} across this room` : undefined}
+                                className={DESK_SEAT_BUTTON}
+                              >
+                                <Plus aria-hidden="true" className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          )}
                           {selectionDeletable && (
                             <button
                               onClick={handleDeleteSelected}
-                              className="flex min-h-[36px] items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold rc-danger transition-transform duration-100 hover:bg-red-500/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-500 active:scale-[0.96]"
+                              disabled={!!deskDeleteBlocked}
+                              title={deskDeleteBlocked || undefined}
+                              className="flex min-h-[36px] items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold rc-danger transition-transform duration-100 hover:bg-red-500/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-500 active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:active:scale-100"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                               Delete

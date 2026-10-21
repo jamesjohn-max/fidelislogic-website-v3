@@ -623,6 +623,53 @@ function uShapeCenterlinePoints(table, count) {
 // aisles and clearances below are the same at every setting.
 // Classroom: an aisle every 6 seats (two 3-seat tables), a cross-aisle every 6 rows.
 const CLASSROOM_LAYOUT = { blockSeats: 6, blockRows: 6, aisle: 1.0, marginX: 0.6, front: { min: 0.6, preferred: 0.9 }, back: { min: 0.2, preferred: 0.6 } };
+export const CLASSROOM_BLOCK_SEATS = CLASSROOM_LAYOUT.blockSeats;
+
+// Seats on one desk; anything non-finite or below 1 falls back to the layout default.
+export const effectiveSeatsPerDesk = (seatsPerDesk) =>
+  Number.isFinite(seatsPerDesk) && seatsPerDesk >= 1 ? Math.floor(seatsPerDesk) : CLASSROOM_BLOCK_SEATS;
+
+// The classroom's desk list from a headcount: full desks, the remainder on the last one.
+// Wherever plan.desks is read, null or [] means "derive", not an empty classroom.
+export function deriveDesks(headcount, seatsPerDesk) {
+  if (!Number.isFinite(headcount)) return [];
+  const perDesk = effectiveSeatsPerDesk(seatsPerDesk);
+  const count = Math.ceil(Math.max(0, headcount) / perDesk);
+  return Array.from({ length: count }, (_, i) => ({
+    // Named by position, not minted fresh each time, so deriving twice names the same
+    // desks. generateLayout draws the derived list while materialiseDesks writes it, and
+    // a desk picked on the plan has to be the same desk in the list that gets written —
+    // with a new id each time, the first drag or delete on a derived classroom would
+    // find no such desk and quietly do nothing. A desk added later carries a uid, which
+    // never looks like this.
+    id: `desk-derived-${i}`,
+    seats: i < count - 1 ? perDesk : headcount - perDesk * (count - 1),
+    dx: 0,
+    dy: 0,
+    seatsSetByHand: false,
+  }));
+}
+
+// The seats a plan actually carries: for a materialised classroom plan the sum of what
+// each desk holds, otherwise the headcount the room was set up with. A null or empty desk
+// list means "derive from the headcount" (see deriveDesks), not an empty room.
+//
+// Every desk is counted through seatsOnDesk, the same rule classroomLayout draws with, so
+// this figure is the number of chairs on the plan however the desk list was edited. That
+// also means a non-empty list always comes to at least one seat per desk — there is no
+// "sums to nothing" case to fall back from.
+// Chairs taken off the plan by hand come off this figure too, so it stays the number of
+// chairs drawn: the derived branch gets that for free (the headcount it quotes is already
+// net of them), and the desk sum, which counts seats the desks hold rather than chairs
+// standing, has to take them off here. No list means nothing to take off, so a state
+// without the field — a saved plan, a caller that never had one — quotes as it did.
+export function planSeatTotal(state) {
+  const desks = state.layout === "classroom" && Array.isArray(state.desks) ? state.desks : null;
+  if (!desks?.length) return state.chairCount;
+  const seated = desks.reduce((n, d) => n + seatsOnDesk(d, state.room, state.seatingDensity), 0);
+  return Math.max(0, seated - (Array.isArray(state.removedChairs) ? state.removedChairs.length : 0));
+}
+
 // Theater: no more than 6 chairs side by side before an aisle, so people can move
 // around the room easily (blocks are split evenly — see rowBlocks), and a
 // cross-aisle every 10 rows.
@@ -712,6 +759,26 @@ function rowCapacity(room, sp) {
   return { seatsPerRow, maxRows };
 }
 
+// How many seats the classroom fits. Counting bare seats the way `rowCapacity` does
+// overstates it, because a desk can be neither split across rows nor hung over a wall:
+// a row with space for 7 seats may only have space for one 6-seat desk. So capacity is
+// counted in desks — as many full desks as fit across a row, over as many rows as the
+// room's depth allows, plus the remainder desk, which is narrower than a full one and
+// so can share the last row with it (see deriveDesks, which puts the remainder last).
+function classroomCapacity(room, sp, perDesk) {
+  const usableW = Math.max(0, room.length - sp.marginX * 2);
+  const seatsAcross = Math.floor(usableW / sp.seatPitch + 1e-9);
+  // Too narrow even for one full desk. An oversized desk is capped to the row's width and
+  // drawn (seatsOnDesk), not dropped, so each row holds one short desk and the room's depth
+  // still buys rows.
+  if (seatsAcross < perDesk) return seatsAcross * rowCapacity(room, sp).maxRows;
+  const deskPitch = perDesk * sp.seatPitch + sp.aisle;
+  const desksPerRow = Math.floor((usableW + sp.aisle) / deskPitch + 1e-9);
+  const spare = usableW - desksPerRow * deskPitch;
+  const remainder = Math.min(perDesk - 1, Math.max(0, Math.floor(spare / sp.seatPitch + 1e-9)));
+  return rowCapacity(room, sp).maxRows * desksPerRow * perDesk + remainder;
+}
+
 // Where the first row's line sits, from the front wall: the front zone gets its
 // preferred size if the rows leave room for it, otherwise whatever is spare over the
 // minimums; anything beyond that is left behind the last row.
@@ -720,9 +787,14 @@ function firstRowLine(room, rows, sp) {
   return sp.front.min + Math.min(spare, sp.front.preferred - sp.front.min) + sp.rowFront;
 }
 
-export function getMaxChairsForLayout(layout, room, table, density = DEFAULT_SEATING_DENSITY) {
-  if (layout === "classroom" || layout === "theater") {
-    const { seatsPerRow, maxRows } = rowCapacity(room, rowSpacing(layout, density, classroomDeskDepth(table)));
+export function getMaxChairsForLayout(layout, room, table, density = DEFAULT_SEATING_DENSITY, seatsPerDesk = null) {
+  // The classroom counts its seats in whole desks (classroomCapacity); theater seats
+  // are loose chairs, so it counts bare seats across a row as it always has.
+  if (layout === "classroom") {
+    return classroomCapacity(room, rowSpacing("classroom", density, classroomDeskDepth(table)), seatsPerDerivedDesk(room, density, seatsPerDesk));
+  }
+  if (layout === "theater") {
+    const { seatsPerRow, maxRows } = rowCapacity(room, rowSpacing("theater", density));
     return seatsPerRow * maxRows;
   }
   // Rectangular/oval/U-shape seat chairs around the table's own perimeter — cap the
@@ -755,13 +827,16 @@ export function getMaxChairsForLayout(layout, room, table, density = DEFAULT_SEA
 
 // The range a layout's chair count can be set to: up to as many as fit, but never more
 // people than the room's permitted occupancy (see occupancyLimit).
-export function getChairLimits(layout, room, table, density = DEFAULT_SEATING_DENSITY) {
-  const fits = Math.max(MIN_CHAIRS, getMaxChairsForLayout(layout, room, table, density));
+export function getChairLimits(layout, room, table, density = DEFAULT_SEATING_DENSITY, seatsPerDesk = null) {
+  const fits = Math.max(MIN_CHAIRS, getMaxChairsForLayout(layout, room, table, density, seatsPerDesk));
   const max = Math.min(fits, occupancyLimit(room));
   return [Math.min(MIN_CHAIRS, max), max];
 }
 
-function rowSeatingLayout(room, count, spacing, { withDesks, deskDepth } = {}) {
+// Rows laid out from a headcount alone, splitting each row into blocks (see rowBlocks).
+// Theater's only; the classroom lays out an explicit desk list instead — see
+// classroomLayout.
+function rowSeatingLayout(room, count, spacing) {
   const { seatsPerRow, maxRows } = rowCapacity(room, spacing);
   const fewestRows = Math.min(maxRows, Math.max(1, Math.ceil(count / seatsPerRow)));
   // If the fewest rows would need an aisle splitting a row, but one more row (when the
@@ -772,7 +847,7 @@ function rowSeatingLayout(room, count, spacing, { withDesks, deskDepth } = {}) {
   // Seats spread as evenly as the rows allow (front rows take any extra), so the last
   // row isn't a short stub behind full ones.
   const perRow = balancedSplit(Math.min(count, seatsPerRow * rows), rows).sort((a, b) => b - a);
-  const chairs = [], desks = [];
+  const chairs = [];
   const firstRowY = firstRowLine(room, rows, spacing);
   perRow.forEach((seatsInRow, r) => {
     if (seatsInRow <= 0) return;
@@ -786,27 +861,105 @@ function rowSeatingLayout(room, count, spacing, { withDesks, deskDepth } = {}) {
     // ends up directly behind another (see seatsBlockedFromDisplay).
     let x = room.length / 2 - rowSpan / 2;
     blocks.forEach((seatsInBlock) => {
-      // One desk strip per block of seats, so a desk never spans an aisle.
-      if (withDesks) {
-        const deskLocal = toLocal(x, rowY - DESK_GAP - deskDepth, room);
-        desks.push({ x: deskLocal.x, y: deskLocal.y, w: seatsInBlock * spacing.seatPitch, h: deskDepth });
-      }
       for (let s = 0; s < seatsInBlock; s++) {
-        const abs = { x: x + (s + 0.5) * spacing.seatPitch, y: withDesks ? rowY + DESK_CHAIR_SETBACK : rowY };
-        chairs.push({ ...toLocal(abs.x, abs.y, room), angle: 0 });
+        chairs.push({ ...toLocal(x + (s + 0.5) * spacing.seatPitch, rowY, room), angle: 0 });
       }
       x += seatsInBlock * spacing.seatPitch + spacing.aisle;
+    });
+  });
+  return { chairs };
+}
+
+// The most seats one desk can carry: a single row's worth across the room. It takes no
+// table because the width terms of rowSpacing do not depend on the desk's depth.
+export const maxSeatsPerDesk = (room, density) => rowCapacity(room, rowSpacing("classroom", density)).seatsPerRow;
+
+// The seats one desk actually carries. THE one place that question is answered: the
+// classroom draws this many chairs on the desk and the report quotes the sum of it, so
+// a second copy of this rule would be a quote that contradicts the diagram beside it —
+// which is the whole failure this exists to prevent.
+//
+// Whole seats, at least one (a clamp, not a filter: a desk must stay on the canvas to
+// stay selectable, so a desk hand-edited into nonsense by way of a shared link is worth
+// one seat rather than vanishing), and never more than the room's rows can hold. Without
+// a room the cap can't be computed, so it's skipped; a missing density is the default.
+export function seatsOnDesk(desk, room, density) {
+  const seats = Math.max(1, Number.isFinite(desk?.seats) ? Math.floor(desk.seats) : 1);
+  if (!room) return seats;
+  const cap = maxSeatsPerDesk(room, density);
+  return Number.isFinite(cap) && cap >= 1 ? Math.min(seats, cap) : seats;
+}
+
+// The seats a newly derived desk gets in this room. THE one place that question is
+// answered: generateLayout derives the classroom's list from the headcount with it and
+// materialiseDesks writes that same list into the plan, so the two cannot disagree. A
+// desk wider than the room's row is capped when drawn (seatsOnDesk), so deriving at the
+// raw default in a narrow room would quote seats the diagram then does not show. Without
+// a room there is no cap to apply, as in seatsOnDesk.
+export function seatsPerDerivedDesk(room, density, seatsPerDesk) {
+  const perDesk = effectiveSeatsPerDesk(seatsPerDesk);
+  if (!room) return perDesk;
+  const cap = maxSeatsPerDesk(room, density);
+  return Number.isFinite(cap) && cap >= 1 ? Math.min(perDesk, cap) : perDesk;
+}
+
+// Packs the desk list into rows: desks are taken in order, each added to the row being
+// filled until the next one's width (its seats at the seat pitch, plus an aisle between
+// desks) would overrun the usable width, which starts a new row. A desk is never split,
+// so a row can carry fewer seats than the bare seat pitch would allow, and a desk wider
+// than the room still gets laid out — on a row of its own — rather than disappearing.
+// Rows sit on the same lines as before (firstRowLine / rowBandY), each centred on the
+// room's midline, so unequal desks read as one centred block.
+//
+// Each desk's seat count comes from seatsOnDesk — the one rule the report quotes too —
+// and its dx/dy offset from the flowed position is clamped so the desk and its chairs
+// stay inside the walls.
+export function classroomLayout(room, deskDepth, deskList, density) {
+  const sp = rowSpacing("classroom", density, deskDepth);
+  const usableW = Math.max(0, room.length - sp.marginX * 2);
+  const deskW = (d) => d.seats * sp.seatPitch;
+  const rows = [];
+  (deskList || []).forEach((src) => {
+    const d = { ...src, seats: seatsOnDesk(src, room, density) };
+    const row = rows[rows.length - 1];
+    const span = row ? row.span + sp.aisle + deskW(d) : 0;
+    if (row && span <= usableW + 1e-6) {
+      row.desks.push(d);
+      row.span = span;
+    } else {
+      rows.push({ desks: [d], span: deskW(d) });
+    }
+  });
+
+  const chairs = [], desks = [];
+  const firstRowY = firstRowLine(room, rows.length, sp);
+  rows.forEach((row, r) => {
+    const rowY = firstRowY + rowBandY(r, sp);
+    let x = room.length / 2 - row.span / 2;
+    row.desks.forEach((d) => {
+      // The desk and its chairs move as one block. A flowed position already outside the
+      // room (desks that no longer fit) is left alone: the clamp only limits the offset.
+      const top = rowY - DESK_GAP - deskDepth, bottom = rowY + DESK_CHAIR_SETBACK + CHAIR_REACH;
+      const finite = (v) => (Number.isFinite(v) ? v : 0);
+      const ox = clamp(finite(d.dx), Math.min(0, -x), Math.max(0, room.length - (x + deskW(d))));
+      const oy = clamp(finite(d.dy), Math.min(0, -top), Math.max(0, room.width - bottom));
+      const deskLocal = toLocal(x + ox, top + oy, room);
+      // dx/dy are the offset actually applied, which is the one the planner can see. A
+      // desk held against a wall has had its own clipped, and whoever moves it next has
+      // to carry on from here — adding to the stored offset instead would pile up travel
+      // past the wall that has to be undone before the desk moves again.
+      desks.push({ deskId: d.id, x: deskLocal.x, y: deskLocal.y, w: deskW(d), h: deskDepth, dx: ox, dy: oy });
+      for (let s = 0; s < d.seats; s++) {
+        chairs.push({ ...toLocal(x + ox + (s + 0.5) * sp.seatPitch, rowY + DESK_CHAIR_SETBACK + oy, room), angle: 0, deskId: d.id });
+      }
+      x += deskW(d) + sp.aisle;
     });
   });
   return { chairs, desks };
 }
 
-function classroomLayout(room, deskDepth, count, density) {
-  return rowSeatingLayout(room, count, rowSpacing("classroom", density, deskDepth), { withDesks: true, deskDepth });
-}
-
 function theaterLayout(room, count, density) {
-  return rowSeatingLayout(room, count, rowSpacing("theater", density), { withDesks: false });
+  return rowSeatingLayout(room, count, rowSpacing("theater", density));
 }
 
 // Absolute floor/ceiling a pod can be resized to. The real per-arrangement ceiling
@@ -1087,7 +1240,9 @@ function contentBounds(chairs, rects = [], circles = []) {
   return Number.isFinite(minX) ? { minX, maxX, minY, maxY } : symmetricBounds(0, 0);
 }
 
-export function generateLayout(layoutType, room, table, chairCount, podOverrides = {}, density = DEFAULT_SEATING_DENSITY) {
+// `classroom` is the plan's per-desk state, `{ desks, seatsPerDesk }` — only the
+// classroom layout reads it, and it defaults to deriving the desks from the headcount.
+export function generateLayout(layoutType, room, table, chairCount, podOverrides = {}, density = DEFAULT_SEATING_DENSITY, classroom = {}) {
   // Nothing chosen yet: an empty room, no table or chairs.
   if (!layoutType) return { tableShape: { type: "none" }, chairs: [], groupBounds: symmetricBounds(0, 0) };
   const boxW = table.orientation === 0 ? table.length : table.width;
@@ -1112,7 +1267,13 @@ export function generateLayout(layoutType, room, table, chairCount, podOverrides
       return { tableShape: { type: "polygon", points: outline }, chairs, groupBounds: contentBounds(chairs, [polygonBox(outline)]) };
     }
     case "classroom": {
-      const { chairs, desks } = classroomLayout(room, classroomDeskDepth(table), chairCount, density);
+      // No list, or an empty one from a hand-edited link, means "derive from the
+      // headcount" — an empty array is never an empty classroom.
+      // Derived desks are no wider than the room's row (see seatsPerDerivedDesk): the
+      // headcount then fills the rows it was offered for.
+      const perDesk = seatsPerDerivedDesk(room, density, classroom.seatsPerDesk);
+      const deskList = Array.isArray(classroom.desks) && classroom.desks.length ? classroom.desks : deriveDesks(chairCount, perDesk);
+      const { chairs, desks } = classroomLayout(room, classroomDeskDepth(table), deskList, density);
       return { tableShape: { type: "desks", desks }, chairs, groupBounds: contentBounds(chairs, desks) };
     }
     case "theater": {
@@ -1944,7 +2105,10 @@ export const CONFIGURATION_COMPLETE_NOTE = "Configuration looks complete — con
 // and "suggestion" for improvements; `addCategories` lists the devices whose "+"
 // would resolve it, so the panel can offer a one-click add.
 export function buildRecommendations(state) {
-  const { room, chairCount, layout, devices } = state;
+  const { room, layout, devices } = state;
+  // Every seat figure below is the plan's real total, resolved once: a classroom's desks
+  // each carry their own count, so the setup headcount can be out of date.
+  const chairCount = planSeatTotal(state);
   const recs = [];
   const add = (id, level, text, addCategories = []) => recs.push({ id, level, text, addCategories });
   // An all-in-one display is a screen, a camera, microphones and speakers in one.
@@ -1954,6 +2118,16 @@ export function buildRecommendations(state) {
   const seatsWord = (n) => `${n} ${n === 1 ? "seat is" : "seats are"}`;
 
   if (!layout) add("no-layout", "essential", "Choose a furniture layout so the table and seating can be planned.");
+  // Chairs are added past the limit by routes no gate covers (a desk's own "+", a larger
+  // default desk, a smaller room), so the plan says so rather than quoting it silently.
+  const permitted = occupancyLimit(room);
+  if (chairCount > permitted)
+    add(
+      "over-occupancy",
+      "essential",
+      `This plan seats ${chairCount} people, over the ${permitted} this room is permitted (1 person per ${DBC_M2_PER_PERSON} m²) — remove ${chairCount - permitted} ${chairCount - permitted === 1 ? "seat" : "seats"} or choose a larger room.`,
+      []
+    );
   if (screensOf(devices).length === 0)
     add("no-display", "essential", "Add at least one display — none is currently placed in this room.", ["display", "allInOne"]);
   // The first screen that's too small for the room's viewing distance, if any.
