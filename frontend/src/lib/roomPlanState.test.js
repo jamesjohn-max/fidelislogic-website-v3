@@ -1,6 +1,6 @@
 import { addDesk, canAddDesk, canRemoveDesk, initialHistory, initialPlan, planReducer, removeDesk, settle } from "./roomPlanState";
 import { ROOM_TEMPLATES, TEMPLATE_IDS, buildTemplatePlan, templateSeats } from "./roomTemplates";
-import { buildRecommendations, classifyRoomType, deriveDesks, generateLayout, getChairLimits, getMaxChairsForLayout, maxSeatsPerDesk, micCoverage, occupancyLimit, placedSeats } from "./roomConfiguratorEngine";
+import { buildRecommendations, classifyRoomType, deriveDesks, generateLayout, effectiveSeatsPerDesk, getChairLimits, getMaxChairsForLayout, maxSeatsPerDesk, micCoverage, occupancyLimit, placedSeats } from "./roomConfiguratorEngine";
 
 const update = (state, patch, extra = {}) => planReducer(state, { type: "update", patch, ...extra });
 const template = (state, id) => planReducer(state, { type: "template", id });
@@ -337,6 +337,22 @@ describe("adding and deleting classroom desks", () => {
       // allowed another.
       const junk = Array.from({ length: 18 }, () => ({ seats: "x" }));
       expect(canAddDesk(junk, room, table, "standard", 3)).toBe(false);
+    });
+
+    // The desk about to be added is measured the same way as the ones already placed. In
+    // a room too narrow for a default desk it will be drawn with fewer seats than the
+    // default asks for, so measuring it raw is what refuses an add the room has space for.
+    it("counts the desk about to be added as the seats it will carry", () => {
+      const room = { length: 4.5, width: 6, height: 2.8 };
+      expect(maxSeatsPerDesk(room, "standard")).toBe(5); // a desk holds at most 5 here...
+      expect(effectiveSeatsPerDesk(null)).toBe(6); // ...while the default desk asks for 6
+      expect(getChairLimits("classroom", room, table, "standard", null)[1]).toBe(5); // and the room holds 5
+
+      // Nothing seated yet, so the first desk is drawn with 5 seats and exactly fills the
+      // room. Measured raw at 6 it overran the capacity and the Add button was dead.
+      expect(canAddDesk(null, room, table, "standard", null)).toBe(true);
+      // That one desk fills the room, so a second is still refused.
+      expect(canAddDesk([{ id: "a", seats: 5 }], room, table, "standard", null)).toBe(false);
     });
   });
 });
