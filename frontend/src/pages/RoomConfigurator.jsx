@@ -702,13 +702,14 @@ export const RoomConfigurator = ({ with3d = false }) => {
     update((p) => {
       const list = materialiseDesks(p).desks;
       if (!list) return null;
-      return {
-        desks: list.map((d) =>
-          d?.id != null && d.id === id
-            ? { ...d, dx: (applied ? applied.dx : d.dx || 0) + dx, dy: (applied ? applied.dy : d.dy || 0) + dy }
-            : d
-        ),
-      };
+      const desks = list.map((d) =>
+        d?.id != null && d.id === id
+          ? { ...d, dx: (applied ? applied.dx : d.dx || 0) + dx, dy: (applied ? applied.dy : d.dy || 0) + dy }
+          : d
+      );
+      // A no-op (a desk already against its wall, an id that matches nothing) is no
+      // state change and no undo step, as with every other desk handler.
+      return desks.some((d, i) => (d.dx || 0) !== (list[i].dx || 0) || (d.dy || 0) !== (list[i].dy || 0)) ? { desks } : null;
     });
   };
 
@@ -779,8 +780,10 @@ export const RoomConfigurator = ({ with3d = false }) => {
   // so a count below that is refused here rather than stored: the remap below would read
   // it as the desk losing every chair while the plan still draws one, and shift the
   // chairs after it by one too many.
-  const handleSetDeskSeats = (id, seats) => {
-    if (id == null || !Number.isFinite(seats) || seats < 1) return;
+  const handleSetDeskSeats = (id, requested) => {
+    if (id == null || !Number.isFinite(requested) || requested < 1) return;
+    // Never more than a row holds: the remap below counts the chairs the desk will draw.
+    const seats = Math.min(requested, maxSeatsPerDesk(room, seatingDensity));
     const block = layoutResult.chairs.flatMap((c, i) => (c.deskId === id ? [i] : []));
     update((p) => {
       const list = materialiseDesks(p).desks;
