@@ -1125,6 +1125,26 @@ describe("the derived classroom seat total", () => {
       expect(agree(desksOf(40), narrow)).toBe(cap);
     });
 
+    // A chair taken off the plan by hand is not on the diagram, so it is not in the quote.
+    // The derived branch has always read that way — the headcount it quotes arrives net of
+    // them — and the desk sum counts seats the desks hold, so it has to take them off.
+    it("on chairs removed by hand — the quote is what is left drawn", () => {
+      const desks = desksOf(6, 6, 2);
+      const classroom = (extra) => ({ layout: "classroom", chairCount: 12, desks, room, seatingDensity: "standard", ...extra });
+      const removedChairs = [1, 4, 9];
+      expect(planSeatTotal(classroom({ removedChairs }))).toBe(drawn(desks) - removedChairs.length);
+      // A state that never carried the field quotes exactly as it did.
+      expect(planSeatTotal(classroom())).toBe(drawn(desks));
+      // And the derived branch is untouched: its headcount already has them taken off.
+      expect(planSeatTotal({ layout: "classroom", chairCount: 12, desks: null, removedChairs })).toBe(12);
+    });
+
+    it("on more chairs removed than the desks hold — nothing, never less", () => {
+      const desks = desksOf(6, 6, 2);
+      const removedChairs = Array.from({ length: drawn(desks) + 5 }, (_, i) => i);
+      expect(planSeatTotal({ layout: "classroom", chairCount: 12, desks, room, seatingDensity: "standard", removedChairs })).toBe(0);
+    });
+
     // buildRecommendations is called with bare states all over these suites, and the
     // report's own state can reach planSeatTotal before a room is entered.
     it("skips the cap, rather than throwing, when the state carries no room", () => {

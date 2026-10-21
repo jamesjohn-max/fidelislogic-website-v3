@@ -802,9 +802,12 @@ export const RoomConfigurator = ({ with3d = false }) => {
     seatingDensity,
     seats,
     // The classroom's desk list and desk size: without them planSeatTotal can't see the
-    // per-desk seats and would quote the setup headcount instead.
+    // per-desk seats and would quote the setup headcount instead. The chairs taken off
+    // the plan by hand come too: chairCount above is already net of them, so without
+    // this the desk sum would be the one figure here that still counts them.
     desks,
     seatsPerDesk,
+    removedChairs: plan.removedChairs,
   };
   // What the advice and the device counts quote: the seats the plan actually carries.
   const seatTotal = planSeatTotal(state);

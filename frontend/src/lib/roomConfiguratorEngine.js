@@ -658,10 +658,16 @@ export function deriveDesks(headcount, seatsPerDesk) {
 // this figure is the number of chairs on the plan however the desk list was edited. That
 // also means a non-empty list always comes to at least one seat per desk — there is no
 // "sums to nothing" case to fall back from.
+// Chairs taken off the plan by hand come off this figure too, so it stays the number of
+// chairs drawn: the derived branch gets that for free (the headcount it quotes is already
+// net of them), and the desk sum, which counts seats the desks hold rather than chairs
+// standing, has to take them off here. No list means nothing to take off, so a state
+// without the field — a saved plan, a caller that never had one — quotes as it did.
 export function planSeatTotal(state) {
   const desks = state.layout === "classroom" && Array.isArray(state.desks) ? state.desks : null;
   if (!desks?.length) return state.chairCount;
-  return desks.reduce((n, d) => n + seatsOnDesk(d, state.room, state.seatingDensity), 0);
+  const seated = desks.reduce((n, d) => n + seatsOnDesk(d, state.room, state.seatingDensity), 0);
+  return Math.max(0, seated - (Array.isArray(state.removedChairs) ? state.removedChairs.length : 0));
 }
 
 // Theater: no more than 6 chairs side by side before an aisle, so people can move
