@@ -644,20 +644,18 @@ export function deriveDesks(headcount, seatsPerDesk) {
   }));
 }
 
-// The seats a plan actually carries: for a materialised classroom plan the sum of its
-// desks' own counts, otherwise the headcount the room was set up with. A null or empty
-// desk list means "derive from the headcount" (see deriveDesks), not an empty room, and
-// a desk hand-edited into nonsense by way of a saved plan counts as no seats.
+// The seats a plan actually carries: for a materialised classroom plan the sum of what
+// each desk holds, otherwise the headcount the room was set up with. A null or empty desk
+// list means "derive from the headcount" (see deriveDesks), not an empty room.
+//
+// Every desk is counted through seatsOnDesk, the same rule classroomLayout draws with, so
+// this figure is the number of chairs on the plan however the desk list was edited. That
+// also means a non-empty list always comes to at least one seat per desk — there is no
+// "sums to nothing" case to fall back from.
 export function planSeatTotal(state) {
   const desks = state.layout === "classroom" && Array.isArray(state.desks) ? state.desks : null;
   if (!desks?.length) return state.chairCount;
-  // Whole seats, never negative: a shared link's desk list is whatever it was edited to.
-  // Floored per desk the way classroomLayout floors each desk's seats when it draws the
-  // chairs, so the quoted figure can't contradict the diagram beside it.
-  const seated = desks.reduce((n, d) => n + (Number.isFinite(d?.seats) ? Math.max(0, Math.floor(d.seats)) : 0), 0);
-  // A list where every desk is malformed comes to nothing. Quoting zero seats would drop
-  // every seat sentence silently, so that counts as "not materialised" too.
-  return seated || state.chairCount;
+  return desks.reduce((n, d) => n + seatsOnDesk(d, state.room, state.seatingDensity), 0);
 }
 
 // Theater: no more than 6 chairs side by side before an aisle, so people can move
@@ -863,6 +861,22 @@ function rowSeatingLayout(room, count, spacing) {
 // table because the width terms of rowSpacing do not depend on the desk's depth.
 export const maxSeatsPerDesk = (room, density) => rowCapacity(room, rowSpacing("classroom", density)).seatsPerRow;
 
+// The seats one desk actually carries. THE one place that question is answered: the
+// classroom draws this many chairs on the desk and the report quotes the sum of it, so
+// a second copy of this rule would be a quote that contradicts the diagram beside it —
+// which is the whole failure this exists to prevent.
+//
+// Whole seats, at least one (a clamp, not a filter: a desk must stay on the canvas to
+// stay selectable, so a desk hand-edited into nonsense by way of a shared link is worth
+// one seat rather than vanishing), and never more than the room's rows can hold. Without
+// a room the cap can't be computed, so it's skipped; a missing density is the default.
+export function seatsOnDesk(desk, room, density) {
+  const seats = Math.max(1, Number.isFinite(desk?.seats) ? Math.floor(desk.seats) : 1);
+  if (!room) return seats;
+  const cap = maxSeatsPerDesk(room, density);
+  return Number.isFinite(cap) && cap >= 1 ? Math.min(seats, cap) : seats;
+}
+
 // Packs the desk list into rows: desks are taken in order, each added to the row being
 // filled until the next one's width (its seats at the seat pitch, plus an aisle between
 // desks) would overrun the usable width, which starts a new row. A desk is never split,
@@ -871,18 +885,16 @@ export const maxSeatsPerDesk = (room, density) => rowCapacity(room, rowSpacing("
 // Rows sit on the same lines as before (firstRowLine / rowBandY), each centred on the
 // room's midline, so unequal desks read as one centred block.
 //
-// Each desk's seats are clamped to 1..maxSeatsPerDesk (a clamp, not a filter: a desk
-// must stay on the canvas to stay selectable), and its dx/dy offset from the flowed
-// position is clamped so the desk and its chairs stay inside the walls.
+// Each desk's seat count comes from seatsOnDesk — the one rule the report quotes too —
+// and its dx/dy offset from the flowed position is clamped so the desk and its chairs
+// stay inside the walls.
 export function classroomLayout(room, deskDepth, deskList, density) {
   const sp = rowSpacing("classroom", density, deskDepth);
   const usableW = Math.max(0, room.length - sp.marginX * 2);
-  const maxSeats = maxSeatsPerDesk(room, density);
   const deskW = (d) => d.seats * sp.seatPitch;
   const rows = [];
   (deskList || []).forEach((src) => {
-    const seats = clamp(Number.isFinite(src.seats) ? Math.floor(src.seats) : 1, 1, maxSeats);
-    const d = { ...src, seats };
+    const d = { ...src, seats: seatsOnDesk(src, room, density) };
     const row = rows[rows.length - 1];
     const span = row ? row.span + sp.aisle + deskW(d) : 0;
     if (row && span <= usableW + 1e-6) {

@@ -1036,19 +1036,49 @@ describe("the derived classroom seat total", () => {
     expect(planSeatTotal({ layout: "classroom", chairCount: 12, desks: null })).toBe(12);
     expect(planSeatTotal({ layout: "classroom", chairCount: 12, desks: [] })).toBe(12);
     expect(planSeatTotal({ layout: "classroom", chairCount: 12 })).toBe(12);
-    expect(planSeatTotal({ layout: "classroom", chairCount: 12, desks: [{ seats: 6 }, null, { seats: "x" }] })).toBe(6);
+    // A malformed desk is worth one seat, not none — see seatsOnDesk.
+    expect(planSeatTotal({ layout: "classroom", chairCount: 12, desks: [{ seats: 6 }, null, { seats: "x" }] })).toBe(8);
   });
 
-  // A shared link's desk list is whatever it was hand-edited to, and it prints.
-  it("falls back to chairCount when every desk in the list is malformed", () => {
-    expect(planSeatTotal({ layout: "classroom", chairCount: 12, desks: [null, { seats: "x" }, {}] })).toBe(12);
-    expect(planSeatTotal({ layout: "classroom", chairCount: 12, desks: desksOf(-6, -2) })).toBe(12);
-  });
+  // A shared link's desk list is whatever it was hand-edited to, and it prints. What it
+  // prints has to be the number of chairs on the diagram beside it, so the quote is
+  // asserted against the layout rather than against a hand-computed figure: one rule,
+  // one place (seatsOnDesk), and this is what catches the two drifting apart again.
+  describe("agrees with the chairs the classroom draws, however the list was edited", () => {
+    const deskTable = { length: 3, width: 1.2, orientation: 0, deskDepth: CLASSROOM_DESK_DEPTH.default };
+    const quoted = (desks, r = room) => planSeatTotal({ layout: "classroom", chairCount: 12, desks, room: r, seatingDensity: "standard" });
+    const drawn = (desks, r = room) => classroomLayout(r, deskTable.deskDepth, desks, "standard").chairs.length;
+    const agree = (desks, r = room) => {
+      expect(quoted(desks, r)).toBe(drawn(desks, r));
+      return quoted(desks, r);
+    };
 
-  it("quotes whole, non-negative seats", () => {
-    // Floored per desk, as classroomLayout floors them when it draws the chairs.
-    expect(planSeatTotal({ layout: "classroom", chairCount: 12, desks: desksOf(6.5, 8.5) })).toBe(14);
-    expect(planSeatTotal({ layout: "classroom", chairCount: 12, desks: desksOf(6, -4) })).toBe(6);
+    it("on a malformed desk among good ones — one seat, not none", () => {
+      expect(agree([{ id: "a", seats: 6 }, { id: "b", seats: "x" }])).toBe(7);
+    });
+
+    it("on a list where every desk is malformed — one seat each, no fallback", () => {
+      expect(agree([null, { seats: "x" }, {}])).toBe(3);
+      expect(agree(desksOf(-6, -2))).toBe(2);
+    });
+
+    it("on fractional seats — floored, not rounded", () => {
+      expect(agree(desksOf(6.5, 8.5))).toBe(14);
+    });
+
+    it("on an oversized desk — capped to what the room's rows hold", () => {
+      const narrow = { length: 6.5, width: 4.5, height: 2.8 };
+      const cap = maxSeatsPerDesk(narrow, "standard");
+      expect(cap).toBeLessThan(40); // the cap has to bite for this to test anything
+      expect(agree(desksOf(40), narrow)).toBe(cap);
+    });
+
+    // buildRecommendations is called with bare states all over these suites, and the
+    // report's own state can reach planSeatTotal before a room is entered.
+    it("skips the cap, rather than throwing, when the state carries no room", () => {
+      expect(planSeatTotal({ layout: "classroom", chairCount: 12, desks: desksOf(40) })).toBe(40);
+      expect(planSeatTotal({ layout: "classroom", chairCount: 12, desks: desksOf(6, 6), room })).toBe(12);
+    });
   });
 
   it("does not clamp a classroom plan's total, and still clamps a rectangular one", () => {
