@@ -14,6 +14,7 @@ import {
   allInOneSpec,
   CLASSROOM_DESK_DEPTH,
   displaySpec,
+  planSeatTotal,
 } from "./roomConfiguratorEngine";
 import { resolveMicRange, micCoverageReport, speakerCoverageReport } from "./roomAudioCoverage";
 
@@ -213,7 +214,10 @@ function drawShareLink(doc, y, url) {
 function drawStatCards(doc, y, state, roomName) {
   const { room, table } = state;
   const area = room.length * room.width;
-  const people = `${state.chairCount} ${state.chairCount === 1 ? "person" : "people"}`;
+  // The seats the plan actually carries, resolved once: a classroom's desks each hold
+  // their own count, so the headcount the room was set up with can be out of date.
+  const seatTotal = planSeatTotal(state);
+  const people = `${seatTotal} ${seatTotal === 1 ? "person" : "people"}`;
   const cards = [
     { label: "Room name", value: roomName },
     { label: "Seating capacity", value: people },
@@ -773,8 +777,11 @@ const PLATFORM_LINE_H = 3.8;
 // to decide whether the section still fits on the current page.
 // `unconfirmed` holds the sections ("step:section") nobody opened, so their values are
 // still the starting defaults; those are marked "(default)" for whoever reads it next.
-function layoutSummaryGrid(doc, state, audience, unconfirmed = new Set()) {
-  const { room, table, chairCount, layout, platform, audioPreference, devices, wallMaterials, floorType, ceilingType, tableTopMaterial, cameraFeatures } = state;
+export function layoutSummaryGrid(doc, state, audience, unconfirmed = new Set()) {
+  const { room, table, layout, platform, audioPreference, devices, wallMaterials, floorType, ceilingType, tableTopMaterial, cameraFeatures } = state;
+  // Every seat figure in the summary is the plan's real total, resolved once (see
+  // planSeatTotal) — the same number the recommendations and the stat card quote.
+  const chairCount = planSeatTotal(state);
   const layoutLabel = LAYOUTS.find((l) => l.id === layout)?.label || "Not chosen";
   const colW = SUMMARY_COL_W;
   const mark = (section, rows) => (unconfirmed.has(section) ? rows.map(([k, v]) => [k, `${v} ${DEFAULT_MARK}`]) : rows);

@@ -1039,6 +1039,18 @@ describe("the derived classroom seat total", () => {
     expect(planSeatTotal({ layout: "classroom", chairCount: 12, desks: [{ seats: 6 }, null, { seats: "x" }] })).toBe(6);
   });
 
+  // A shared link's desk list is whatever it was hand-edited to, and it prints.
+  it("falls back to chairCount when every desk in the list is malformed", () => {
+    expect(planSeatTotal({ layout: "classroom", chairCount: 12, desks: [null, { seats: "x" }, {}] })).toBe(12);
+    expect(planSeatTotal({ layout: "classroom", chairCount: 12, desks: desksOf(-6, -2) })).toBe(12);
+  });
+
+  it("quotes whole, non-negative seats", () => {
+    // Floored per desk, as classroomLayout floors them when it draws the chairs.
+    expect(planSeatTotal({ layout: "classroom", chairCount: 12, desks: desksOf(6.5, 8.5) })).toBe(14);
+    expect(planSeatTotal({ layout: "classroom", chairCount: 12, desks: desksOf(6, -4) })).toBe(6);
+  });
+
   it("does not clamp a classroom plan's total, and still clamps a rectangular one", () => {
     const base = initialPlan();
     const small = { length: 4, width: 3, height: 2.8 };

@@ -651,7 +651,13 @@ export function deriveDesks(headcount, seatsPerDesk) {
 export function planSeatTotal(state) {
   const desks = state.layout === "classroom" && Array.isArray(state.desks) ? state.desks : null;
   if (!desks?.length) return state.chairCount;
-  return desks.reduce((n, d) => n + (Number.isFinite(d?.seats) ? d.seats : 0), 0);
+  // Whole seats, never negative: a shared link's desk list is whatever it was edited to.
+  // Floored per desk the way classroomLayout floors each desk's seats when it draws the
+  // chairs, so the quoted figure can't contradict the diagram beside it.
+  const seated = desks.reduce((n, d) => n + (Number.isFinite(d?.seats) ? Math.max(0, Math.floor(d.seats)) : 0), 0);
+  // A list where every desk is malformed comes to nothing. Quoting zero seats would drop
+  // every seat sentence silently, so that counts as "not materialised" too.
+  return seated || state.chairCount;
 }
 
 // Theater: no more than 6 chairs side by side before an aisle, so people can move

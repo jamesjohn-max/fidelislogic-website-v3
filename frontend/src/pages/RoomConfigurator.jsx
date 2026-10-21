@@ -1385,7 +1385,7 @@ export const RoomConfigurator = ({ with3d = false }) => {
   const planStatusBarProps = {
     room,
     layout,
-    capacity: effectiveChairCount,
+    capacity: seatTotal,
     onReset: handleReset,
     canUndo: history.past.length > 0,
     canRedo: history.future.length > 0,
