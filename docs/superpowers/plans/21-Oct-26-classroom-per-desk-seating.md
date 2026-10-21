@@ -91,7 +91,11 @@ Export `CLASSROOM_LAYOUT.blockSeats` under a name the test can import. `effectiv
 
 - [ ] **Step 4: Add `seatsPerDesk: null` and `desks: null` to `initialPlan`, and wire the clearing**
 
-`hasSeatEdits` (`roomPlanState.js:78`) gains `p.desks != null`. Both clearing sites (`:156`, `:220`) reset `desks: null` alongside `podOverrides: {}`.
+> **Correction (made during Task 1's review).** This step originally said `hasSeatEdits` should gain `p.desks != null`. **Do not do that** — it was wrong, and it is the only defect the plan shipped with. `hasSeatEdits` feeds the chairs-changed wipe at `roomPlanState.js:153-160`, which sits inside `if (furnitureChanged)` — true for a room resize, a density change, a table change or a headcount change. Routing desks through it means a planner resizing the room silently loses every desk edit. Spec §5.2 makes `dx`/`dy` relative to the **flowed** position precisely so desks survive a reflow, and §9 scopes the clear to a layout-**type** change.
+
+Leave `hasSeatEdits` as it was. Clear `desks` on a genuine layout-type change (`prev.layout !== p.layout`), keeping the `seatEditsCleared` increment so the UI still reports the reset. The `applyTemplate` clearing sites are correct as they stand — a template sets a new layout.
+
+Two tests pin the distinction: a room resize **preserves** desks; a layout-type change **clears** them.
 
 **Review Focus 4:** wherever `desks` is read, `desks == null || desks.length === 0` means "derive". An empty array from a hand-edited link is not an empty classroom.
 
