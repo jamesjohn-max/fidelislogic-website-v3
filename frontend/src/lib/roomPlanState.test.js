@@ -1,6 +1,6 @@
-import { addDesk, canAddDesk, canRemoveDesk, initialHistory, initialPlan, planReducer, removeDesk, settle } from "./roomPlanState";
+import { addDesk, canAddDesk, canRemoveDesk, classroomOf, initialHistory, initialPlan, materialiseDesks, planReducer, removeDesk, settle } from "./roomPlanState";
 import { ROOM_TEMPLATES, TEMPLATE_IDS, buildTemplatePlan, templateSeats } from "./roomTemplates";
-import { buildRecommendations, classifyRoomType, deriveDesks, generateLayout, effectiveSeatsPerDesk, getChairLimits, getMaxChairsForLayout, maxSeatsPerDesk, micCoverage, occupancyLimit, placedSeats } from "./roomConfiguratorEngine";
+import { buildRecommendations, classifyRoomType, deriveDesks, generateLayout, effectiveSeatsPerDesk, getChairLimits, getMaxChairsForLayout, maxSeatsPerDesk, micCoverage, occupancyLimit, placedSeats, planSeatTotal, seatsPerDerivedDesk } from "./roomConfiguratorEngine";
 
 const update = (state, patch, extra = {}) => planReducer(state, { type: "update", patch, ...extra });
 const template = (state, id) => planReducer(state, { type: "template", id });
@@ -355,6 +355,115 @@ describe("adding and deleting classroom desks", () => {
       expect(canAddDesk(seated, room, table, "standard", null)).toBe(true);
       // Three full desks (15) cannot take another 5.
       expect(canAddDesk([5, 5, 5].map((seats, i) => ({ id: `f${i}`, seats })), room, table, "standard", null)).toBe(false);
+    });
+  });
+});
+
+describe("materialising the classroom desk list", () => {
+  const table = { length: 3, width: 1.2, orientation: 0 };
+  const classroom = (patch = {}) => ({
+    ...initialPlan(),
+    layout: "classroom",
+    room: { length: 6.5, width: 4.5, height: 2.8 },
+    table,
+    chairCount: 9,
+    seatingDensity: "standard",
+    seatsPerDesk: 3,
+    ...patch,
+  });
+  const seats = (desks) => desks.map((d) => d.seats);
+
+  it("leaves desks null until a desk is edited, and the headcount keeps driving the layout", () => {
+    let state = planReducer(initialHistory(), { type: "reset", plan: classroom() });
+    state = update(state, { chairCount: 12 });
+    expect(state.present.desks).toBeNull();
+    expect(generateLayout("classroom", state.present.room, table, 12, {}, "standard", classroomOf(state.present)).chairs).toHaveLength(12);
+  });
+
+  it("writes the derived list on the first desk edit, and is a no-op on a plan that already has one", () => {
+    const plan = classroom();
+    const done = materialiseDesks(plan);
+    expect(done).not.toBe(plan);
+    expect(done.desks).not.toBe(plan.desks);
+    expect(done.desks).toEqual(deriveDesks(9, 3).map((d) => ({ ...d, id: expect.any(String) })));
+    expect(plan.desks).toBeNull();
+    expect(materialiseDesks(done)).toBe(done);
+  });
+
+  // The gate: addDesk treats a null list as empty, so adding to a still-derived classroom
+  // would collapse nine seats on three desks to one new desk.
+  it("lets an add on a derived classroom keep the derived desks", () => {
+    const done = materialiseDesks(classroom());
+    expect(addDesk(done.desks, 3)).toHaveLength(4);
+    expect(planSeatTotal({ ...done, desks: addDesk(done.desks, 3) })).toBe(12);
+  });
+
+  it("treats an empty or malformed list as not-yet-a-list and materialises it", () => {
+    for (const bad of [undefined, null, []]) {
+      const done = materialiseDesks(classroom({ desks: bad }));
+      expect(done.desks).toHaveLength(3);
+    }
+  });
+
+  it("changes nothing for a non-classroom plan or a classroom with no headcount", () => {
+    const boardroom = { ...classroom(), layout: "rectangular" };
+    expect(materialiseDesks(boardroom)).toBe(boardroom);
+    for (const chairCount of [0, NaN, undefined]) {
+      const empty = classroom({ chairCount });
+      expect(materialiseDesks(empty)).toBe(empty);
+    }
+  });
+
+  it("derives the desk width the classroom will draw, so a narrow room materialises narrow desks", () => {
+    const plan = classroom({ room: { length: 4.5, width: 6, height: 2.8 }, chairCount: 18, seatsPerDesk: null });
+    expect(maxSeatsPerDesk(plan.room, "standard")).toBeLessThan(effectiveSeatsPerDesk(null));
+    const drawn = generateLayout("classroom", plan.room, table, plan.chairCount, {}, "standard", classroomOf(plan)).chairs.length;
+    const done = materialiseDesks(plan);
+    const written = done.desks.reduce((n, d) => n + d.seats, 0);
+    // The list written and the layout drawn from the headcount agree, and the quote follows.
+    expect(written).toBe(drawn);
+    expect(planSeatTotal(done)).toBe(drawn);
+    expect(generateLayout("classroom", done.room, table, done.chairCount, {}, "standard", classroomOf(done)).chairs).toHaveLength(drawn);
+    expect(done.desks.every((d) => d.seats <= maxSeatsPerDesk(plan.room, "standard"))).toBe(true);
+  });
+
+  it("answers the derived desk size in one place, and degrades without a room", () => {
+    const room = { length: 4.5, width: 6, height: 2.8 };
+    expect(seatsPerDerivedDesk(room, "standard", null)).toBe(Math.min(6, maxSeatsPerDesk(room, "standard")));
+    expect(seatsPerDerivedDesk(undefined, "standard", 4)).toBe(4);
+    expect(seatsPerDerivedDesk(undefined, undefined, null)).toBe(6);
+  });
+
+  describe("when the default desk size changes", () => {
+    const withDesks = (desks) => planReducer(initialHistory(), { type: "reset", plan: classroom({ desks }) });
+
+    it("re-seats untouched desks and leaves a hand-set one alone", () => {
+      const [a, b, c] = deriveDesks(9, 3);
+      const state = update(withDesks([a, { ...b, seats: 5, seatsSetByHand: true }, c]), { seatsPerDesk: 4 });
+      expect(seats(state.present.desks)).toEqual([4, 5, 4]);
+      expect(state.present.desks.map((d) => d.id)).toEqual([a.id, b.id, c.id]);
+    });
+
+    it("keeps a desk whose edit coincides with the default, because the flag decides, not the number", () => {
+      const [a, b] = deriveDesks(6, 3);
+      const state = update(withDesks([{ ...a, seatsSetByHand: true }, b]), { seatsPerDesk: 4 });
+      expect(seats(state.present.desks)).toEqual([3, 4]);
+    });
+
+    it("keeps the same list when nothing needed re-seating", () => {
+      const list = deriveDesks(6, 3).map((d) => ({ ...d, seatsSetByHand: true }));
+      const state = withDesks(list);
+      const next = update(state, { seatsPerDesk: 4 });
+      expect(next.present.desks).toBe(state.present.desks);
+      // A change within the same whole number is not a change of desk size.
+      const same = update(withDesks(deriveDesks(6, 3)), { seatsPerDesk: 3.4 });
+      expect(seats(same.present.desks)).toEqual([3, 3]);
+    });
+
+    it("does not touch a null list, and a malformed entry survives", () => {
+      expect(update(withDesks(null), { seatsPerDesk: 4 }).present.desks).toBeNull();
+      const [a] = deriveDesks(3, 3);
+      expect(() => update(withDesks([a, null, { id: "x" }]), { seatsPerDesk: 4 })).not.toThrow();
     });
   });
 });

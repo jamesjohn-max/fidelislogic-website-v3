@@ -5,10 +5,12 @@ import {
   clamp,
   clampTableOffset,
   createDefaultDoor,
+  deriveDesks,
   effectiveSeatsPerDesk,
   generateLayout,
   getChairLimits,
   seatsOnDesk,
+  seatsPerDerivedDesk,
   getTableLimits,
   mainScreen,
   refreshAutoDevices,
@@ -167,8 +169,31 @@ export function canAddDesk(desks, room, table, density, seatsPerDesk) {
   return seated + adding <= getChairLimits("classroom", room, table, density, seatsPerDesk)[1];
 }
 
+// The first desk edit turns "derive from the headcount" into a real list. addDesk and
+// removeDesk read a null or empty list as an empty classroom, so every desk edit must
+// pass the plan through here first or an Add on a derived room would leave one desk.
+// The list is derived exactly as generateLayout derives it (seatsPerDerivedDesk). Returns
+// a new plan when it writes a list and the same plan when there is nothing to write: a
+// non-classroom plan, one that already has a list, or a classroom with no headcount.
+export function materialiseDesks(plan) {
+  if (plan.layout !== "classroom" || (Array.isArray(plan.desks) && plan.desks.length)) return plan;
+  const desks = deriveDesks(plan.chairCount, seatsPerDerivedDesk(plan.room, plan.seatingDensity, plan.seatsPerDesk));
+  return desks.length ? { ...plan, desks } : plan;
+}
+
+// When the default desk size changes, desks the user has not sized by hand follow it;
+// a hand-set one (seatsSetByHand — a flag, never a comparison with the default) keeps
+// its seats. Returns the same list when no desk changes.
+function reseatDesks(prev, p) {
+  const was = effectiveSeatsPerDesk(prev.seatsPerDesk);
+  const seats = effectiveSeatsPerDesk(p.seatsPerDesk);
+  if (p.layout !== "classroom" || !Array.isArray(p.desks) || was === seats) return p;
+  const moves = (d) => d && typeof d === "object" && !d.seatsSetByHand && d.seats !== seats;
+  return p.desks.some(moves) ? { ...p, desks: p.desks.map((d) => (moves(d) ? { ...d, seats } : d)) } : p;
+}
+
 function settleFurnitureAndDevices(prev, next) {
-  let p = next;
+  let p = reseatDesks(prev, next);
   const furnitureChanged =
     prev.room !== p.room || prev.layout !== p.layout || prev.table !== p.table || prev.chairCount !== p.chairCount || prev.seatingDensity !== p.seatingDensity;
 

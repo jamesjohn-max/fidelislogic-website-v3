@@ -878,6 +878,19 @@ export function seatsOnDesk(desk, room, density) {
   return Number.isFinite(cap) && cap >= 1 ? Math.min(seats, cap) : seats;
 }
 
+// The seats a newly derived desk gets in this room. THE one place that question is
+// answered: generateLayout derives the classroom's list from the headcount with it and
+// materialiseDesks writes that same list into the plan, so the two cannot disagree. A
+// desk wider than the room's row is capped when drawn (seatsOnDesk), so deriving at the
+// raw default in a narrow room would quote seats the diagram then does not show. Without
+// a room there is no cap to apply, as in seatsOnDesk.
+export function seatsPerDerivedDesk(room, density, seatsPerDesk) {
+  const perDesk = effectiveSeatsPerDesk(seatsPerDesk);
+  if (!room) return perDesk;
+  const cap = maxSeatsPerDesk(room, density);
+  return Number.isFinite(cap) && cap >= 1 ? Math.min(perDesk, cap) : perDesk;
+}
+
 // Packs the desk list into rows: desks are taken in order, each added to the row being
 // filled until the next one's width (its seats at the seat pitch, plus an aisle between
 // desks) would overrun the usable width, which starts a new row. A desk is never split,
@@ -1240,9 +1253,9 @@ export function generateLayout(layoutType, room, table, chairCount, podOverrides
     case "classroom": {
       // No list, or an empty one from a hand-edited link, means "derive from the
       // headcount" — an empty array is never an empty classroom.
-      // A desk wider than the room's row is capped when drawn (seatsOnDesk), so derive
-      // desks no wider than that: the headcount then fills the rows it was offered for.
-      const perDesk = Math.min(effectiveSeatsPerDesk(classroom.seatsPerDesk), maxSeatsPerDesk(room, density));
+      // Derived desks are no wider than the room's row (see seatsPerDerivedDesk): the
+      // headcount then fills the rows it was offered for.
+      const perDesk = seatsPerDerivedDesk(room, density, classroom.seatsPerDesk);
       const deskList = classroom.desks?.length ? classroom.desks : deriveDesks(chairCount, perDesk);
       const { chairs, desks } = classroomLayout(room, classroomDeskDepth(table), deskList, density);
       return { tableShape: { type: "desks", desks }, chairs, groupBounds: contentBounds(chairs, desks) };
