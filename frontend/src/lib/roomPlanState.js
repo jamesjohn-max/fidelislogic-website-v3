@@ -8,6 +8,7 @@ import {
   effectiveSeatsPerDesk,
   generateLayout,
   getChairLimits,
+  seatsOnDesk,
   getTableLimits,
   mainScreen,
   refreshAutoDevices,
@@ -157,7 +158,9 @@ export const removeDesk = (desks, id) =>
 // occupancy (getChairLimits). The desk sum only grows by hand and planSeatTotal prints
 // it, so this is the one place that keeps a quote inside the fire-safe headcount.
 export function canAddDesk(desks, room, table, density, seatsPerDesk) {
-  const seated = (Array.isArray(desks) ? desks : []).reduce((n, d) => n + (Number.isFinite(d?.seats) ? d.seats : 0), 0);
+  // Counted through seatsOnDesk, the one rule the classroom draws and the report quotes,
+  // so the button decides on the seats the room will actually hold.
+  const seated = (Array.isArray(desks) ? desks : []).reduce((n, d) => n + seatsOnDesk(d, room, density), 0);
   return seated + effectiveSeatsPerDesk(seatsPerDesk) <= getChairLimits("classroom", room, table, density, seatsPerDesk)[1];
 }
 

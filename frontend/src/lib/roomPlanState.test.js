@@ -1,6 +1,6 @@
 import { addDesk, canAddDesk, canRemoveDesk, initialHistory, initialPlan, planReducer, removeDesk, settle } from "./roomPlanState";
 import { ROOM_TEMPLATES, TEMPLATE_IDS, buildTemplatePlan, templateSeats } from "./roomTemplates";
-import { buildRecommendations, classifyRoomType, deriveDesks, generateLayout, getChairLimits, getMaxChairsForLayout, micCoverage, occupancyLimit, placedSeats } from "./roomConfiguratorEngine";
+import { buildRecommendations, classifyRoomType, deriveDesks, generateLayout, getChairLimits, getMaxChairsForLayout, maxSeatsPerDesk, micCoverage, occupancyLimit, placedSeats } from "./roomConfiguratorEngine";
 
 const update = (state, patch, extra = {}) => planReducer(state, { type: "update", patch, ...extra });
 const template = (state, id) => planReducer(state, { type: "template", id });
@@ -318,6 +318,25 @@ describe("adding and deleting classroom desks", () => {
       expect(occupancyLimit(room)).toBe(23); // ...but only 23 people are permitted
       expect(canAddDesk(deriveDesks(18, 3), room, table, "standard", 3)).toBe(true);
       expect(canAddDesk(deriveDesks(21, 3), room, table, "standard", 3)).toBe(false);
+    });
+
+    // The button has to decide on the seats a desk actually carries (seatsOnDesk — the
+    // same rule the classroom draws and the report quotes), not on the raw numbers in a
+    // hand-edited list. Reading the raw ones is wrong in both directions: it refuses adds
+    // on a plan with room to spare, and allows them on a plan that is already full.
+    it("counts each desk as the seats it actually carries, not its raw number", () => {
+      const room = { length: 6.5, width: 4.5, height: 2.8 };
+      expect(maxSeatsPerDesk(room, "standard")).toBe(7); // a desk holds at most 7 here...
+      expect(getChairLimits("classroom", room, table, "standard", 3)[1]).toBe(18); // ...and the room 18
+
+      // One desk edited to 40 seats draws 7, so there is room for another: raw 40 + 3
+      // would have refused it.
+      expect(canAddDesk([{ id: "wide", seats: 40 }], room, table, "standard", 3)).toBe(true);
+
+      // 18 malformed desks draw a chair each, which fills the room: raw 0 + 3 would have
+      // allowed another.
+      const junk = Array.from({ length: 18 }, () => ({ seats: "x" }));
+      expect(canAddDesk(junk, room, table, "standard", 3)).toBe(false);
     });
   });
 });
