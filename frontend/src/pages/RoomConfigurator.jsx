@@ -37,7 +37,7 @@ import { toast } from "../components/ui/sonner";
 import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
 import { api } from "../lib/api";
 import { micSources, speakerSources, derivedMicRange, derivedSpeakerRange } from "../lib/roomAudioCoverage";
-import { initialHistory, planReducer } from "../lib/roomPlanState";
+import { initialHistory, planReducer, materialiseDesks, removeDesk } from "../lib/roomPlanState";
 import { ROOM_TEMPLATES, emptyDevices } from "../lib/roomTemplates";
 import { loadDraft, saveDraft, clearDraft, loadPhotos, savePhotos, hasPlanLink, readPlanLink, planLink } from "../lib/roomPlannerDraft";
 // three.js only loads when someone opens the 3D view.
@@ -488,7 +488,7 @@ export const RoomConfigurator = ({ with3d = false }) => {
 
   // A regenerated seating plan's chairs and pods aren't the ones that were selected.
   useEffect(() => {
-    setSelection((s) => (s?.category === "chair" || s?.category === "tablePod" ? null : s));
+    setSelection((s) => (s?.category === "chair" || s?.category === "tablePod" || s?.category === "desk" ? null : s));
   }, [layout, chairCount, table, room, seatingDensity]);
 
   // Where microphones/speakers get spread: the room, the table, and the area the
@@ -657,6 +657,29 @@ export const RoomConfigurator = ({ with3d = false }) => {
       const o = p.podOverrides[index] || {};
       return { podOverrides: { ...p.podOverrides, [index]: { ...o, dx: (o.dx || 0) + dx, dy: (o.dy || 0) + dy } } };
     });
+  };
+
+  // Classroom: moving a desk carries its chairs with it (they are generated from the
+  // desk's position), so only the desk's own offset is stored — added to what it has,
+  // like a pod's. The raw offset goes in: classroomLayout clamps it so the desk and its
+  // chairs stay inside the walls. Every desk edit goes through materialiseDesks first,
+  // because until the first one the list is null, meaning "derive from the headcount" —
+  // writing to it without materialising would leave a derived room with one desk. The
+  // list and the desk are replaced, never mutated: generateLayout compares desks by
+  // reference, so an in-place change would not redraw.
+  const handleDeskDragCommit = (id, dx, dy) => {
+    update((p) => {
+      const list = materialiseDesks(p).desks;
+      if (!list) return null;
+      return { desks: list.map((d) => (d?.id === id ? { ...d, dx: (d.dx || 0) + dx, dy: (d.dy || 0) + dy } : d)) };
+    });
+  };
+
+  // Removing a desk takes its chairs with it. removeDesk keeps the last desk and
+  // returns the list it was given when it changes nothing.
+  const handleRemoveDesk = (id) => {
+    update((p) => ({ desks: removeDesk(materialiseDesks(p).desks, id) }));
+    setSelection(null);
   };
 
   // Turning a pod turns its chair ring with it. Chairs of that pod that were
@@ -1554,6 +1577,8 @@ export const RoomConfigurator = ({ with3d = false }) => {
                   onSetChairAngle={handleSetChairAngle}
                   onPodDragCommit={handlePodDragCommit}
                   onSetPodAngle={handleSetPodAngle}
+                  onDeskDragCommit={handleDeskDragCommit}
+                  onRemoveDesk={handleRemoveDesk}
                   hint={!layout && (step.id === "seating" || step.id === "table") ? "Pick a layout to add its furniture to the plan." : step.planHint}
                 />
               )}

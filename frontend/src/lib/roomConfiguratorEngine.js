@@ -636,7 +636,13 @@ export function deriveDesks(headcount, seatsPerDesk) {
   const perDesk = effectiveSeatsPerDesk(seatsPerDesk);
   const count = Math.ceil(Math.max(0, headcount) / perDesk);
   return Array.from({ length: count }, (_, i) => ({
-    id: uid("desk"),
+    // Named by position, not minted fresh each time, so deriving twice names the same
+    // desks. generateLayout draws the derived list while materialiseDesks writes it, and
+    // a desk picked on the plan has to be the same desk in the list that gets written —
+    // with a new id each time, the first drag or delete on a derived classroom would
+    // find no such desk and quietly do nothing. A desk added later carries a uid, which
+    // never looks like this.
+    id: `desk-derived-${i}`,
     seats: i < count - 1 ? perDesk : headcount - perDesk * (count - 1),
     dx: 0,
     dy: 0,
