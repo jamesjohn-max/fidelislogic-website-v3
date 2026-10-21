@@ -1181,8 +1181,64 @@ describe("the derived classroom seat total", () => {
       return { plan: { ...base, room: small, layout, chairCount: max + 6 }, max };
     };
     const classroom = over("classroom");
-    expect(fitOccupancy(classroom.plan).chairCount).toBe(classroom.max + 6);
+    // Only a materialised desk list is exempt: its total is the sum of the desks, so the
+    // headcount is not the quote. Without one, the headcount is the quote and is clamped.
+    const withDesks = { ...classroom.plan, desks: [{ id: "d0", seats: 6, dx: 0, dy: 0, seatsSetByHand: true }] };
+    expect(fitOccupancy(withDesks).chairCount).toBe(classroom.max + 6);
     const rectangular = over("rectangular");
     expect(fitOccupancy(rectangular.plan).chairCount).toBe(rectangular.max);
+  });
+});
+
+// Final whole-branch review fixes.
+describe("final review fixes", () => {
+  const deskTable = { length: 3, width: 1.2, orientation: 0, deskDepth: CLASSROOM_DESK_DEPTH.default };
+
+  // Desks are derived and drawn at min(perDesk, maxSeatsPerDesk); the capacity must use the same width.
+  it("classroomCapacity is offered only in seats that are drawn inside the room, even for a desk wider than the row cap", () => {
+    const room = { length: 6.45, width: 2.5, height: 2.8 };
+    const max = getMaxChairsForLayout("classroom", room, deskTable, "comfortable", 7);
+    const { chairs } = generateLayout("classroom", room, deskTable, max, {}, "comfortable", { seatsPerDesk: 7 });
+    expect(chairs).toHaveLength(max);
+    chairs.forEach((c) => expect(Math.abs(c.y)).toBeLessThanOrEqual(room.width / 2 + 1e-6));
+    expect(max).toBe(getMaxChairsForLayout("classroom", room, deskTable, "comfortable", 6));
+  });
+
+  it("fitOccupancy clamps a classroom with no desk list, or an empty one, to the room's limit", () => {
+    const base = initialPlan();
+    const room = { length: 8, width: 6, height: 2.8 };
+    expect(occupancyLimit(room)).toBe(32);
+    const plan = (desks) => ({ ...base, room, layout: "classroom", chairCount: 200, desks });
+    const max = getChairLimits("classroom", room, base.table, base.seatingDensity, base.seatsPerDesk)[1];
+    expect(max).toBeLessThan(200);
+    expect(fitOccupancy(plan(null)).chairCount).toBe(max);
+    expect(fitOccupancy(plan([])).chairCount).toBe(max);
+    const noKey = { ...plan(undefined), chairCount: 200 };
+    delete noKey.desks;
+    expect(fitOccupancy(noKey).chairCount).toBe(max);
+  });
+
+  it("a non-array desks list from a hand-edited link derives from the headcount rather than throwing", () => {
+    const room = { length: 8, width: 6, height: 2.8 };
+    [ "ab", { length: 2 } ].forEach((desks) => {
+      const r = generateLayout("classroom", room, deskTable, 8, {}, "standard", { desks });
+      expect(r.chairs).toHaveLength(8);
+    });
+  });
+
+  describe("a plan past the room's permitted occupancy is flagged", () => {
+    const room = { length: 7.5, width: 4.5, height: 2.8 };
+    const desks = (n) => Array.from({ length: n }, (_, i) => ({ id: `d${i}`, seats: 6, dx: 0, dy: 0, seatsSetByHand: true }));
+    const state = (n) => ({ ...makeState({ room }), layout: "classroom", chairCount: 12, desks: desks(n), seatingDensity: "standard" });
+    it("as an essential recommendation that states both figures", () => {
+      expect(occupancyLimit(room)).toBe(22);
+      const rec = buildRecommendations(state(4)).find((r) => r.id === "over-occupancy");
+      expect(rec).toMatchObject({ level: "essential", addCategories: [] });
+      expect(rec.text).toContain("24");
+      expect(rec.text).toContain("22");
+    });
+    it("and not at or under the limit", () => {
+      expect(ids(state(3))).not.toContain("over-occupancy");
+    });
   });
 });

@@ -791,7 +791,7 @@ export function getMaxChairsForLayout(layout, room, table, density = DEFAULT_SEA
   // The classroom counts its seats in whole desks (classroomCapacity); theater seats
   // are loose chairs, so it counts bare seats across a row as it always has.
   if (layout === "classroom") {
-    return classroomCapacity(room, rowSpacing("classroom", density, classroomDeskDepth(table)), effectiveSeatsPerDesk(seatsPerDesk));
+    return classroomCapacity(room, rowSpacing("classroom", density, classroomDeskDepth(table)), seatsPerDerivedDesk(room, density, seatsPerDesk));
   }
   if (layout === "theater") {
     const { seatsPerRow, maxRows } = rowCapacity(room, rowSpacing("theater", density));
@@ -1272,7 +1272,7 @@ export function generateLayout(layoutType, room, table, chairCount, podOverrides
       // Derived desks are no wider than the room's row (see seatsPerDerivedDesk): the
       // headcount then fills the rows it was offered for.
       const perDesk = seatsPerDerivedDesk(room, density, classroom.seatsPerDesk);
-      const deskList = classroom.desks?.length ? classroom.desks : deriveDesks(chairCount, perDesk);
+      const deskList = Array.isArray(classroom.desks) && classroom.desks.length ? classroom.desks : deriveDesks(chairCount, perDesk);
       const { chairs, desks } = classroomLayout(room, classroomDeskDepth(table), deskList, density);
       return { tableShape: { type: "desks", desks }, chairs, groupBounds: contentBounds(chairs, desks) };
     }
@@ -2118,6 +2118,16 @@ export function buildRecommendations(state) {
   const seatsWord = (n) => `${n} ${n === 1 ? "seat is" : "seats are"}`;
 
   if (!layout) add("no-layout", "essential", "Choose a furniture layout so the table and seating can be planned.");
+  // Chairs are added past the limit by routes no gate covers (a desk's own "+", a larger
+  // default desk, a smaller room), so the plan says so rather than quoting it silently.
+  const permitted = occupancyLimit(room);
+  if (chairCount > permitted)
+    add(
+      "over-occupancy",
+      "essential",
+      `This plan seats ${chairCount} people, over the ${permitted} this room is permitted (1 person per ${DBC_M2_PER_PERSON} m²) — remove ${chairCount - permitted} ${chairCount - permitted === 1 ? "seat" : "seats"} or choose a larger room.`,
+      []
+    );
   if (screensOf(devices).length === 0)
     add("no-display", "essential", "Add at least one display — none is currently placed in this room.", ["display", "allInOne"]);
   // The first screen that's too small for the room's viewing distance, if any.
