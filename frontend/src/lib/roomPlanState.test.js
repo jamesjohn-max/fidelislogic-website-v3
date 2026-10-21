@@ -427,6 +427,29 @@ describe("materialising the classroom desk list", () => {
     expect(done.desks.every((d) => d.seats <= maxSeatsPerDesk(plan.room, "standard"))).toBe(true);
   });
 
+  // The id a desk is picked by on the plan has to be the id materialiseDesks writes for
+  // it: generateLayout derives the list to draw it and materialiseDesks derives it again
+  // to write it. A desk named afresh on each derive leaves the first drag or delete on a
+  // still-derived classroom landing on no desk at all — a whole UI with nothing wrong on
+  // screen and nothing happening. Deriving once can't show it, so this holds two derives
+  // against each other and never spells the naming scheme out.
+  it("names a derived desk the same on every derive, so a drawn desk is the desk the list writes", () => {
+    expect(deriveDesks(9, 3).map((d) => d.id)).toEqual(deriveDesks(9, 3).map((d) => d.id));
+
+    const plan = classroom();
+    const drawn = generateLayout("classroom", plan.room, table, plan.chairCount, {}, "standard", classroomOf(plan));
+    const written = materialiseDesks(plan).desks;
+    expect(drawn.tableShape.desks.map((d) => d.deskId)).toEqual(written.map((d) => d.id));
+    // The chairs are picked by the same id, which is how a desk drags its own chairs.
+    expect([...new Set(drawn.chairs.map((c) => c.deskId))]).toEqual(written.map((d) => d.id));
+
+    // A desk added by hand is never named like a derived one, however long the list grows.
+    const grown = addDesk(written, 3);
+    const byHand = grown[grown.length - 1].id;
+    expect(new Set(grown.map((d) => d.id)).size).toBe(grown.length);
+    expect(deriveDesks(12, 3).map((d) => d.id)).not.toContain(byHand);
+  });
+
   it("answers the derived desk size in one place, and degrades without a room", () => {
     const room = { length: 4.5, width: 6, height: 2.8 };
     expect(seatsPerDerivedDesk(room, "standard", null)).toBe(Math.min(6, maxSeatsPerDesk(room, "standard")));

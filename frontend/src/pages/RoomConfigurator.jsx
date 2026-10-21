@@ -677,8 +677,30 @@ export const RoomConfigurator = ({ with3d = false }) => {
 
   // Removing a desk takes its chairs with it. removeDesk keeps the last desk and
   // returns the list it was given when it changes nothing.
+  //
+  // What a planner has done to a single chair — nudged it, turned it, taken it away — is
+  // held by that chair's place in the generated list, so losing a desk's chairs shifts
+  // every later chair down by however many it carried. The classroom generates its
+  // chairs desk by desk in list order, so the chairs that remain keep their order and
+  // the shift is exactly the number of this desk's chairs before them. Both records are
+  // rewritten here, or the nudge a planner gave one chair would reappear on another.
   const handleRemoveDesk = (id) => {
-    update((p) => ({ desks: removeDesk(materialiseDesks(p).desks, id) }));
+    const gone = layoutResult.chairs.flatMap((c, i) => (c.deskId === id ? [i] : []));
+    const below = (i) => gone.filter((g) => g < i).length;
+    update((p) => {
+      const list = materialiseDesks(p).desks;
+      const desks = removeDesk(list, id);
+      if (desks === list) return null;
+      return {
+        desks,
+        chairOffsets: Object.fromEntries(
+          Object.entries(p.chairOffsets)
+            .filter(([i]) => !gone.includes(Number(i)))
+            .map(([i, off]) => [Number(i) - below(Number(i)), off])
+        ),
+        removedChairs: p.removedChairs.filter((i) => !gone.includes(i)).map((i) => i - below(i)),
+      };
+    });
     setSelection(null);
   };
 
