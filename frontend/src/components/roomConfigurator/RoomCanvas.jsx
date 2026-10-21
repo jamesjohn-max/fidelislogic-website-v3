@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { X, Trash2, Radar } from "lucide-react";
+import { X, Trash2, Radar, Minus, Plus } from "lucide-react";
 import {
   GRID_STEP,
   ROOM_MARGIN,
@@ -508,6 +508,11 @@ function RulerTicks({ marks, orientation, wallAt, sign }) {
 const KEY_MOVE = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
 const KEY_TURN_DEG = 15;
 
+// The −/+ either side of the selected desk's seat count, in the selection bar's own
+// idiom: the same height, tokens and disabled treatment as the Delete beside them.
+const DESK_SEAT_BUTTON =
+  "flex min-h-[36px] w-7 items-center justify-center rounded-md text-blue-700 transition-transform duration-100 hover:bg-blue-500/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:active:scale-100";
+
 export function RoomCanvas({
   room,
   table,
@@ -534,6 +539,10 @@ export function RoomCanvas({
   // remove — both by desk id, never by index, so a deletion can't re-point them.
   onDeskDragCommit,
   onRemoveDesk,
+  // And the selected desk's own seat count, bounded 1..deskSeatMax (the most one desk
+  // can seat in this room — fewer than the standard six in a narrow one).
+  onSetDeskSeats,
+  deskSeatMax = 1,
   diagramRef,
   // Every mic and speaker's reach (micSources + speakerSources). coverageMode picks which
   // are drawn: "selected" (the selected device's), "all" or "off".
@@ -994,6 +1003,10 @@ export function RoomCanvas({
   };
   // A classroom keeps at least one desk; the reason shows on the disabled Delete.
   const deskDeleteBlocked = selection?.category === "desk" && deskList.length < 2 ? "A classroom keeps at least one desk" : null;
+  // The selected desk's seats, counted off the plan: a desk's chairs are generated one
+  // per seat, so this is the number the classroom actually draws (a desk asking for more
+  // than the room's row holds is capped — see seatsOnDesk), not the raw stored figure.
+  const selectedDeskSeats = selectedDesk ? layoutResult.chairs.reduce((n, c) => n + (c.deskId === selectedDeskId ? 1 : 0), 0) : 0;
 
   const selectionLabel = !selection
     ? null
@@ -1326,6 +1339,36 @@ export function RoomCanvas({
                           )}
                         </span>
                         <div className="flex items-center gap-1">
+                          {/* Classroom: how many seats this one desk carries. Changing it
+                              marks the desk hand-set, so it keeps these seats when the
+                              default desk size changes under Seating. */}
+                          {selection.category === "desk" && selectedDesk && onSetDeskSeats && (
+                            <div role="group" aria-label="Seats on this desk" className="flex items-center rounded-md border border-blue-400/30">
+                              <button
+                                type="button"
+                                aria-label="One seat fewer on this desk"
+                                onClick={() => onSetDeskSeats(selectedDeskId, selectedDeskSeats - 1)}
+                                disabled={selectedDeskSeats <= 1}
+                                title={selectedDeskSeats <= 1 ? "A desk keeps at least one seat" : undefined}
+                                className={DESK_SEAT_BUTTON}
+                              >
+                                <Minus aria-hidden="true" className="h-3.5 w-3.5" />
+                              </button>
+                              <span aria-live="polite" className="min-w-[3.75rem] text-center text-xs font-semibold tabular-nums text-blue-700">
+                                {selectedDeskSeats} {selectedDeskSeats === 1 ? "seat" : "seats"}
+                              </span>
+                              <button
+                                type="button"
+                                aria-label="One seat more on this desk"
+                                onClick={() => onSetDeskSeats(selectedDeskId, selectedDeskSeats + 1)}
+                                disabled={selectedDeskSeats >= deskSeatMax}
+                                title={selectedDeskSeats >= deskSeatMax ? `A desk seats at most ${deskSeatMax} across this room` : undefined}
+                                className={DESK_SEAT_BUTTON}
+                              >
+                                <Plus aria-hidden="true" className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          )}
                           {selectionDeletable && (
                             <button
                               onClick={handleDeleteSelected}

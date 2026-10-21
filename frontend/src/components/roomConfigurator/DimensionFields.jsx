@@ -10,6 +10,9 @@ import {
   DBC_M2_PER_PERSON,
   POD_RADIUS_LIMITS,
   CLASSROOM_DESK_DEPTH,
+  CLASSROOM_BLOCK_SEATS,
+  maxSeatsPerDesk,
+  seatsPerDerivedDesk,
   SEATING_DENSITIES,
   DEFAULT_SEATING_DENSITY,
   seatingSpacingSummary,
@@ -311,33 +314,118 @@ export function TableFields({
   );
 }
 
-export function SeatingFields({ room, table, layout, chairCount, onChairCountChange, seatingDensity = DEFAULT_SEATING_DENSITY, onSeatingDensityChange }) {
-  const chairLimits = getChairLimits(layout, room, table, seatingDensity);
+export function SeatingFields({
+  room,
+  table,
+  layout,
+  chairCount,
+  onChairCountChange,
+  seatingDensity = DEFAULT_SEATING_DENSITY,
+  onSeatingDensityChange,
+  // Classroom only. `seatsPerDesk` is the default desk size (null = the standard six),
+  // `desksSet` is true once the desk list is real — from then on the desks, not this
+  // headcount, set the plan's seats, so it reads `seatTotal` instead of being editable.
+  // `canAddDesk` answers whether one more desk still fits; the page decides that, since
+  // the reason it doesn't is the same occupancy limit the Chairs hint already explains.
+  seatsPerDesk = null,
+  onSeatsPerDeskChange,
+  onAddDesk,
+  canAddDesk = true,
+  deskCount = 0,
+  desksSet = false,
+  seatTotal,
+}) {
+  const classroom = layout === "classroom";
+  // seatsPerDesk changes how many seats the classroom fits (a desk is never split across
+  // rows), so both figures are read at the desk size actually in force.
+  const chairLimits = getChairLimits(layout, room, table, seatingDensity, seatsPerDesk);
   // When the room's occupancy, not the furniture, sets the most seats, say so.
   const occupancy = occupancyLimit(room);
-  const cappedByCode = chairLimits[1] === occupancy && getMaxChairsForLayout(layout, room, table, seatingDensity) > occupancy;
+  const cappedByCode = chairLimits[1] === occupancy && getMaxChairsForLayout(layout, room, table, seatingDensity, seatsPerDesk) > occupancy;
+  const codeReason = `Dubai Building Code allows 1 person per ${DBC_M2_PER_PERSON} m² (${(room.length * room.width).toFixed(1)} m² room)`;
+  // The most one desk can seat here: a single row's worth across the room, which in a
+  // narrow room is fewer than the standard six — the stepper has to reach it, so it is
+  // the stepper's maximum and the value shown is the one the plan draws.
+  const deskSeatCap = classroom ? Math.max(1, maxSeatsPerDesk(room, seatingDensity)) : CLASSROOM_BLOCK_SEATS;
+  const perDesk = classroom ? seatsPerDerivedDesk(room, seatingDensity, seatsPerDesk) : CLASSROOM_BLOCK_SEATS;
+  // A dead Add desk needs its reason on it: the limit is the room's permitted occupancy
+  // or what the floor fits, neither of which is a fault to be fixed by pressing harder.
+  const addDeskBlocked = canAddDesk
+    ? null
+    : cappedByCode
+    ? `Room is full at ${occupancy} people: ${codeReason}`
+    : `Room is full: only ${chairLimits[1]} seats fit this layout`;
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <label htmlFor="rc-chairs" className="block text-sm font-semibold rc-ink">Chairs</label>
           <span className="block text-xs rc-ink-muted">
-            {cappedByCode
-              ? `Up to ${occupancy}: Dubai Building Code allows 1 person per ${DBC_M2_PER_PERSON} m² (${(room.length * room.width).toFixed(1)} m² room)`
+            {desksSet
+              ? "Set by the desks now: change a desk's seats on the plan, or add a desk below"
+              : cappedByCode
+              ? `Up to ${occupancy}: ${codeReason}`
               : `Up to ${chairLimits[1]} fit this layout`}
           </span>
         </div>
-        <NumberField
-          id="rc-chairs"
-          value={chairCount}
-          min={chairLimits[0]}
-          max={chairLimits[1]}
-          step={1}
-          decimals={0}
-          className="w-[120px] shrink-0"
-          onChange={(v) => onChairCountChange(Math.round(v))}
-        />
+        {desksSet ? (
+          // Not a field: the headcount no longer drives the layout, so it is shown as
+          // what the desks come to rather than sitting there looking editable.
+          <output
+            id="rc-chairs"
+            aria-live="polite"
+            className="flex h-10 w-[120px] shrink-0 items-center justify-center rounded-lg border rc-border rc-fill text-[15px] font-semibold tabular-nums rc-ink"
+          >
+            {seatTotal}
+          </output>
+        ) : (
+          <NumberField
+            id="rc-chairs"
+            value={chairCount}
+            min={chairLimits[0]}
+            max={chairLimits[1]}
+            step={1}
+            decimals={0}
+            className="w-[120px] shrink-0"
+            onChange={(v) => onChairCountChange(Math.round(v))}
+          />
+        )}
       </div>
+      {/* The classroom's desks: how many seats a desk gets by default (desks sized by
+          hand on the plan keep their own), and one more desk. */}
+      {classroom && onSeatsPerDeskChange && (
+        <div className="flex flex-wrap items-start gap-3">
+          <NumberField
+            id="rc-seats-per-desk"
+            label="Seats per desk"
+            value={perDesk}
+            min={1}
+            max={deskSeatCap}
+            step={1}
+            decimals={0}
+            helper={seatsPerDesk == null && perDesk === CLASSROOM_BLOCK_SEATS ? `${CLASSROOM_BLOCK_SEATS} (standard)` : `Up to ${deskSeatCap} in this room`}
+            className="w-[150px] shrink-0"
+            onChange={(v) => onSeatsPerDeskChange(Math.round(v))}
+          />
+          <div className="flex min-w-0 flex-col gap-1">
+            <FieldLabel id="rc-add-desk-label">Desks</FieldLabel>
+            <button
+              type="button"
+              onClick={onAddDesk}
+              disabled={!canAddDesk}
+              title={addDeskBlocked || undefined}
+              aria-describedby="rc-add-desk-label"
+              className="flex h-10 items-center gap-1.5 rounded-lg border rc-border rc-fill px-3 text-[13px] font-semibold rc-ink shadow-sm transition-transform duration-100 rc-fill-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:active:scale-100"
+            >
+              <Plus aria-hidden="true" className="h-3.5 w-3.5" />
+              Add desk
+            </button>
+            <span className="text-xs rc-ink-muted">
+              {addDeskBlocked ? (cappedByCode ? `At the ${occupancy}-person limit` : "No room for another desk") : `${deskCount} on the plan`}
+            </span>
+          </div>
+        </div>
+      )}
       {/* How tightly seats are packed — changes how many chairs fit (the Chairs max). */}
       <Segmented
         label="Seating spacing"
