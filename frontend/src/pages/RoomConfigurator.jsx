@@ -82,6 +82,7 @@ import {
   refLabel,
   planSeatTotal,
   maxSeatsPerDesk,
+  seatsPerDerivedDesk,
 } from "../lib/roomConfiguratorEngine";
 
 // A customer's plan shows the room, its furniture, its doors and its screen, no other
@@ -747,10 +748,16 @@ export const RoomConfigurator = ({ with3d = false }) => {
   // above all others: until the first desk edit the list is null, meaning "derive from
   // the headcount", and addDesk reads that as an empty classroom — so adding to a
   // derived room without materialising would throw its desks away and leave one.
+  //
+  // The size stored is the derived one, not the raw default: materialiseDesks writes the
+  // desks beside it at seatsPerDerivedDesk, so passing the raw default would store 6 on
+  // the new desk where its siblings hold the 3 a narrow room allows. Nothing would read
+  // wrong today — seatsOnDesk caps every read — but widen the room later and that one
+  // desk jumps to 6 on its own while the rest stay put.
   const handleAddDesk = () => {
     update((p) => {
       const list = materialiseDesks(p).desks;
-      return { desks: addDesk(list, p.seatsPerDesk) };
+      return { desks: addDesk(list, seatsPerDerivedDesk(p.room, p.seatingDensity, p.seatsPerDesk)) };
     });
   };
 
@@ -768,8 +775,12 @@ export const RoomConfigurator = ({ with3d = false }) => {
   // seating fewer or more shifts every chair after it — and the nudges, turns and
   // removals a planner left on individual chairs are held by index. They are moved with
   // the chairs here, exactly as removing a desk does.
+  // A desk always carries at least one seat (seatsOnDesk draws one whatever it is told),
+  // so a count below that is refused here rather than stored: the remap below would read
+  // it as the desk losing every chair while the plan still draws one, and shift the
+  // chairs after it by one too many.
   const handleSetDeskSeats = (id, seats) => {
-    if (id == null || !Number.isFinite(seats)) return;
+    if (id == null || !Number.isFinite(seats) || seats < 1) return;
     const block = layoutResult.chairs.flatMap((c, i) => (c.deskId === id ? [i] : []));
     update((p) => {
       const list = materialiseDesks(p).desks;
@@ -1312,9 +1323,13 @@ export const RoomConfigurator = ({ with3d = false }) => {
           <StepGroup
             title="Seats"
             description={isCustomer ? "Starts at the most that fit. Set it to how many people use the room." : undefined}
-            // A classroom's seats are the sum of what its desks hold, so the summary
-            // quotes that rather than the setup headcount the desks have taken over from.
-            summary={`${layout === "classroom" ? seatTotal : chairCount} ${isCustomer ? "seats" : "chairs"} · ${seatingDensityLabel(seatingDensity)} spacing`}
+            // Once the desks set the seats, the summary quotes what they come to rather
+            // than the setup headcount they have taken over from. It switches on the same
+            // thing the field does, not on the layout: a classroom still deriving its
+            // desks has an editable headcount, and planSeatTotal is net of chairs taken
+            // off the plan by hand, so switching earlier would print a figure one short
+            // of the field right beside it.
+            summary={`${desksSet ? seatTotal : chairCount} ${isCustomer ? "seats" : "chairs"} · ${seatingDensityLabel(seatingDensity)} spacing`}
             alerts={essentials(seatingRecs)}
             {...group(ids.seats)}
           >

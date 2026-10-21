@@ -467,6 +467,22 @@ describe("materialising the classroom desk list", () => {
       expect(state.present.desks.map((d) => d.id)).toEqual([a.id, b.id, c.id]);
     });
 
+    // A different default re-partitions the whole classroom, and what a planner did to a
+    // single chair is held by that chair's place in the generated list. Across a
+    // re-partition there is no mapping from the old places to the new ones, so the edits
+    // go — a nudge kept through this would reappear on somebody else's chair, which is
+    // worse than losing it. The desks themselves are untouched, and the count says the
+    // edits were cleared so the page can tell the planner.
+    it("clears chair edits when a new default re-partitions the rows", () => {
+      const state = update(withDesks(deriveDesks(20, 6)), { chairOffsets: { 13: { dx: 0.2, dy: 0 } }, removedChairs: [2] });
+      expect(state.present.chairOffsets).toEqual({ 13: { dx: 0.2, dy: 0 } });
+      const next = update(state, { seatsPerDesk: 4 });
+      expect(seats(next.present.desks)).toEqual([4, 4, 4, 4]);
+      expect(next.present.chairOffsets).toEqual({});
+      expect(next.present.removedChairs).toEqual([]);
+      expect(next.present.seatEditsCleared).toBe(state.present.seatEditsCleared + 1);
+    });
+
     it("keeps a desk whose edit coincides with the default, because the flag decides, not the number", () => {
       const [a, b] = deriveDesks(6, 3);
       const state = update(withDesks([{ ...a, seatsSetByHand: true }, b]), { seatsPerDesk: 4 });

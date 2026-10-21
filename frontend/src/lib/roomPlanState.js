@@ -194,8 +194,20 @@ function reseatDesks(prev, p) {
 
 function settleFurnitureAndDevices(prev, next) {
   let p = reseatDesks(prev, next);
+  // seatsPerDesk belongs here with the rest: it re-seats the classroom's desks
+  // (reseatDesks, above) and so re-partitions its rows, which both moves the chairs the
+  // hand edits below are indexed against and changes how many seats the room fits. The
+  // invariant is kept here rather than at the one caller that writes the field, so the
+  // next writer of it cannot miss it. The desk list is deliberately not in this test:
+  // a desk moved or re-seated on its own has a stable mapping for those edits and the
+  // page remaps them, where a whole re-partition has none and clears them instead.
   const furnitureChanged =
-    prev.room !== p.room || prev.layout !== p.layout || prev.table !== p.table || prev.chairCount !== p.chairCount || prev.seatingDensity !== p.seatingDensity;
+    prev.room !== p.room ||
+    prev.layout !== p.layout ||
+    prev.table !== p.table ||
+    prev.chairCount !== p.chairCount ||
+    prev.seatingDensity !== p.seatingDensity ||
+    prev.seatsPerDesk !== p.seatsPerDesk;
 
   if (furnitureChanged) {
     // The table stays in proportion to the room: capped so there's always space for
