@@ -957,6 +957,31 @@ describe("classroom rows packed from the desk list", () => {
       }
     });
 
+    // The property that matters: the figure offered is the figure drawn. The planner sets a
+    // headcount up to the offered maximum and the desks are derived from it, so what comes
+    // out has to be exactly that many chairs, inside the walls. Hand-built desk lists cannot
+    // show this: they pass whether or not the derived ones agree with the capacity.
+    describe("the offered maximum is what a derived desk list draws", () => {
+      it.each([
+        ["4.5 x 6 m", 4.5, 6, 20],
+        ["3 x 9 m", 3, 9, 18],
+        ["4.5 x 9 m", 4.5, 9, 30],
+        ["6 x 6 m", 6, 6, 24],
+        ["9 x 3 m", 9, 3, 17],
+      ])("%s: the offered maximum is drawn in full, inside the walls", (_, length, width, expected) => {
+        const r = { length, width, height: 2.8 };
+        const max = getMaxChairsForLayout("classroom", r, table);
+        expect(max).toBe(expected); // the room is still the case it was chosen to be
+        const { chairs, tableShape } = generateLayout("classroom", r, table, max);
+        expect(chairs).toHaveLength(max);
+        expectSaneDesks(r, tableShape.desks);
+        chairs.forEach((c) => {
+          expect(Math.abs(c.x)).toBeLessThanOrEqual(r.length / 2 + 1e-6);
+          expect(Math.abs(c.y)).toBeLessThanOrEqual(r.width / 2 + 1e-6);
+        });
+      });
+    });
+
     // Too narrow for a full desk, an oversized desk is capped to the row's width and drawn,
     // so depth buys rows. The figure is checked against the renderer, not a hand count:
     // one capped desk per row, that many rows, all inside the four walls.

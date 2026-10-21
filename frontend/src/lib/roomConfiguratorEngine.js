@@ -1240,7 +1240,10 @@ export function generateLayout(layoutType, room, table, chairCount, podOverrides
     case "classroom": {
       // No list, or an empty one from a hand-edited link, means "derive from the
       // headcount" — an empty array is never an empty classroom.
-      const deskList = classroom.desks?.length ? classroom.desks : deriveDesks(chairCount, effectiveSeatsPerDesk(classroom.seatsPerDesk));
+      // A desk wider than the room's row is capped when drawn (seatsOnDesk), so derive
+      // desks no wider than that: the headcount then fills the rows it was offered for.
+      const perDesk = Math.min(effectiveSeatsPerDesk(classroom.seatsPerDesk), maxSeatsPerDesk(room, density));
+      const deskList = classroom.desks?.length ? classroom.desks : deriveDesks(chairCount, perDesk);
       const { chairs, desks } = classroomLayout(room, classroomDeskDepth(table), deskList, density);
       return { tableShape: { type: "desks", desks }, chairs, groupBounds: contentBounds(chairs, desks) };
     }
