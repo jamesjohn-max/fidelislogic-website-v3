@@ -957,13 +957,40 @@ describe("classroom rows packed from the desk list", () => {
       }
     });
 
-    it("counts a single short desk when the room is too narrow for a full one", () => {
-      // 3 m long: 1.8 m usable fits 3 seats, and a 6-seat desk can't be split to use
-      // the depth, so no number of rows helps.
-      const narrow = { length: 3, width: 9, height: 2.8 };
-      const max = getMaxChairsForLayout("classroom", narrow, table);
-      expect(max).toBe(3);
-      expectSaneDesks(narrow, generateLayout("classroom", narrow, table, max).tableShape.desks);
+    // Too narrow for a full desk, an oversized desk is capped to the row's width and drawn,
+    // so depth buys rows. The figure is checked against the renderer, not a hand count:
+    // one capped desk per row, that many rows, all inside the four walls.
+    describe("in a room too narrow for a full desk", () => {
+      const rooms = [[3, 6], [3, 9], [4.5, 6], [4.5, 9], [2.5, 7], [4, 8]].map(([length, width]) => ({ length, width, height: 2.8 }));
+      const depth = CLASSROOM_DESK_DEPTH.default;
+      const drawnAt = (r, cap) => {
+        const across = maxSeatsPerDesk(r, "standard");
+        const list = Array.from({ length: Math.ceil(cap / across) }, (_, i) => ({ id: `d${i}`, seats: across }));
+        return classroomLayout(r, depth, list, "standard");
+      };
+
+      it.each(rooms.map((r) => [`${r.length} x ${r.width} m`, r]))("%s: every seat offered is drawn inside the walls", (_, r) => {
+        const max = getMaxChairsForLayout("classroom", r, table);
+        const { chairs, desks } = drawnAt(r, max);
+        expect(chairs).toHaveLength(max);
+        expectSaneDesks(r, desks);
+        chairs.forEach((c) => {
+          expect(Math.abs(c.x)).toBeLessThanOrEqual(r.length / 2 + 1e-6);
+          expect(Math.abs(c.y)).toBeLessThanOrEqual(r.width / 2 + 1e-6);
+        });
+      });
+
+      it("offers more seats the deeper the room, at the same width", () => {
+        const at = (width) => getMaxChairsForLayout("classroom", { length: 3, width, height: 2.8 }, table);
+        expect(at(9)).toBeGreaterThan(at(6));
+        expect(at(6)).toBeGreaterThan(at(3));
+      });
+
+      it("offers 18 in 3 x 9 m, and the renderer draws all 18", () => {
+        const r = { length: 3, width: 9, height: 2.8 };
+        expect(getMaxChairsForLayout("classroom", r, table)).toBe(18);
+        expect(drawnAt(r, 18).chairs).toHaveLength(18);
+      });
     });
 
     it("still renders a hand-edited list that overflows, rather than dropping desks", () => {

@@ -756,9 +756,10 @@ function rowCapacity(room, sp) {
 function classroomCapacity(room, sp, perDesk) {
   const usableW = Math.max(0, room.length - sp.marginX * 2);
   const seatsAcross = Math.floor(usableW / sp.seatPitch + 1e-9);
-  // Too narrow even for one full desk: a desk can't be split, so a single short desk
-  // is all that fits, however deep the room is.
-  if (seatsAcross < perDesk) return seatsAcross;
+  // Too narrow even for one full desk. An oversized desk is capped to the row's width and
+  // drawn (seatsOnDesk), not dropped, so each row holds one short desk and the room's depth
+  // still buys rows.
+  if (seatsAcross < perDesk) return seatsAcross * rowCapacity(room, sp).maxRows;
   const deskPitch = perDesk * sp.seatPitch + sp.aisle;
   const desksPerRow = Math.floor((usableW + sp.aisle) / deskPitch + 1e-9);
   const spare = usableW - desksPerRow * deskPitch;

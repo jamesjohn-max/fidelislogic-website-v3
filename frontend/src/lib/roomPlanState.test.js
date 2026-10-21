@@ -346,13 +346,15 @@ describe("adding and deleting classroom desks", () => {
       const room = { length: 4.5, width: 6, height: 2.8 };
       expect(maxSeatsPerDesk(room, "standard")).toBe(5); // a desk holds at most 5 here...
       expect(effectiveSeatsPerDesk(null)).toBe(6); // ...while the default desk asks for 6
-      expect(getChairLimits("classroom", room, table, "standard", null)[1]).toBe(5); // and the room holds 5
+      // The depth now offers 4 rows of 5 = 20, but the 27 m2 room's occupancy limit stops it at 18.
+      expect(getChairLimits("classroom", room, table, "standard", null)[1]).toBe(18);
 
-      // Nothing seated yet, so the first desk is drawn with 5 seats and exactly fills the
-      // room. Measured raw at 6 it overran the capacity and the Add button was dead.
-      expect(canAddDesk(null, room, table, "standard", null)).toBe(true);
-      // That one desk fills the room, so a second is still refused.
-      expect(canAddDesk([{ id: "a", seats: 5 }], room, table, "standard", null)).toBe(false);
+      // Desks of 5, 5 and 3 seat 13, leaving room for exactly one more 5-seat desk (18).
+      // Measured raw at 6 it would total 19 against 18 and the Add button would be dead.
+      const seated = [5, 5, 3].map((seats, i) => ({ id: `d${i}`, seats }));
+      expect(canAddDesk(seated, room, table, "standard", null)).toBe(true);
+      // Three full desks (15) cannot take another 5.
+      expect(canAddDesk([5, 5, 5].map((seats, i) => ({ id: `f${i}`, seats })), room, table, "standard", null)).toBe(false);
     });
   });
 });
