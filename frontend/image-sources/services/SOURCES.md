@@ -15,7 +15,7 @@ keep working.
 | `consulting-1.jpg` | Supplied by client (AI-generated), 2026-10-17 |
 | `consulting-2.jpg` | Supplied by client (AI-generated), 2026-10-18 |
 | `deployment-configuration-1.jpg` | https://unsplash.com/photos/photo-1676275774895-7fbba85dce94 |
-| `deployment-configuration-2.jpg` | https://unsplash.com/photos/photo-1544197150-b99a580bb7a8 |
+| `deployment-configuration-2.jpg` | https://unsplash.com/photos/photo-1544197150-b99a580bb7a8 — superseded in `public/`, see note |
 | `managed-support-1.jpg` | https://unsplash.com/photos/photo-1551434678-e076c223a692 |
 | `managed-support-2.jpg` | https://unsplash.com/photos/photo-1594915440248-1e419eba6611 |
 | `video-conferencing-rentals-1.jpg` | https://unsplash.com/photos/photo-1573497161249-42447f9f6706 |
@@ -28,3 +28,13 @@ keep working.
 | `relocation-office-moves-2.jpg` | https://unsplash.com/photos/photo-1679395561581-9d9bc2584047 |
 | `training-adoption-1.jpg` | https://unsplash.com/photos/photo-1542744173-8e7e53415bb0 |
 | `training-adoption-2.jpg` | https://unsplash.com/photos/photo-1758691736548-073bc97cdff4 |
+
+**Exception — `deployment-configuration-2`:** the variants served from
+`public/img/services/` were supplied as finished images on 2026-10-18 and do **not**
+come from the source file above, which is still the original Unsplash photo. Nothing
+in `image-sources/` reproduces them, so `scripts/optimize-images.sh` will regenerate
+that set from the Unsplash original and silently replace the supplied artwork. Put the
+original in `image-sources/` and correct the row above before running the script again.
+
+Note the service's hero (`deployment-configuration-1`) is still the Unsplash
+photograph, so the two images on that page do not currently share a visual style.
