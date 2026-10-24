@@ -12,8 +12,8 @@ keep working.
 
 | File | Unsplash photo |
 | --- | --- |
-| `consulting-1.jpg` | https://unsplash.com/photos/photo-1758873269035-aae0e1fd3422 |
-| `consulting-2.jpg` | https://unsplash.com/photos/photo-1552664730-d307ca884978 |
+| `consulting-1.jpg` | Supplied by client (AI-generated), 2026-10-17 |
+| `consulting-2.jpg` | Supplied by client (AI-generated), 2026-10-18 |
 | `deployment-configuration-1.jpg` | https://unsplash.com/photos/photo-1676275774895-7fbba85dce94 |
 | `deployment-configuration-2.jpg` | https://unsplash.com/photos/photo-1544197150-b99a580bb7a8 |
 | `managed-support-1.jpg` | https://unsplash.com/photos/photo-1551434678-e076c223a692 |
